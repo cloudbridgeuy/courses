@@ -1,0 +1,406 @@
+/* CloudBridge brand stylesheet — Montserrat, brand palette, document layout. */
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/static/montserrat.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --cb-ink: #2d2926;
+  --cb-blue: #5dc8f0;
+  --cb-teal: #5fc8be;
+  --cb-grey: #75787b;
+  --cb-link: #0a7ea4;
+  --cb-page: #ffffff;
+  --cb-card: #ffffff;
+  --cb-border: #e2e6e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.65;
+  color: var(--cb-ink);
+  background: var(--cb-page);
+}
+
+/* --- Chrome: header band, gradient strip, footer --- */
+
+.cb-header {
+  background: var(--cb-ink);
+  padding: 1rem 1.25rem;
+}
+
+.cb-header a {
+  display: inline-block;
+}
+
+.cb-header img {
+  height: 2.2rem;
+  width: auto;
+  display: block;
+}
+
+.cb-strip {
+  height: 4px;
+  background: linear-gradient(90deg, var(--cb-teal), var(--cb-blue));
+}
+
+.cb-footer {
+  background: var(--cb-ink);
+  color: #cfd2d4;
+  padding: 1.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.cb-footer img {
+  height: 1.6rem;
+  width: auto;
+}
+
+/* --- Document body --- */
+
+main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0.5rem 0 1.5rem;
+}
+
+h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-top: 2.75rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--cb-teal);
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+a {
+  color: var(--cb-link);
+  text-decoration-color: var(--cb-blue);
+}
+
+/* Section nav */
+
+nav[aria-label="Contenido"] {
+  background: #f5f8fa;
+  border: 1px solid var(--cb-border);
+  border-left: 4px solid var(--cb-teal);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+nav[aria-label="Contenido"] ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+nav[aria-label="Contenido"] a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+nav[aria-label="Contenido"] a:hover {
+  text-decoration: underline;
+}
+
+/* Index page course cards */
+
+main > ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+main > ul > li > a {
+  display: block;
+  padding: 1.1rem 1.25rem;
+  background: var(--cb-card);
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+main > ul > li > a:hover {
+  border-color: var(--cb-teal);
+  box-shadow: 0 2px 12px rgba(95, 200, 190, 0.18);
+}
+
+/* Code */
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: #eef1f3;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+pre {
+  background: var(--cb-ink);
+  color: #e8e8e8;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* Tables */
+
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--cb-border);
+  padding: 0.4rem 0.8rem;
+}
+
+/* Course→session→section tree */
+
+.cb-tree {
+  list-style: none;
+  padding: 0;
+}
+
+.cb-tree a {
+  text-decoration: none;
+}
+
+.cb-tree a:hover {
+  text-decoration: underline;
+}
+
+.cb-tree ul {
+  list-style: none;
+  padding-left: 1.25rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+details.cb-tree-course {
+  display: block;
+  background: var(--cb-card);
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  padding: 0 1.25rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+details.cb-tree-course:hover {
+  border-color: var(--cb-teal);
+  box-shadow: 0 2px 12px rgba(95, 200, 190, 0.18);
+}
+
+details.cb-tree-course > summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--cb-ink);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0;
+}
+
+details.cb-tree-course[open] > ul {
+  padding-bottom: 1rem;
+}
+
+details.cb-tree-course > summary::before {
+  content: "▸";
+  font-size: 0.75rem;
+  color: var(--cb-grey);
+  transition: transform 0.15s ease;
+  display: inline-block;
+  width: 0.9rem;
+  text-align: center;
+}
+
+details.cb-tree-course[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details.cb-tree-course > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cb-tree-session > a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cb-tree li {
+  margin: 0.3rem 0;
+}
+
+/* Session footer nav */
+
+.cb-session-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+.cb-session-nav a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cb-session-nav a:hover {
+  text-decoration: underline;
+}
+
+.cb-prev {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.cb-up {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.cb-next {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* Solution cards */
+
+.solucion {
+  margin: 1.25rem 0;
+  border: 1px solid var(--cb-border);
+  border-left: 4px solid var(--cb-teal);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.solucion-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--cb-teal);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.solucion-toggle:hover {
+  background: #4fb3aa;
+}
+
+.solucion-cuerpo {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+/* Scroll-to-top button — only appears in wide viewports (margin space available) */
+
+#cb-top-btn {
+  position: fixed;
+  bottom: 2rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--cb-teal);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 2.5rem;
+  text-align: center;
+  text-decoration: none;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+#cb-top-btn:hover {
+  background: #4fb3aa;
+}
+
+@media (min-width: 56rem) {
+  #cb-top-btn.cb-top-visible {
+    display: block;
+    opacity: 1;
+  }
+}
+
+/* Slideshow entry link on session pages */
+
+.cb-slides-link {
+  margin: 0 0 1.5rem;
+}
+
+.cb-slides-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  background: var(--cb-teal);
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.cb-slides-link a:hover {
+  background: #4fb3aa;
+  text-decoration: none;
+}

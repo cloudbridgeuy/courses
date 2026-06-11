@@ -147,6 +147,7 @@ pub struct SessionPage<'a> {
     pub assets: &'a PageAssets,
     pub prev: Option<&'a Session>,
     pub next: Option<&'a Session>,
+    pub has_slides: bool,
 }
 
 /// Renders one session as a complete HTML document: the section nav, the
@@ -174,8 +175,60 @@ pub fn render_session_page(input: &SessionPage<'_>) -> String {
     let footer_nav = render_session_footer_nav(&course_slug, input.prev, input.next);
 
     let title = escape_html(&input.session.title);
-    let main = format!("<h1>{title}</h1>\n{nav}{sections}{footer_nav}");
+    let slides_link = if input.has_slides {
+        format!(
+            "<p class=\"cb-slides-link\"><a href=\"/courses/{course_slug}/{session_slug}/slides\">▶ Ver diapositivas</a></p>\n",
+            session_slug = escape_html(input.session.slug.as_str())
+        )
+    } else {
+        String::new()
+    };
+    let main = format!("<h1>{title}</h1>\n{slides_link}{nav}{sections}{footer_nav}");
     page("es", &title, &render_head_assets(input.assets), &main)
+}
+
+/// Renders a reveal.js slideshow for one session.
+///
+/// Each element of `slides_html` becomes one `<section>` in the `.slides`
+/// container. Returns an empty-slides page when `slides_html` is empty (the
+/// route is only registered when slides exist, so this is a safety net).
+pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[String]) -> String {
+    let course_slug = escape_html(course.slug.as_str());
+    let session_slug = escape_html(session.slug.as_str());
+    let title = escape_html(&session.title);
+    let course_title = escape_html(&course.title);
+
+    let mut sections = String::new();
+    for slide in slides_html {
+        sections.push_str("<section>\n");
+        sections.push_str(slide);
+        sections.push_str("</section>\n");
+    }
+
+    format!(
+        "<!doctype html>\n<html lang=\"es\">\n<head>\n\
+         <meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+         <title>{title} — Diapositivas</title>\n\
+         <link rel=\"stylesheet\" href=\"/static/reveal.min.css\">\n\
+         <link rel=\"stylesheet\" href=\"/static/reveal-theme-black.min.css\">\n\
+         <style>\
+.cb-slides-back{{position:fixed;top:1rem;left:1rem;z-index:9999;font-size:0.8rem}}\
+.cb-slides-back a{{color:#fff;text-decoration:none;opacity:0.7}}\
+.cb-slides-back a:hover{{opacity:1}}\
+</style>\n\
+         </head>\n<body>\n\
+         <div class=\"reveal\">\n<div class=\"slides\">\n\
+         {sections}\
+         </div>\n</div>\n\
+         <script src=\"/static/reveal.min.js\"></script>\n\
+         <script>\
+Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
+</script>\n\
+         <div class=\"cb-slides-back\">\
+<a href=\"/courses/{course_slug}/{session_slug}\">← {course_title}</a></div>\n\
+         </body>\n</html>\n"
+    )
 }
 
 /// The bottom session nav: previous, next, and back-to-course links.
@@ -236,12 +289,14 @@ pub fn render_site(courses: &[LoadedCourse]) -> RenderedSite {
 
         let sessions = &loaded.course.sessions;
         for (i, session) in sessions.iter().enumerate() {
+            let has_slides = loaded.session_slides.get(i).is_some_and(|s| !s.is_empty());
             let input = SessionPage {
                 course: &loaded.course,
                 session,
                 assets: &loaded.session_assets[i],
                 prev: i.checked_sub(1).map(|p| &sessions[p]),
                 next: sessions.get(i + 1),
+                has_slides,
             };
             let key = format!("{course_slug}/{}", session.slug.as_str());
             pages.insert(key, render_session_page(&input));
@@ -288,6 +343,7 @@ mod tests {
             assets: &loaded.session_assets[0],
             prev: None,
             next: None,
+            has_slides: false,
         }
     }
 
@@ -383,6 +439,7 @@ mod tests {
             assets: &assets,
             prev: None,
             next: None,
+            has_slides: false,
         };
         let html = render_session_page(&input);
         assert!(html.contains("<script defer src=\"/static/toggle.js\">"));
@@ -416,6 +473,7 @@ mod tests {
             assets: &loaded.session_assets[0],
             prev: None,
             next: Some(&next),
+            has_slides: false,
         };
         let html = render_session_page(&input);
         assert!(!html.contains("cb-prev"));
@@ -437,6 +495,7 @@ mod tests {
             assets: &loaded.session_assets[0],
             prev: Some(&prev),
             next: None,
+            has_slides: false,
         };
         let html = render_session_page(&input);
         assert!(!html.contains("cb-next"));
@@ -463,6 +522,7 @@ mod tests {
             assets: &loaded.session_assets[0],
             prev: Some(&prev),
             next: Some(&next),
+            has_slides: false,
         };
         let html = render_session_page(&input);
         assert!(html.contains("cb-prev"));
@@ -553,6 +613,50 @@ mod tests {
     fn not_found_page_links_to_root() {
         let html = render_not_found_page();
         assert!(html.contains("<a href=\"/\">"));
+    }
+
+    // ── slides link ──────────────────────────────────────────────────────
+
+    #[test]
+    fn session_page_with_slides_shows_slides_link() {
+        let loaded = sample();
+        let input = SessionPage {
+            course: &loaded.course,
+            session: &loaded.course.sessions[0],
+            assets: &loaded.session_assets[0],
+            prev: None,
+            next: None,
+            has_slides: true,
+        };
+        let html = render_session_page(&input);
+        assert!(html.contains("Ver diapositivas"));
+        assert!(html.contains("/courses/aws-devops/semana-1/slides"));
+    }
+
+    #[test]
+    fn session_page_without_slides_hides_slides_link() {
+        let loaded = sample();
+        let html = render_session_page(&sample_session_page(&loaded));
+        assert!(!html.contains("Ver diapositivas"));
+    }
+
+    #[test]
+    fn slideshow_page_wraps_each_slide_in_section_tag() {
+        let loaded = sample();
+        let slides = vec![
+            "<p>Slide one</p>\n".to_owned(),
+            "<p>Slide two</p>\n".to_owned(),
+        ];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains("<div class=\"reveal\">"));
+        assert!(html.contains("<div class=\"slides\">"));
+        let count = html.matches("<section>").count();
+        assert_eq!(count, 2);
+        assert!(html.contains("Slide one"));
+        assert!(html.contains("Slide two"));
+        assert!(html.contains("reveal.min.js"));
+        assert!(html.contains("Diapositivas"));
+        assert!(html.contains("cb-slides-back"));
     }
 
     // ── render_site ───────────────────────────────────────────────────────

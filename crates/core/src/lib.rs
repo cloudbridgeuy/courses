@@ -25,7 +25,7 @@ pub use manifest::{Manifest, parse_manifest};
 pub use markdown::render_markdown;
 pub use render::{
     RenderedSite, SessionPage, escape_html, render_index_page, render_landing_page,
-    render_not_found_page, render_session_page, render_site, render_tree,
+    render_not_found_page, render_session_page, render_site, render_slideshow_page, render_tree,
 };
 pub use section::{Frontmatter, parse_frontmatter, split_frontmatter};
 pub use solutions::{RenderedBody, Segment, render_section_body, split_solutions};
