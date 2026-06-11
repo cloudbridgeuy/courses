@@ -6,8 +6,8 @@ pub const TOGGLE_JS_PATH: &str = "/static/toggle.js";
 pub const REVEAL_JS_PATH: &str = "/static/reveal.min.js";
 /// URL path of the reveal.js base stylesheet.
 pub const REVEAL_CSS_PATH: &str = "/static/reveal.min.css";
-/// URL path of the reveal.js black theme stylesheet.
-pub const REVEAL_THEME_PATH: &str = "/static/reveal-theme-black.min.css";
+/// URL path of the CloudBridge slideshow theme stylesheet.
+pub const SLIDES_CSS_PATH: &str = "/static/slides.css";
 
 /// The stylesheets, and scripts, a rendered page must reference, in order,
 /// without duplicates.

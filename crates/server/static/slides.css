@@ -1,0 +1,108 @@
+/* CloudBridge slideshow theme — replaces reveal.js stock themes.
+   Loaded only on /courses/{slug}/{session}/slides, alongside reveal.min.css. */
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/static/montserrat.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --cb-ink: #2d2926;
+  --cb-blue: #5dc8f0;
+  --cb-teal: #5fc8be;
+  --r-background-color: #2d2926;
+  --r-main-font: "Montserrat", system-ui, sans-serif;
+  --r-main-font-size: 38px;
+  --r-main-color: #ffffff;
+  --r-heading-font: "Montserrat", system-ui, sans-serif;
+  --r-heading-color: #ffffff;
+  --r-heading-text-transform: none;
+  --r-link-color: #5dc8f0;
+  --r-link-color-hover: #8ddaf5;
+  --r-selection-background-color: #5fc8be;
+  --r-selection-color: #2d2926;
+}
+
+.reveal-viewport {
+  background: var(--cb-ink);
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.reveal h2 {
+  padding-bottom: 0.25em;
+  border-bottom: 3px solid var(--cb-teal);
+  display: inline-block;
+}
+
+.reveal pre,
+.reveal code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.reveal pre {
+  background: #221f1d;
+  border-left: 4px solid var(--cb-teal);
+  border-radius: 4px;
+  padding: 0.6em 0.9em;
+  font-size: 0.6em;
+  line-height: 1.5;
+  box-shadow: none;
+}
+
+.reveal table {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 0.75em;
+}
+
+.reveal th {
+  color: var(--cb-teal);
+  border-bottom: 2px solid var(--cb-teal);
+  padding: 0.3em 0.8em;
+  text-align: left;
+}
+
+.reveal td {
+  border-bottom: 1px solid #4a4542;
+  padding: 0.3em 0.8em;
+}
+
+.reveal .controls,
+.reveal .progress {
+  color: var(--cb-teal);
+}
+
+/* Close button: top-right, circular ghost, back to the session guide. */
+
+.cb-slides-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  color: #fff;
+  opacity: 0.6;
+  font-size: 1.4rem;
+  line-height: 1;
+  text-decoration: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.cb-slides-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}

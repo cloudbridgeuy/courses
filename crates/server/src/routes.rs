@@ -11,7 +11,7 @@ const TOGGLE_JS: &str = include_str!("../static/toggle.js");
 const GUIDE_CSS: &str = include_str!("../static/guide.css");
 const REVEAL_JS: &str = include_str!("../static/reveal.min.js");
 const REVEAL_CSS: &str = include_str!("../static/reveal.min.css");
-const REVEAL_THEME_CSS: &str = include_str!("../static/reveal-theme-black.min.css");
+const SLIDES_CSS: &str = include_str!("../static/slides.css");
 const MONTSERRAT_TTF: &[u8] = include_bytes!("../static/montserrat.ttf");
 const CLOUDBRIDGE_PNG: &[u8] = include_bytes!("../static/cloudbridge.png");
 const CLOUDBRIDGE_WHITE_PNG: &[u8] = include_bytes!("../static/cloudbridge-white.png");
@@ -39,31 +39,27 @@ async fn index(State(site): State<Arc<RenderedSite>>) -> Html<String> {
 
 async fn course_page(State(site): State<Arc<RenderedSite>>, Path(slug): Path<String>) -> Response {
     // Pages are keyed by parsed slugs, so any invalid slug simply misses.
-    match site.pages.get(&slug) {
-        Some(html) => Html(html.clone()).into_response(),
-        None => not_found(&site),
-    }
+    lookup_page(&site, &slug)
 }
 
 async fn session_page(
     State(site): State<Arc<RenderedSite>>,
     Path((slug, session)): Path<(String, String)>,
 ) -> Response {
-    let key = format!("{slug}/{session}");
-    match site.pages.get(&key) {
-        Some(html) => Html(html.clone()).into_response(),
-        None => not_found(&site),
-    }
+    lookup_page(&site, &format!("{slug}/{session}"))
 }
 
 async fn slides_page(
     State(site): State<Arc<RenderedSite>>,
     Path((slug, session)): Path<(String, String)>,
 ) -> Response {
-    let key = format!("{slug}/{session}/slides");
-    match site.pages.get(&key) {
+    lookup_page(&site, &format!("{slug}/{session}/slides"))
+}
+
+fn lookup_page(site: &RenderedSite, key: &str) -> Response {
+    match site.pages.get(key) {
         Some(html) => Html(html.clone()).into_response(),
-        None => not_found(&site),
+        None => not_found(site),
     }
 }
 
@@ -75,7 +71,7 @@ async fn static_file(State(site): State<Arc<RenderedSite>>, Path(file): Path<Str
         "guide.css" => asset("text/css; charset=utf-8", GUIDE_CSS),
         "reveal.min.js" => asset("application/javascript; charset=utf-8", REVEAL_JS),
         "reveal.min.css" => asset("text/css; charset=utf-8", REVEAL_CSS),
-        "reveal-theme-black.min.css" => asset("text/css; charset=utf-8", REVEAL_THEME_CSS),
+        "slides.css" => asset("text/css; charset=utf-8", SLIDES_CSS),
         "montserrat.ttf" => bytes("font/ttf", MONTSERRAT_TTF),
         "cloudbridge.png" => bytes("image/png", CLOUDBRIDGE_PNG),
         "cloudbridge-white.png" => bytes("image/png", CLOUDBRIDGE_WHITE_PNG),

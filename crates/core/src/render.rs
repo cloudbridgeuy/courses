@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 
-use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, REVEAL_THEME_PATH};
+use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH};
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
 
@@ -23,16 +24,15 @@ pub fn escape_html(raw: &str) -> String {
 fn render_head_assets(assets: &PageAssets) -> String {
     let mut out = String::new();
     for href in &assets.styles {
-        out.push_str(&format!(
-            "<link rel=\"stylesheet\" href=\"{}\">\n",
+        // Infallible: writing to a String never fails.
+        let _ = writeln!(
+            out,
+            "<link rel=\"stylesheet\" href=\"{}\">",
             escape_html(href)
-        ));
+        );
     }
     for src in &assets.scripts {
-        out.push_str(&format!(
-            "<script defer src=\"{}\"></script>\n",
-            escape_html(src)
-        ));
+        let _ = writeln!(out, "<script defer src=\"{}\"></script>", escape_html(src));
     }
     out
 }
@@ -197,14 +197,11 @@ pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[
     let course_slug = escape_html(course.slug.as_str());
     let session_slug = escape_html(session.slug.as_str());
     let title = escape_html(&session.title);
-    let course_title = escape_html(&course.title);
 
-    let mut sections = String::new();
-    for slide in slides_html {
-        sections.push_str("<section>\n");
-        sections.push_str(slide);
-        sections.push_str("</section>\n");
-    }
+    let sections: String = slides_html
+        .iter()
+        .map(|slide| format!("<section>\n{slide}</section>\n"))
+        .collect();
 
     format!(
         "<!doctype html>\n<html lang=\"es\">\n<head>\n\
@@ -212,12 +209,7 @@ pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title} — Diapositivas</title>\n\
          <link rel=\"stylesheet\" href=\"{REVEAL_CSS_PATH}\">\n\
-         <link rel=\"stylesheet\" href=\"{REVEAL_THEME_PATH}\">\n\
-         <style>\
-.cb-slides-back{{position:fixed;top:1rem;left:1rem;z-index:9999;font-size:0.8rem}}\
-.cb-slides-back a{{color:#fff;text-decoration:none;opacity:0.7}}\
-.cb-slides-back a:hover{{opacity:1}}\
-</style>\n\
+         <link rel=\"stylesheet\" href=\"{SLIDES_CSS_PATH}\">\n\
          </head>\n<body>\n\
          <div class=\"reveal\">\n<div class=\"slides\">\n\
          {sections}\
@@ -226,8 +218,8 @@ pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[
          <script>\
 Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
 </script>\n\
-         <div class=\"cb-slides-back\">\
-<a href=\"/courses/{course_slug}/{session_slug}\">← {course_title}</a></div>\n\
+         <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
+aria-label=\"Cerrar diapositivas\">✕</a>\n\
          </body>\n</html>\n"
     )
 }
@@ -408,9 +400,13 @@ mod tests {
     #[test]
     fn render_escapes_titles() {
         let loaded = sample();
-        let html = render_session_page(&sample_session_page(&loaded));
-        assert!(html.contains("Taller &lt;AWS&gt; &amp; DevOps") || html.contains("Semana 1"));
-        assert!(!html.contains("<AWS>"));
+        // Course title escaping: render_landing_page puts the course title in <h1> and <title>.
+        let landing_html = render_landing_page(&loaded);
+        assert!(landing_html.contains("Taller &lt;AWS&gt; &amp; DevOps"));
+        assert!(!landing_html.contains("Taller <AWS>"));
+        // Session title: render_session_page puts the session title in <h1>.
+        let session_html = render_session_page(&sample_session_page(&loaded));
+        assert!(session_html.contains("Semana 1"));
     }
 
     #[test]
@@ -665,9 +661,22 @@ mod tests {
         assert!(html.contains("Slide two"));
         assert!(html.contains("reveal.min.js"));
         assert!(html.contains("Diapositivas"));
-        assert!(html.contains("cb-slides-back"));
-        // back-link must appear before </body>
-        assert!(html.find("cb-slides-back").unwrap() < html.find("</body>").unwrap());
+        assert!(html.contains("cb-slides-close"));
+        assert!(html.contains("aria-label=\"Cerrar diapositivas\""));
+        assert!(html.contains("slides.css"));
+        assert!(!html.contains("reveal-theme-black"));
+        // close button must appear before </body>
+        assert!(html.find("cb-slides-close").unwrap() < html.find("</body>").unwrap());
+    }
+
+    #[test]
+    fn slideshow_close_button_links_to_session_guide() {
+        let loaded = sample();
+        let slides = vec!["<p>One</p>\n".to_owned()];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(
+            html.contains("<a class=\"cb-slides-close\" href=\"/courses/aws-devops/semana-1\"")
+        );
     }
 
     // ── render_site ───────────────────────────────────────────────────────
