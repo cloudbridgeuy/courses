@@ -1,0 +1,15 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+color-eyre = { workspace = true }
+duct = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,50 @@
+[workspace]
+members = ["xtask/", "crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+authors = ["Guzmán Monné"]
+rust-version = "1.95.0"
+publish = false
+
+[workspace.lints.clippy]
+# Note: unwrap_used and expect_used are enabled in lib.rs/main.rs via #![deny(...)]
+# rather than here, so test code can still use .unwrap() for brevity.
+
+# Make Impossible States Impossible — force explicit variant names, no glob imports
+enum_glob_use = "deny"
+wildcard_imports = "deny"
+
+# Parse Don't Validate — cleaner early returns at boundaries
+manual_let_else = "warn"
+
+# Algebraic Data Types — catch enums with huge size disparity between variants
+large_enum_variant = "warn"
+
+# Clarity — make clones and copies visible and intentional
+implicit_clone = "warn"
+cloned_instead_of_copied = "warn"
+redundant_closure_for_method_calls = "warn"
+needless_pass_by_value = "warn"
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+incremental = true
+debug = 0
+
+[workspace.dependencies]
+courses_core = { path = "crates/core" }
+
+axum = "0.8"
+clap = { version = "4.5", features = ["derive"] }
+color-eyre = "0.6"
+duct = "0.13"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

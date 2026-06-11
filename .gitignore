@@ -1,0 +1,12 @@
+/target/
+**/xtask-lint.log
+
+.claude/*
+!.claude/context/
+!.claude/commands/
+!.claude/designs/
+!.claude/plans/
+
+.envrc
+.local/
+.DS_Store
