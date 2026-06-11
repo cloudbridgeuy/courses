@@ -17,6 +17,29 @@ Código → Build → Test → Deploy → Monitor
 ```
 :::
 
+:::slide
+## Ejercicios de la sesión
+
+1. Crear el repositorio y subir el código
+2. Construir la imagen con CodeBuild
+3. Publicar la imagen en ECR
+4. Desplegar la plantilla de CloudFormation
+
+Cada ejercicio incluye su solución oculta — botón **Ver solución** en la guía.
+:::
+
+:::slide
+## Servicios del taller
+
+| Servicio | Rol en el pipeline |
+| --- | --- |
+| CodeCommit | Repositorio de código fuente |
+| CodeBuild | Construcción de la imagen |
+| ECR | Registro de imágenes Docker |
+| CloudFormation | Infraestructura como código |
+| ECS + Fargate | Ejecución de contenedores |
+:::
+
 ## La narrativa del taller
 
 Durante cuatro semanas usted desplegará y operará una aplicación web real de principio a fin,
