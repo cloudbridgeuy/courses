@@ -23,6 +23,7 @@ pub fn router(site: Arc<RenderedSite>) -> Router {
         .route("/courses", get(index))
         .route("/courses/{slug}", get(course_page))
         .route("/courses/{slug}/{session}", get(session_page))
+        .route("/courses/{slug}/{session}/slides", get(slides_page))
         .route("/static/{file}", get(static_file))
         .route("/health", get(health))
         .with_state(site)
@@ -49,6 +50,17 @@ async fn session_page(
     Path((slug, session)): Path<(String, String)>,
 ) -> Response {
     let key = format!("{slug}/{session}");
+    match site.pages.get(&key) {
+        Some(html) => Html(html.clone()).into_response(),
+        None => not_found(&site),
+    }
+}
+
+async fn slides_page(
+    State(site): State<Arc<RenderedSite>>,
+    Path((slug, session)): Path<(String, String)>,
+) -> Response {
+    let key = format!("{slug}/{session}/slides");
     match site.pages.get(&key) {
         Some(html) => Html(html.clone()).into_response(),
         None => not_found(&site),

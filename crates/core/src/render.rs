@@ -289,17 +289,25 @@ pub fn render_site(courses: &[LoadedCourse]) -> RenderedSite {
 
         let sessions = &loaded.course.sessions;
         for (i, session) in sessions.iter().enumerate() {
-            let has_slides = loaded.session_slides.get(i).is_some_and(|s| !s.is_empty());
+            let slides = &loaded.session_slides[i];
             let input = SessionPage {
                 course: &loaded.course,
                 session,
                 assets: &loaded.session_assets[i],
                 prev: i.checked_sub(1).map(|p| &sessions[p]),
                 next: sessions.get(i + 1),
-                has_slides,
+                has_slides: !slides.is_empty(),
             };
             let key = format!("{course_slug}/{}", session.slug.as_str());
             pages.insert(key, render_session_page(&input));
+
+            if !slides.is_empty() {
+                let slides_key = format!("{course_slug}/{}/slides", session.slug.as_str());
+                pages.insert(
+                    slides_key,
+                    render_slideshow_page(&loaded.course, session, slides),
+                );
+            }
         }
     }
     RenderedSite {
@@ -657,6 +665,8 @@ mod tests {
         assert!(html.contains("reveal.min.js"));
         assert!(html.contains("Diapositivas"));
         assert!(html.contains("cb-slides-back"));
+        // back-link must appear before </body>
+        assert!(html.find("cb-slides-back").unwrap() < html.find("</body>").unwrap());
     }
 
     // ── render_site ───────────────────────────────────────────────────────
@@ -676,5 +686,21 @@ mod tests {
         assert!(!site.index_html.is_empty());
         assert!(!site.pages.is_empty());
         assert!(!site.not_found_html.is_empty());
+    }
+
+    #[test]
+    fn render_site_keys_slideshow_page_when_slides_present() {
+        let slides_html = vec!["<p>One</p>\n".to_owned()];
+        let mut courses = vec![make_loaded("aws-devops", "AWS DevOps")];
+        courses[0].session_slides = vec![slides_html];
+        let site = render_site(&courses);
+        assert!(site.pages.contains_key("aws-devops/s1/slides"));
+    }
+
+    #[test]
+    fn render_site_skips_slideshow_page_when_no_slides() {
+        let courses = vec![make_loaded("aws-devops", "AWS DevOps")];
+        let site = render_site(&courses);
+        assert!(!site.pages.contains_key("aws-devops/s1/slides"));
     }
 }
