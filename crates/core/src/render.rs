@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::assets::PageAssets;
+use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, REVEAL_THEME_PATH};
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
 
@@ -191,7 +191,8 @@ pub fn render_session_page(input: &SessionPage<'_>) -> String {
 ///
 /// Each element of `slides_html` becomes one `<section>` in the `.slides`
 /// container. Returns an empty-slides page when `slides_html` is empty (the
-/// route is only registered when slides exist, so this is a safety net).
+/// route key is only inserted by `render_site` when slides are non-empty, so
+/// this is a safety net for direct callers).
 pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[String]) -> String {
     let course_slug = escape_html(course.slug.as_str());
     let session_slug = escape_html(session.slug.as_str());
@@ -210,8 +211,8 @@ pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[
          <meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title} — Diapositivas</title>\n\
-         <link rel=\"stylesheet\" href=\"/static/reveal.min.css\">\n\
-         <link rel=\"stylesheet\" href=\"/static/reveal-theme-black.min.css\">\n\
+         <link rel=\"stylesheet\" href=\"{REVEAL_CSS_PATH}\">\n\
+         <link rel=\"stylesheet\" href=\"{REVEAL_THEME_PATH}\">\n\
          <style>\
 .cb-slides-back{{position:fixed;top:1rem;left:1rem;z-index:9999;font-size:0.8rem}}\
 .cb-slides-back a{{color:#fff;text-decoration:none;opacity:0.7}}\
@@ -221,7 +222,7 @@ pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[
          <div class=\"reveal\">\n<div class=\"slides\">\n\
          {sections}\
          </div>\n</div>\n\
-         <script src=\"/static/reveal.min.js\"></script>\n\
+         <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script>\
 Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
 </script>\n\

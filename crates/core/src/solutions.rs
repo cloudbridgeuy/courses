@@ -13,6 +13,9 @@ pub enum Segment {
 ///
 /// Fences must sit alone on their line. Nesting is rejected; an unclosed
 /// block is rejected.
+///
+/// Note: `":::slide"` has no space; `"::: solucion"` uses a space.
+/// Writing `"::: slide"` (with a space) is silently treated as plain Markdown.
 pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
     enum State {
         Outside,
