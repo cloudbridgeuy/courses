@@ -349,7 +349,8 @@ details.cb-tree-course > summary::-webkit-details-marker {
 
 /* Scroll-to-top button — only appears in wide viewports (margin space available) */
 
-#cb-top-btn {
+#cb-top-btn,
+#cb-back-btn {
   position: fixed;
   bottom: 2rem;
   right: 1rem;
@@ -369,12 +370,14 @@ details.cb-tree-course > summary::-webkit-details-marker {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
-#cb-top-btn:hover {
+#cb-top-btn:hover,
+#cb-back-btn:hover {
   background: #4fb3aa;
 }
 
 @media (min-width: 56rem) {
-  #cb-top-btn.cb-top-visible {
+  #cb-top-btn.cb-top-visible,
+  #cb-back-btn.cb-top-visible {
     display: block;
     opacity: 1;
   }

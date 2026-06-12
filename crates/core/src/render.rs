@@ -72,8 +72,13 @@ fn page(lang: &str, title_html: &str, head_extra: &str, main_html: &str) -> Stri
          <title>{title_html}</title>\n{head_extra}</head>\n<body>\n\
          {header}<main>\n{main_html}</main>\n{footer}\
          <a href=\"#top\" id=\"cb-top-btn\" aria-label=\"Volver arriba\">↑</a>\n\
-         <script>var b=document.getElementById('cb-top-btn'),f=document.querySelector('.cb-footer');\
-window.addEventListener('scroll',function(){{b.classList.toggle('cb-top-visible',scrollY>300);}});\
+         <a href=\"#\" id=\"cb-back-btn\" aria-label=\"Volver a la posición anterior\">↓</a>\n\
+         <script>var b=document.getElementById('cb-top-btn'),r=document.getElementById('cb-back-btn'),\
+f=document.querySelector('.cb-footer'),saved=null;\
+b.addEventListener('click',function(){{saved=scrollY;}});\
+r.addEventListener('click',function(e){{e.preventDefault();var y=saved;saved=null;scrollTo({{top:y}});}});\
+window.addEventListener('scroll',function(){{b.classList.toggle('cb-top-visible',scrollY>300);\
+r.classList.toggle('cb-top-visible',saved!==null&&scrollY<=300);}});\
 new IntersectionObserver(function(e){{b.style.bottom=e[0].isIntersecting?(f.offsetHeight+12)+'px':'';}}).observe(f);\
 </script>\n\
          </body>\n</html>\n"
