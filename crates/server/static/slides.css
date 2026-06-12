@@ -112,6 +112,37 @@
   color: var(--cb-teal);
 }
 
+/* Light slide variant: :::slide light → <section class="cb-light">. */
+
+.reveal section.cb-light {
+  background: #f5f4f2;
+}
+
+.reveal section.cb-light h1,
+.reveal section.cb-light h2,
+.reveal section.cb-light h3 {
+  color: var(--cb-ink);
+}
+
+.reveal section.cb-light h2 {
+  border-bottom-color: var(--cb-teal);
+}
+
+.reveal section.cb-light p,
+.reveal section.cb-light li,
+.reveal section.cb-light td,
+.reveal section.cb-light th {
+  color: var(--cb-ink);
+}
+
+.reveal section.cb-light th {
+  border-bottom-color: var(--cb-teal);
+}
+
+.reveal section.cb-light td {
+  border-bottom-color: #ccc9c6;
+}
+
 /* Close button: top-right, circular ghost, back to the session guide. */
 
 .cb-slides-close {

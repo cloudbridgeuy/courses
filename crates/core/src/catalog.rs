@@ -3,7 +3,7 @@ use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
 use crate::manifest::{SessionEntry, parse_manifest};
 use crate::section::{parse_frontmatter, split_frontmatter};
-use crate::solutions::render_section_body;
+use crate::solutions::{SlideFragment, render_section_body};
 
 /// Raw inputs for one course: its slug, its manifest TOML, and its section
 /// files as `(file name, contents)` pairs.
@@ -21,9 +21,9 @@ pub struct CourseInput<'a> {
 pub struct LoadedCourse {
     pub course: Course,
     pub session_assets: Vec<PageAssets>,
-    /// Rendered slide HTML fragments per session, in section order.
+    /// Rendered slide fragments per session, in section order.
     /// Index-aligned with `course.sessions`.
-    pub session_slides: Vec<Vec<String>>,
+    pub session_slides: Vec<Vec<SlideFragment>>,
 }
 
 /// Parses raw course inputs into a [`LoadedCourse`] (parse, don't validate).
@@ -61,7 +61,7 @@ pub fn parse_course(input: &CourseInput<'_>) -> Result<LoadedCourse> {
 fn assemble_session(
     entry: &SessionEntry,
     files: &[(String, String)],
-) -> Result<(Session, PageAssets, Vec<String>)> {
+) -> Result<(Session, PageAssets, Vec<SlideFragment>)> {
     let session_slug = SessionSlug::parse(&entry.slug)?;
     let mut assets = PageAssets::base();
     let mut sections = Vec::with_capacity(entry.sections.len());
@@ -383,9 +383,9 @@ mod tests {
         let loaded = parse_course(&input).unwrap();
         let slides = &loaded.session_slides[0];
         assert_eq!(slides.len(), 3);
-        assert!(slides[0].contains("Slide A"));
-        assert!(slides[1].contains("Slide B"));
-        assert!(slides[2].contains("Slide C"));
+        assert!(slides[0].html.contains("Slide A"));
+        assert!(slides[1].html.contains("Slide B"));
+        assert!(slides[2].html.contains("Slide C"));
     }
 
     #[test]

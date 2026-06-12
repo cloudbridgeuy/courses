@@ -4,6 +4,7 @@ use std::fmt::Write as FmtWrite;
 use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH};
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
+use crate::solutions::SlideFragment;
 
 /// Escapes the five HTML-significant characters in `raw`.
 pub fn escape_html(raw: &str) -> String {
@@ -193,14 +194,25 @@ pub fn render_session_page(input: &SessionPage<'_>) -> String {
 /// container. Returns an empty-slides page when `slides_html` is empty (the
 /// route key is only inserted by `render_site` when slides are non-empty, so
 /// this is a safety net for direct callers).
-pub fn render_slideshow_page(course: &Course, session: &Session, slides_html: &[String]) -> String {
+pub fn render_slideshow_page(
+    course: &Course,
+    session: &Session,
+    slides_html: &[SlideFragment],
+) -> String {
     let course_slug = escape_html(course.slug.as_str());
     let session_slug = escape_html(session.slug.as_str());
     let title = escape_html(&session.title);
 
     let sections: String = slides_html
         .iter()
-        .map(|slide| format!("<section>\n{slide}</section>\n"))
+        .map(|slide| {
+            let class = if slide.light {
+                " class=\"cb-light\""
+            } else {
+                ""
+            };
+            format!("<section{class}>\n{}</section>\n", slide.html)
+        })
         .collect();
 
     format!(
@@ -652,8 +664,14 @@ mod tests {
     fn slideshow_page_wraps_each_slide_in_section_tag() {
         let loaded = sample();
         let slides = vec![
-            "<p>Slide one</p>\n".to_owned(),
-            "<p>Slide two</p>\n".to_owned(),
+            SlideFragment {
+                html: "<p>Slide one</p>\n".to_owned(),
+                light: false,
+            },
+            SlideFragment {
+                html: "<p>Slide two</p>\n".to_owned(),
+                light: false,
+            },
         ];
         let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
         assert!(html.contains("<div class=\"reveal\">"));
@@ -675,11 +693,32 @@ mod tests {
     #[test]
     fn slideshow_close_button_links_to_session_guide() {
         let loaded = sample();
-        let slides = vec!["<p>One</p>\n".to_owned()];
+        let slides = vec![SlideFragment {
+            html: "<p>One</p>\n".to_owned(),
+            light: false,
+        }];
         let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
         assert!(
             html.contains("<a class=\"cb-slides-close\" href=\"/courses/aws-devops/semana-1\"")
         );
+    }
+
+    #[test]
+    fn light_slide_emits_cb_light_class_dark_slide_does_not() {
+        let loaded = sample();
+        let slides = vec![
+            SlideFragment {
+                html: "<p>Dark</p>\n".to_owned(),
+                light: false,
+            },
+            SlideFragment {
+                html: "<p>Light</p>\n".to_owned(),
+                light: true,
+            },
+        ];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains("<section>\n<p>Dark</p>"));
+        assert!(html.contains("<section class=\"cb-light\">\n<p>Light</p>"));
     }
 
     // ── render_site ───────────────────────────────────────────────────────
@@ -703,7 +742,10 @@ mod tests {
 
     #[test]
     fn render_site_keys_slideshow_page_when_slides_present() {
-        let slides_html = vec!["<p>One</p>\n".to_owned()];
+        let slides_html = vec![SlideFragment {
+            html: "<p>One</p>\n".to_owned(),
+            light: false,
+        }];
         let mut courses = vec![make_loaded("aws-devops", "AWS DevOps")];
         courses[0].session_slides = vec![slides_html];
         let site = render_site(&courses);

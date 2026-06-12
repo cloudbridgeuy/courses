@@ -6,7 +6,14 @@ use crate::markdown::render_markdown;
 pub enum Segment {
     Markdown(String),
     Solution(String),
-    Slide(String),
+    Slide { md: String, light: bool },
+}
+
+/// A rendered slide HTML fragment with its display variant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlideFragment {
+    pub html: String,
+    pub light: bool,
 }
 
 /// Splits a Markdown body on `::: solucion` and `:::slide` / `:::` fenced blocks.
@@ -20,7 +27,7 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
     enum State {
         Outside,
         InSolution,
-        InSlide,
+        InSlide { light: bool },
     }
 
     let mut segments = Vec::new();
@@ -36,11 +43,13 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
                         segments.push(Segment::Markdown(std::mem::take(&mut buf)));
                     }
                     state = State::InSolution;
-                } else if fence == ":::slide" {
+                } else if fence == ":::slide" || fence == ":::slide light" {
                     if !buf.is_empty() {
                         segments.push(Segment::Markdown(std::mem::take(&mut buf)));
                     }
-                    state = State::InSlide;
+                    state = State::InSlide {
+                        light: fence == ":::slide light",
+                    };
                 } else {
                     buf.push_str(line);
                     buf.push('\n');
@@ -49,7 +58,7 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
             State::InSolution => {
                 if fence == "::: solucion" {
                     return Err(Error::NestedSolution);
-                } else if fence == ":::slide" {
+                } else if fence == ":::slide" || fence == ":::slide light" {
                     return Err(Error::NestedSlide);
                 } else if fence == ":::" {
                     segments.push(Segment::Solution(std::mem::take(&mut buf)));
@@ -59,13 +68,16 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
                     buf.push('\n');
                 }
             }
-            State::InSlide => {
-                if fence == ":::slide" {
+            State::InSlide { light } => {
+                if fence == ":::slide" || fence == ":::slide light" {
                     return Err(Error::NestedSlide);
                 } else if fence == "::: solucion" {
                     return Err(Error::NestedSolution);
                 } else if fence == ":::" {
-                    segments.push(Segment::Slide(std::mem::take(&mut buf)));
+                    segments.push(Segment::Slide {
+                        md: std::mem::take(&mut buf),
+                        light,
+                    });
                     state = State::Outside;
                 } else {
                     buf.push_str(line);
@@ -77,7 +89,7 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
 
     match state {
         State::InSolution => return Err(Error::UnclosedSolution),
-        State::InSlide => return Err(Error::UnclosedSlide),
+        State::InSlide { .. } => return Err(Error::UnclosedSlide),
         State::Outside => {}
     }
     if !buf.is_empty() {
@@ -90,7 +102,7 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderedBody {
     pub html: String,
-    pub slide_html: Vec<String>,
+    pub slide_html: Vec<SlideFragment>,
     pub uses_solutions: bool,
     pub uses_slides: bool,
 }
@@ -111,9 +123,12 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
                 uses_solutions = true;
                 html.push_str(&render_solution(&render_markdown(&md)));
             }
-            Segment::Slide(md) => {
+            Segment::Slide { md, light } => {
                 uses_slides = true;
-                slide_html.push(render_markdown(&md));
+                slide_html.push(SlideFragment {
+                    html: render_markdown(&md),
+                    light,
+                });
             }
         }
     }
@@ -291,7 +306,10 @@ mod tests {
             segs,
             vec![
                 Segment::Markdown("Intro.\n".to_owned()),
-                Segment::Slide("## Slide 1\nContent.\n".to_owned()),
+                Segment::Slide {
+                    md: "## Slide 1\nContent.\n".to_owned(),
+                    light: false
+                },
                 Segment::Markdown("Outro.\n".to_owned()),
             ]
         );
@@ -304,7 +322,10 @@ mod tests {
         assert_eq!(
             segs,
             vec![
-                Segment::Slide("Slide content.\n".to_owned()),
+                Segment::Slide {
+                    md: "Slide content.\n".to_owned(),
+                    light: false
+                },
                 Segment::Solution("Answer.\n".to_owned()),
             ]
         );
@@ -343,7 +364,42 @@ mod tests {
         assert!(result.html.contains("After."));
         assert!(result.uses_slides);
         assert_eq!(result.slide_html.len(), 1);
-        assert!(result.slide_html[0].contains("<strong>Bold</strong>"));
+        assert!(result.slide_html[0].html.contains("<strong>Bold</strong>"));
+    }
+
+    #[test]
+    fn slide_light_modifier_produces_light_fragment() {
+        let body = ":::slide light\n## Light slide\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Slide {
+                md: "## Light slide\n".to_owned(),
+                light: true
+            }]
+        );
+    }
+
+    #[test]
+    fn slide_without_modifier_produces_dark_fragment() {
+        let body = ":::slide\n## Dark slide\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Slide {
+                md: "## Dark slide\n".to_owned(),
+                light: false
+            }]
+        );
+    }
+
+    #[test]
+    fn render_section_body_light_slide_sets_light_true() {
+        let body = ":::slide light\n**Bold**\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert_eq!(result.slide_html.len(), 1);
+        assert!(result.slide_html[0].light);
+        assert!(result.slide_html[0].html.contains("<strong>Bold</strong>"));
     }
 
     #[test]

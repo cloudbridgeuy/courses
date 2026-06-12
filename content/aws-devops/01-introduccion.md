@@ -17,7 +17,7 @@ Código → Build → Test → Deploy → Monitor
 ```
 :::
 
-:::slide
+:::slide light
 ## Ejercicios de la sesión
 
 1. Crear el repositorio y subir el código
