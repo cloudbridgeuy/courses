@@ -927,6 +927,15 @@ mod tests {
     }
 
     #[test]
+    fn warning_between_anchor_and_solution_prevents_exercise_pairing() {
+        // Warning hits `other =>`, resetting tail_anchor — no Anchor::Exercise.
+        let body = "{#ej}\n### Ej\n\nX.\n\n::: warning\nW.\n:::\n::: solucion\nR.\n:::\n\n:::slide\n{{ej}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(!result.slide_html[0].html.contains("cb-ejercicio"));
+        assert!(result.html.contains("R."));
+    }
+
+    #[test]
     fn render_section_body_no_slides_has_empty_slide_html() {
         let result = render_section_body("Plain text.\n").unwrap();
         assert!(!result.uses_slides);

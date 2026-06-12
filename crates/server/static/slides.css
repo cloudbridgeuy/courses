@@ -258,7 +258,8 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* Warning admonitions inside slides (rare: only via raw HTML in content). */
+/* Defensive: the ::: warning directive is rejected inside :::slide, so this
+   only styles a literal <div class="cb-warning"> embedded as raw HTML. */
 
 .reveal .cb-warning {
   background: #fdf6e3;
