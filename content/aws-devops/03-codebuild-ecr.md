@@ -87,8 +87,7 @@ reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 
 ### Abrir Amazon ECR
 
-1. En la barra de búsqueda de la consola de AWS, escriba `ECR` y seleccione
-   [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home).
+1. Abra [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home).
 2. En el panel lateral, asegúrese de estar en **Private registry → Repositories**.
 
 ### Crear el repositorio de imágenes
@@ -108,7 +107,7 @@ necesitará al configurar CodeBuild.
 
 ### Abrir CodeBuild
 
-1. En la barra de búsqueda, escriba `CodeBuild` y ábralo.
+1. Abra [**CodeBuild**](https://console.aws.amazon.com/codesuite/codebuild/home).
 2. Pulse **Create build project**.
 
 ### Configurar la fuente
@@ -191,7 +190,7 @@ para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 Cree un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>`.
 
 ::: solucion
-1. En la consola de AWS, busque [**ECR**](https://console.aws.amazon.com/ecr/home) y abra **Elastic Container Registry**.
+1. Abra [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home).
 2. En el panel lateral, seleccione **Private registry → Repositories**.
 3. Pulse **Create repository**.
 4. En **Repository name**, escriba `taller-aws-<su-nombre>`.

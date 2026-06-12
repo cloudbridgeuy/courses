@@ -138,8 +138,7 @@ su primer nombre en minúsculas y sin acentos (por ejemplo: `taller-aws-maria`).
 ### Abrir la consola de CodeCommit
 
 1. Inicie sesión en la consola de AWS en [console.aws.amazon.com](https://console.aws.amazon.com).
-2. En la barra de búsqueda superior, escriba `CodeCommit` y seleccione [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home) en
-   los resultados.
+2. Abra [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home).
 3. Confirme que la región seleccionada (esquina superior derecha) es la misma que le
    indicó el instructor. El taller usa una única región para todos los recursos.
 
@@ -265,7 +264,7 @@ remoto, y suba la rama `main`.
    cd courses
    ```
 
-2. En la consola de AWS, busque [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home), pulse **Create repository**, y
+2. Abra [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home), pulse **Create repository**, y
    cree `taller-aws-<su-nombre>` (su primer nombre en minúsculas, sin acentos).
 3. Agregue CodeCommit como remoto, según el acceso que configuró en los
    pre-requisitos:

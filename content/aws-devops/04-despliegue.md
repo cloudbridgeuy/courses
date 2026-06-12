@@ -44,7 +44,7 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 
 ### Abrir CloudFormation
 
-1. En la barra de búsqueda de la consola de AWS, escriba `CloudFormation` y abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
+1. Abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. Confirme que la región seleccionada (esquina superior derecha) es la misma que ha
    usado para todos los recursos del taller.
 
