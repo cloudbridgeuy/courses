@@ -44,7 +44,7 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 
 ### Abrir CloudFormation
 
-1. En la barra de búsqueda de la consola de AWS, escriba `CloudFormation` y ábralo.
+1. En la barra de búsqueda de la consola de AWS, escriba `CloudFormation` y abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. Confirme que la región seleccionada (esquina superior derecha) es la misma que ha
    usado para todos los recursos del taller.
 
@@ -111,7 +111,7 @@ Ejercicio 4. Al terminar, abra la URL del ALB en el navegador y confirme que la
 aplicación está en línea.
 
 ::: solucion
-1. En la consola de AWS, abra **CloudFormation**.
+1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. Pulse **Create stack → With new resources (standard)**.
 3. Seleccione **Upload a template file**, pulse **Choose file**, y suba
    `taller-semana1.yaml`.

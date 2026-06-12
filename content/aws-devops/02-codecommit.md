@@ -37,7 +37,7 @@ git config --global user.email su-correo@ejemplo.com
 
 ### 3. Acceso HTTPS
 
-En la consola de IAM → su usuario → pestaña **Security credentials** → sección
+En la [consola de IAM](https://console.aws.amazon.com/iam/home) → su usuario → pestaña **Security credentials** → sección
 **HTTPS Git credentials for AWS CodeCommit** → pulse **Generate credentials**.
 Guarde el usuario y la contraseña generados; los necesitará al hacer `git push`.
 
@@ -49,7 +49,7 @@ Genere un par de claves si aún no tiene uno:
 ssh-keygen -t rsa -b 4096
 ```
 
-Luego, en la consola de IAM → su usuario → **Security credentials** →
+Luego, en la [consola de IAM](https://console.aws.amazon.com/iam/home) → su usuario → **Security credentials** →
 **SSH keys for AWS CodeCommit** → **Upload SSH public key**. Copie el contenido
 de `~/.ssh/id_rsa.pub` y péguelo. Anote el **SSH key ID** que IAM asigna
 (comienza con `APKA…`).
@@ -101,7 +101,7 @@ su primer nombre en minúsculas y sin acentos (por ejemplo: `taller-aws-maria`).
 ### Abrir la consola de CodeCommit
 
 1. Inicie sesión en la consola de AWS en [console.aws.amazon.com](https://console.aws.amazon.com).
-2. En la barra de búsqueda superior, escriba `CodeCommit` y seleccione el servicio en
+2. En la barra de búsqueda superior, escriba `CodeCommit` y seleccione [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home) en
    los resultados.
 3. Confirme que la región seleccionada (esquina superior derecha) es la misma que le
    indicó el instructor. El taller usa una única región para todos los recursos.
@@ -226,7 +226,7 @@ remoto, y suba la rama `main`.
    cd courses
    ```
 
-2. En la consola de AWS, busque **CodeCommit**, pulse **Create repository**, y
+2. En la consola de AWS, busque [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home), pulse **Create repository**, y
    cree `taller-aws-<su-nombre>` (su primer nombre en minúsculas, sin acentos).
 3. Copie la **Clone URL** del nuevo repositorio (HTTPS o SSH, según el acceso que
    configuró en los pre-requisitos) y agréguelo como remoto:
@@ -248,7 +248,7 @@ remoto, y suba la rama `main`.
    ```
 
    Con HTTPS, git pedirá el usuario y la contraseña generados en IAM.
-6. En la consola de CodeCommit, abra su repositorio: los archivos aparecen en la
+6. En la [consola de CodeCommit](https://console.aws.amazon.com/codesuite/codecommit/home), abra su repositorio: los archivos aparecen en la
    pestaña **Code**.
 :::
 
@@ -257,7 +257,7 @@ remoto, y suba la rama `main`.
 {#ejercicio-2}
 ### Ejercicio 2 — Cree una rama, y encuentre su commit
 
-Desde la consola de CodeCommit, cree la rama `desarrollo` a partir de `main`. Luego
+Desde la [consola de CodeCommit](https://console.aws.amazon.com/codesuite/codecommit/home), cree la rama `desarrollo` a partir de `main`. Luego
 localice el ID del commit más reciente en esa rama.
 
 ::: solucion

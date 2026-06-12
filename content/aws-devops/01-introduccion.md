@@ -103,7 +103,5 @@ Antes de comenzar, confirme que cuenta con lo siguiente:
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation, ECS y
   Fargate, y DynamoDB. Si no está seguro, consulte con el instructor.
 - **Navegador web** actualizado (Chrome o Firefox recomendados).
-- **Archivo `.zip` con el código de la aplicación**, provisto por el instructor al inicio
-  del taller. Guárdelo en un lugar de fácil acceso.
 - **Plantilla de CloudFormation** `taller-semana1.yaml`, también provista por el
   instructor. La usará en la sección 4.

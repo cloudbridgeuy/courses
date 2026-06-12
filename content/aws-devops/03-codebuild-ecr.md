@@ -88,7 +88,7 @@ reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 ### Abrir Amazon ECR
 
 1. En la barra de búsqueda de la consola de AWS, escriba `ECR` y seleccione
-   **Elastic Container Registry**.
+   [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home).
 2. En el panel lateral, asegúrese de estar en **Private registry → Repositories**.
 
 ### Crear el repositorio de imágenes
@@ -139,7 +139,7 @@ necesitará al configurar CodeBuild.
 El rol creado automáticamente puede acceder a CodeCommit, pero aún no tiene permiso
 para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 
-1. En una nueva pestaña del navegador, abra **IAM → Roles** y busque el rol recién
+1. En una nueva pestaña del navegador, abra [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles) y busque el rol recién
     creado (su nombre comienza con `codebuild-taller-aws-<su-nombre>`).
 2. Pulse **Add permissions → Attach policies**.
 3. Busque `AmazonEC2ContainerRegistryPowerUser` y selecciónelo.
@@ -179,7 +179,7 @@ para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 
 ### Verificar la imagen en ECR
 
-1. Vuelva a la consola de ECR y abra su repositorio `taller-aws-<su-nombre>`.
+1. Vuelva a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abra su repositorio `taller-aws-<su-nombre>`.
 2. En la pestaña **Images**, verá la imagen recién publicada con la etiqueta `latest`
     y la fecha y hora del push. Copie el **Image URI** completo —lo necesitará en la
     siguiente sección para lanzar el stack de CloudFormation.
@@ -191,7 +191,7 @@ para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 Cree un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>`.
 
 ::: solucion
-1. En la consola de AWS, busque **ECR** y abra **Elastic Container Registry**.
+1. En la consola de AWS, busque [**ECR**](https://console.aws.amazon.com/ecr/home) y abra **Elastic Container Registry**.
 2. En el panel lateral, seleccione **Private registry → Repositories**.
 3. Pulse **Create repository**.
 4. En **Repository name**, escriba `taller-aws-<su-nombre>`.
@@ -212,7 +212,7 @@ repositorio de ECR. Ejecute el build y verifique que la imagen aparece en ECR co
 etiqueta `latest`.
 
 ::: solucion
-1. En la consola de AWS, abra **CodeBuild** y pulse **Create build project**.
+1. En la consola de AWS, abra [**CodeBuild**](https://console.aws.amazon.com/codesuite/codebuild/home) y pulse **Create build project**.
 2. En **Project name**, escriba `taller-aws-<su-nombre>-build`.
 3. En **Source provider**, seleccione **AWS CodeCommit** y luego su repositorio.
 4. En **Reference type**, elija **Branch → main**.
@@ -229,7 +229,7 @@ etiqueta `latest`.
 10. En **Buildspec**, deje **Use a buildspec file** seleccionado.
 11. En **Artifacts**, seleccione **No artifacts**.
 12. Pulse **Create build project**.
-13. En IAM, busque el rol cuyo nombre comienza con `codebuild-taller-aws-<su-nombre>`,
+13. En [IAM](https://console.aws.amazon.com/iam/home), busque el rol cuyo nombre comienza con `codebuild-taller-aws-<su-nombre>`,
     adjúntele la política `AmazonEC2ContainerRegistryPowerUser`.
 14. Vuelva a CodeBuild, abra el proyecto, y pulse **Start build**.
 15. En la pestaña **Build logs**, siga la ejecución hasta que el estado sea

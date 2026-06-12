@@ -40,7 +40,7 @@ build ni resubir el código.
 
 ### Iniciar la eliminación
 
-1. En la consola de AWS, abra **CloudFormation**.
+1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. En la lista de stacks, seleccione su stack `taller-<su-nombre>`.
 3. Pulse **Delete**.
 4. En el diálogo de confirmación, pulse **Delete stack**.
@@ -94,7 +94,7 @@ vuelve a estar en línea.
 ::: solucion
 **Destrucción:**
 
-1. En la consola de AWS, abra **CloudFormation**.
+1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. Seleccione su stack `taller-<su-nombre>`.
 3. Pulse **Delete → Delete stack**.
 4. En la pestaña **Events**, siga los eventos hasta que el stack desaparezca de la
