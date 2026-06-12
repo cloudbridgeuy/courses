@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
-use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH};
+use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH};
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
 use crate::solutions::SlideFragment;
@@ -227,6 +227,7 @@ pub fn render_slideshow_page(
          {sections}\
          </div>\n</div>\n\
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
+         <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          <script>\
 Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
 </script>\n\

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
+use crate::render::escape_html;
 
 /// One segment of a section body: plain Markdown, a hidden solution, or a slide.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,9 +136,8 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
             }
             Segment::Slide { md, light } => {
                 uses_slides = true;
-                let md = substitute_refs(&md, &anchors)?;
                 slide_html.push(SlideFragment {
-                    html: render_markdown(&md),
+                    html: render_slide(&md, &anchors)?,
                     light,
                 });
             }
@@ -151,25 +151,62 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
     })
 }
 
+/// An anchored block: plain Markdown, or an exercise (a heading-opened
+/// subsection whose `::: solucion` block immediately follows it).
+enum Anchor {
+    Block(String),
+    Exercise { md: String, solution_md: String },
+}
+
 /// Collects `{#name}` anchors from Markdown segments, stripping the marker
-/// lines while leaving the anchored blocks in place.
-fn extract_anchors(segments: Vec<Segment>) -> Result<(Vec<Segment>, HashMap<String, String>)> {
+/// lines while leaving the anchored blocks in place. A heading-opened anchor
+/// that runs to the end of its segment and is immediately followed by a
+/// `::: solucion` segment becomes an [`Anchor::Exercise`] carrying that
+/// solution.
+fn extract_anchors(segments: Vec<Segment>) -> Result<(Vec<Segment>, HashMap<String, Anchor>)> {
     let mut anchors = HashMap::new();
-    let mut out = Vec::with_capacity(segments.len());
+    let mut out: Vec<Segment> = Vec::with_capacity(segments.len());
+    let mut tail_anchor: Option<String> = None;
     for segment in segments {
         match segment {
             Segment::Markdown(md) => {
-                out.push(Segment::Markdown(strip_anchors(&md, &mut anchors)?));
+                let (stripped, tail) = strip_anchors(&md, &mut anchors)?;
+                tail_anchor = tail;
+                out.push(Segment::Markdown(stripped));
             }
-            other => out.push(other),
+            Segment::Solution(solution) => {
+                if let Some(name) = tail_anchor.take()
+                    && let Some(Anchor::Block(md)) = anchors.remove(&name)
+                {
+                    anchors.insert(
+                        name,
+                        Anchor::Exercise {
+                            md,
+                            solution_md: solution.clone(),
+                        },
+                    );
+                }
+                out.push(Segment::Solution(solution));
+            }
+            other => {
+                tail_anchor = None;
+                out.push(other);
+            }
         }
     }
     Ok((out, anchors))
 }
 
-fn strip_anchors(md: &str, anchors: &mut HashMap<String, String>) -> Result<String> {
+/// Strips anchor markers from one Markdown segment. Also returns the name of
+/// a heading-opened anchor whose block ran to the end of the segment, if any —
+/// the candidate for exercise-solution attachment.
+fn strip_anchors(
+    md: &str,
+    anchors: &mut HashMap<String, Anchor>,
+) -> Result<(String, Option<String>)> {
     let lines: Vec<&str> = md.lines().collect();
     let mut out = String::new();
+    let mut tail_anchor = None;
     let mut i = 0;
     while i < lines.len() {
         let Some(name) = parse_anchor_marker(lines[i]) else {
@@ -184,13 +221,19 @@ fn strip_anchors(md: &str, anchors: &mut HashMap<String, String>) -> Result<Stri
             return Err(Error::EmptyAnchor(name.to_owned()));
         }
         let block: String = lines[start..end].iter().map(|l| format!("{l}\n")).collect();
-        if anchors.insert(name.to_owned(), block.clone()).is_some() {
+        if anchors
+            .insert(name.to_owned(), Anchor::Block(block.clone()))
+            .is_some()
+        {
             return Err(Error::DuplicateAnchor(name.to_owned()));
         }
+        let is_heading = lines[start].starts_with('#');
+        let trailing = lines[end..].iter().all(|l| l.trim().is_empty());
+        tail_anchor = (is_heading && trailing).then(|| name.to_owned());
         out.push_str(&block);
         i = end;
     }
-    Ok(out)
+    Ok((out, tail_anchor))
 }
 
 /// End (exclusive) of the block starting at `start`: a whole code fence, a
@@ -236,9 +279,12 @@ fn is_valid_anchor_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// Replaces `{{name}}` lines in slide Markdown with the anchored block.
-fn substitute_refs(md: &str, anchors: &HashMap<String, String>) -> Result<String> {
-    let mut out = String::new();
+/// Renders slide Markdown to HTML, expanding `{{name}}` lines: block anchors
+/// are inlined as Markdown; exercise anchors render as a hero card with a
+/// solution toggle.
+fn render_slide(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
+    let mut html = String::new();
+    let mut buf = String::new();
     for line in md.lines() {
         let reference = line
             .trim()
@@ -246,20 +292,61 @@ fn substitute_refs(md: &str, anchors: &HashMap<String, String>) -> Result<String
             .and_then(|r| r.strip_suffix("}}"))
             .map(str::trim)
             .filter(|name| is_valid_anchor_name(name));
-        match reference {
-            Some(name) => {
-                let block = anchors
-                    .get(name)
-                    .ok_or_else(|| Error::UnknownSlideRef(name.to_owned()))?;
-                out.push_str(block);
-            }
-            None => {
-                out.push_str(line);
-                out.push('\n');
+        let Some(name) = reference else {
+            buf.push_str(line);
+            buf.push('\n');
+            continue;
+        };
+        match anchors.get(name) {
+            None => return Err(Error::UnknownSlideRef(name.to_owned())),
+            Some(Anchor::Block(block)) => buf.push_str(block),
+            Some(Anchor::Exercise { md, solution_md }) => {
+                if !buf.is_empty() {
+                    html.push_str(&render_markdown(&std::mem::take(&mut buf)));
+                }
+                html.push_str(&render_exercise(md, solution_md));
             }
         }
     }
-    Ok(out)
+    if !buf.is_empty() {
+        html.push_str(&render_markdown(&buf));
+    }
+    Ok(html)
+}
+
+/// Renders an exercise hero card: a kicker (the part of the heading before
+/// " — ", e.g. "Ejercicio 1"), the title, the statement, and the standard
+/// solution toggle.
+fn render_exercise(md: &str, solution_md: &str) -> String {
+    let lines: Vec<&str> = md.lines().collect();
+    let heading_idx = lines.iter().position(|l| l.starts_with('#'));
+    let heading = heading_idx
+        .map(|i| lines[i].trim_start_matches('#').trim())
+        .unwrap_or_default();
+    let statement_md = heading_idx
+        .map(|i| lines[i + 1..].join("\n"))
+        .unwrap_or_else(|| md.to_owned());
+    let (kicker, title) = match heading.split_once(" — ") {
+        Some((kicker, title)) => (kicker, title),
+        None => ("", heading),
+    };
+    let kicker_html = if kicker.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p class=\"cb-ejercicio-kicker\">{}</p>\n",
+            escape_html(kicker)
+        )
+    };
+    format!(
+        "<div class=\"cb-ejercicio\">\n\
+         {kicker_html}<h3>{}</h3>\n\
+         <div class=\"cb-ejercicio-cuerpo\">\n{}</div>\n\
+         {}</div>\n",
+        escape_html(title),
+        render_markdown(&statement_md),
+        render_solution(&render_markdown(solution_md)),
+    )
 }
 
 fn render_solution(inner_html: &str) -> String {
@@ -627,12 +714,37 @@ mod tests {
     }
 
     #[test]
-    fn heading_anchor_excludes_solution_block() {
-        let body = "{#ej}\n### Ejercicio\n\nEnunciado.\n\n::: solucion\nRespuesta secreta.\n:::\n\n:::slide\n{{ej}}\n:::\n";
+    fn exercise_anchor_renders_hero_card_with_solution_toggle() {
+        let body = "{#ej}\n### Ejercicio 1 — Cree su repositorio\n\nEnunciado.\n\n::: solucion\nRespuesta secreta.\n:::\n\n:::slide\n{{ej}}\n:::\n";
         let result = render_section_body(body).unwrap();
-        assert!(result.slide_html[0].html.contains("Enunciado."));
-        assert!(!result.slide_html[0].html.contains("Respuesta secreta."));
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("class=\"cb-ejercicio\""));
+        assert!(slide.contains("class=\"cb-ejercicio-kicker\">Ejercicio 1</p>"));
+        assert!(slide.contains("<h3>Cree su repositorio</h3>"));
+        assert!(slide.contains("Enunciado."));
+        assert!(slide.contains("Ver solución"));
+        assert!(slide.contains("Respuesta secreta."));
+        assert!(slide.contains("hidden"));
+        // guide still renders its own toggle
         assert!(result.html.contains("Respuesta secreta."));
+    }
+
+    #[test]
+    fn exercise_heading_without_dash_has_no_kicker() {
+        let body = "{#ej}\n### Reto final\n\nEnunciado.\n\n::: solucion\nR.\n:::\n\n:::slide\n{{ej}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(!slide.contains("cb-ejercicio-kicker"));
+        assert!(slide.contains("<h3>Reto final</h3>"));
+    }
+
+    #[test]
+    fn heading_anchor_not_followed_by_solution_stays_plain_block() {
+        let body = "{#sec}\n### Sección\n\nTexto.\n\n### Otra\n\nX.\n\n:::slide\n{{sec}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(!slide.contains("cb-ejercicio"));
+        assert!(slide.contains("Texto."));
     }
 
     #[test]

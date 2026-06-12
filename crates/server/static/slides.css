@@ -140,6 +140,84 @@
   border-bottom-color: #ccc9c6;
 }
 
+/* Exercise hero card: kicker + title + statement + solution toggle. */
+
+.reveal .cb-ejercicio {
+  text-align: left;
+  max-width: 85%;
+  margin: 0 auto;
+  padding: 0.9em 1.1em;
+  background: #3a3531;
+  border-left: 6px solid var(--cb-teal);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+
+.reveal .cb-ejercicio-kicker {
+  margin: 0;
+  color: var(--cb-teal);
+  font-size: 0.45em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.reveal .cb-ejercicio h3 {
+  margin: 0.1em 0 0.4em;
+  font-size: 1em;
+}
+
+.reveal .cb-ejercicio-cuerpo {
+  font-size: 0.7em;
+  line-height: 1.5;
+}
+
+.reveal .cb-ejercicio ol,
+.reveal .cb-ejercicio ul {
+  margin: 0.4em 0 0.4em 1.2em;
+  width: auto;
+  max-width: none;
+}
+
+.reveal .cb-ejercicio .solucion {
+  margin-top: 0.6em;
+}
+
+.reveal .solucion-toggle {
+  font-family: inherit;
+  font-size: 0.5em;
+  font-weight: 700;
+  color: var(--cb-ink);
+  background: var(--cb-teal);
+  border: none;
+  border-radius: 999px;
+  padding: 0.5em 1.4em;
+  cursor: pointer;
+}
+
+.reveal .solucion-toggle:hover {
+  background: var(--cb-blue);
+}
+
+.reveal .solucion-cuerpo {
+  margin-top: 0.6em;
+  font-size: 0.55em;
+  line-height: 1.5;
+  max-height: 11em;
+  overflow-y: auto;
+  border-top: 1px solid #4a4542;
+  padding-top: 0.6em;
+}
+
+.reveal section.cb-light .cb-ejercicio {
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(45, 41, 38, 0.12);
+}
+
+.reveal section.cb-light .solucion-cuerpo {
+  border-top-color: #e3e0dd;
+}
+
 /* Close button: top-right, circular ghost, back to the session guide. */
 
 .cb-slides-close {
