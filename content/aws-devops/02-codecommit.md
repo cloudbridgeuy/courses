@@ -222,26 +222,26 @@ autenticación es transparente gracias al archivo `~/.ssh/config`.
     - **Commits**: muestra el historial. Pulse un commit para ver exactamente qué cambió.
     - **Branches**: muestra las ramas existentes. Por ahora solo existe `main`.
 
-## Branching básico: la rama `desarrollo`
+## Branching básico: la rama `dev`
 
 Una rama (*branch*) es una línea paralela de desarrollo. Los cambios en una rama no
 afectan a las demás hasta que se fusionan explícitamente. La convención habitual es
 mantener `main` siempre con código funcional y trabajar los cambios en ramas
 separadas antes de incorporarlos.
 
-### Crear la rama `desarrollo` desde la consola
+### Crear la rama `dev` desde la consola
 
 1. En la pestaña **Branches**, pulse **Create branch**.
-2. En **Branch name**, escriba `desarrollo`.
+2. En **Branch name**, escriba `dev`.
 3. En **Branch from**, seleccione `main` (la rama de la que derivará).
 4. Pulse **Create branch**.
 
-La rama `desarrollo` aparece ahora en la lista. Comparte todos los commits de `main`
+La rama `dev` aparece ahora en la lista. Comparte todos los commits de `main`
 en este momento —es una copia exacta del estado actual.
 
 ### Localizar el ID del commit
 
-1. Pulse sobre el nombre de la rama `desarrollo` para abrirla.
+1. Pulse sobre el nombre de la rama `dev` para abrirla.
 2. En la pestaña **Commits**, verá el historial. El **commit ID** es el identificador
     hexadecimal largo que aparece junto a cada commit (por ejemplo:
     `a1b2c3d4e5f6...`). Copie los primeros 8 caracteres —son suficientes para
@@ -299,16 +299,16 @@ remoto, y suba la rama `main`.
 {#ejercicio-2}
 ### Ejercicio 2 — Cree una rama, y encuentre su commit
 
-Desde la [consola de CodeCommit](https://console.aws.amazon.com/codesuite/codecommit/home), cree la rama `desarrollo` a partir de `main`. Luego
+Desde la [consola de CodeCommit](https://console.aws.amazon.com/codesuite/codecommit/home), cree la rama `dev` a partir de `main`. Luego
 localice el ID del commit más reciente en esa rama.
 
 ::: solucion
 1. En la vista de su repositorio, pulse la pestaña **Branches**.
 2. Pulse **Create branch**.
-3. En **Branch name**, escriba `desarrollo`.
+3. En **Branch name**, escriba `dev`.
 4. En **Branch from**, seleccione `main`.
 5. Pulse **Create branch**. La rama aparece en la lista.
-6. Pulse sobre el nombre `desarrollo` para abrirla.
+6. Pulse sobre el nombre `dev` para abrirla.
 7. Seleccione la pestaña **Commits**. El commit más reciente aparece al tope de la
    lista.
 8. El **commit ID** es el identificador hexadecimal largo junto al commit. Los primeros
