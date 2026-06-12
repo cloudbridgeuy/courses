@@ -74,11 +74,13 @@ fn page(lang: &str, title_html: &str, head_extra: &str, main_html: &str) -> Stri
          <a href=\"#top\" id=\"cb-top-btn\" aria-label=\"Volver arriba\">↑</a>\n\
          <a href=\"#\" id=\"cb-back-btn\" aria-label=\"Volver a la posición anterior\">↓</a>\n\
          <script>var b=document.getElementById('cb-top-btn'),r=document.getElementById('cb-back-btn'),\
-f=document.querySelector('.cb-footer'),saved=null;\
-b.addEventListener('click',function(){{saved=scrollY;}});\
-r.addEventListener('click',function(e){{e.preventDefault();var y=saved;saved=null;scrollTo({{top:y}});}});\
-window.addEventListener('scroll',function(){{b.classList.toggle('cb-top-visible',scrollY>300);\
-r.classList.toggle('cb-top-visible',saved!==null&&scrollY<=300);}});\
+f=document.querySelector('.cb-footer'),k='cb-scroll:'+location.pathname;\
+function u(){{b.classList.toggle('cb-top-visible',scrollY>300);\
+r.classList.toggle('cb-top-visible',sessionStorage.getItem(k)!==null&&scrollY<=300);}}\
+b.addEventListener('click',function(){{sessionStorage.setItem(k,scrollY);}});\
+r.addEventListener('click',function(e){{e.preventDefault();var y=+sessionStorage.getItem(k);\
+sessionStorage.removeItem(k);scrollTo({{top:y}});}});\
+window.addEventListener('scroll',u);u();\
 new IntersectionObserver(function(e){{b.style.bottom=e[0].isIntersecting?(f.offsetHeight+12)+'px':'';}}).observe(f);\
 </script>\n\
          </body>\n</html>\n"
