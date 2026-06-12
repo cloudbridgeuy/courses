@@ -230,6 +230,7 @@ pub fn render_slideshow_page(
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          <script>\
 Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
+document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
 </script>\n\
          <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
 aria-label=\"Cerrar diapositivas\">✕</a>\n\
