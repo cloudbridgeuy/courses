@@ -15,6 +15,8 @@ session title (e.g. `del-codigo-a-la-imagen`), NOT filenames. All content is Spa
 | Syntax | Effect |
 |--------|--------|
 | `::: solucion` … `:::` | Collapsible solution card (button toggle) in guide and slides |
+| `::: warning` … `:::` | Always-visible amber admonition (guide only). Takes NO arguments — `::: warning anything` is plain Markdown |
+| `::: extra <title>` … `:::` | Collapsible deep-dive `<details>` block, closed by default (guide only). Title optional; empty falls back to "Contenido adicional" |
 | `:::slide` … `:::` | reveal.js slide (dark, default theme) |
 | `:::slide light` … `:::` | Light slide variant (`<section class="cb-light">`) |
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
