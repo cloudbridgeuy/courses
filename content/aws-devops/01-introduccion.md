@@ -107,10 +107,3 @@ Antes de comenzar, confirme que cuenta con lo siguiente:
   del taller. Guárdelo en un lugar de fácil acceso.
 - **Plantilla de CloudFormation** `taller-semana1.yaml`, también provista por el
   instructor. La usará en la sección 4.
-
-## Nota sobre CodeCommit
-
-En julio de 2024, AWS cerró el alta de CodeCommit para nuevas cuentas. Si su cuenta
-fue creada después de esa fecha, es posible que no tenga acceso al servicio. En ese
-caso, el instructor le indicará la alternativa que se usará para este taller. Todos los
-demás servicios (CodeBuild, ECR, CloudFormation, ECS) no tienen esta restricción.
