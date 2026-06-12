@@ -52,6 +52,28 @@
   display: inline-block;
 }
 
+.reveal ol,
+.reveal ul {
+  display: block;
+  text-align: left;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 80%;
+}
+
+.reveal ol {
+  list-style: decimal;
+}
+
+.reveal ul {
+  list-style: disc;
+}
+
+.reveal li {
+  margin: 0.35em 0;
+  padding-left: 0.25em;
+}
+
 .reveal pre,
 .reveal code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
