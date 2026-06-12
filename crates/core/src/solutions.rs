@@ -4,12 +4,15 @@ use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
 
-/// One segment of a section body: plain Markdown, a hidden solution, or a slide.
+/// One segment of a section body: plain Markdown, a hidden solution, a slide,
+/// an always-visible warning admonition, or a collapsible extra block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Segment {
     Markdown(String),
     Solution(String),
     Slide { md: String, light: bool },
+    Warning(String),
+    Extra { title: String, md: String },
 }
 
 /// A rendered slide HTML fragment with its display variant.
@@ -19,18 +22,50 @@ pub struct SlideFragment {
     pub light: bool,
 }
 
-/// Splits a Markdown body on `::: solucion` and `:::slide` / `:::` fenced blocks.
+/// Splits a Markdown body on `::: solucion`, `:::slide`, `::: warning`, and
+/// `::: extra <title>` fenced blocks (closed by `:::`).
 ///
 /// Fences must sit alone on their line. Nesting is rejected; an unclosed
 /// block is rejected.
 ///
-/// Note: `":::slide"` has no space; `"::: solucion"` uses a space.
-/// Writing `"::: slide"` (with a space) is silently treated as plain Markdown.
+/// Note: `":::slide"` has no space; the other fences use a space.
+/// `"::: warning"` takes no arguments — with trailing text it is plain
+/// Markdown. `"::: extra"` takes an optional title after the keyword.
 pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
     enum State {
         Outside,
         InSolution,
         InSlide { light: bool },
+        InWarning,
+        InExtra { title: String },
+    }
+
+    fn opener(fence: &str) -> Option<State> {
+        if fence == "::: solucion" {
+            Some(State::InSolution)
+        } else if fence == ":::slide" || fence == ":::slide light" {
+            Some(State::InSlide {
+                light: fence == ":::slide light",
+            })
+        } else if fence == "::: warning" {
+            Some(State::InWarning)
+        } else if let Some(rest) = fence.strip_prefix("::: extra") {
+            (rest.is_empty() || rest.starts_with(' ')).then(|| State::InExtra {
+                title: rest.trim().to_owned(),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn nested_error(state: &State) -> Error {
+        match state {
+            State::InSolution => Error::NestedSolution,
+            State::InSlide { .. } => Error::NestedSlide,
+            State::InWarning => Error::NestedWarning,
+            State::InExtra { .. } => Error::NestedExtra,
+            State::Outside => unreachable!("opener never returns Outside"),
+        }
     }
 
     let mut segments = Vec::new();
@@ -41,48 +76,31 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
         let fence = line.trim_end();
         match state {
             State::Outside => {
-                if fence == "::: solucion" {
+                if let Some(open) = opener(fence) {
                     if !buf.is_empty() {
                         segments.push(Segment::Markdown(std::mem::take(&mut buf)));
                     }
-                    state = State::InSolution;
-                } else if fence == ":::slide" || fence == ":::slide light" {
-                    if !buf.is_empty() {
-                        segments.push(Segment::Markdown(std::mem::take(&mut buf)));
-                    }
-                    state = State::InSlide {
-                        light: fence == ":::slide light",
+                    state = open;
+                } else {
+                    buf.push_str(line);
+                    buf.push('\n');
+                }
+            }
+            ref open_state => {
+                if let Some(inner) = opener(fence) {
+                    return Err(nested_error(&inner));
+                } else if fence == ":::" {
+                    let md = std::mem::take(&mut buf);
+                    let segment = match std::mem::replace(&mut state, State::Outside) {
+                        State::InSolution => Segment::Solution(md),
+                        State::InSlide { light } => Segment::Slide { md, light },
+                        State::InWarning => Segment::Warning(md),
+                        State::InExtra { title } => Segment::Extra { title, md },
+                        State::Outside => unreachable!("matched non-Outside arm"),
                     };
+                    segments.push(segment);
                 } else {
-                    buf.push_str(line);
-                    buf.push('\n');
-                }
-            }
-            State::InSolution => {
-                if fence == "::: solucion" {
-                    return Err(Error::NestedSolution);
-                } else if fence == ":::slide" || fence == ":::slide light" {
-                    return Err(Error::NestedSlide);
-                } else if fence == ":::" {
-                    segments.push(Segment::Solution(std::mem::take(&mut buf)));
-                    state = State::Outside;
-                } else {
-                    buf.push_str(line);
-                    buf.push('\n');
-                }
-            }
-            State::InSlide { light } => {
-                if fence == ":::slide" || fence == ":::slide light" {
-                    return Err(Error::NestedSlide);
-                } else if fence == "::: solucion" {
-                    return Err(Error::NestedSolution);
-                } else if fence == ":::" {
-                    segments.push(Segment::Slide {
-                        md: std::mem::take(&mut buf),
-                        light,
-                    });
-                    state = State::Outside;
-                } else {
+                    let _ = open_state;
                     buf.push_str(line);
                     buf.push('\n');
                 }
@@ -93,6 +111,8 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
     match state {
         State::InSolution => return Err(Error::UnclosedSolution),
         State::InSlide { .. } => return Err(Error::UnclosedSlide),
+        State::InWarning => return Err(Error::UnclosedWarning),
+        State::InExtra { .. } => return Err(Error::UnclosedExtra),
         State::Outside => {}
     }
     if !buf.is_empty() {
@@ -112,7 +132,9 @@ pub struct RenderedBody {
 
 /// Renders a section's Markdown body, expanding `::: solucion` blocks into
 /// toggle markup (button plus hidden panel). `:::slide` blocks are collected
-/// separately and omitted from the guide HTML.
+/// separately and omitted from the guide HTML. `::: warning` renders as an
+/// always-visible admonition div; `::: extra <title>` renders as a closed
+/// `<details>` block — both are guide-only (not included in slides).
 ///
 /// A line `{#name}` in plain Markdown anchors the block that follows (until a
 /// blank line; a whole code fence; or, when the block opens with a heading,
@@ -140,6 +162,10 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
                     html: render_slide(&md, &anchors)?,
                     light,
                 });
+            }
+            Segment::Warning(md) => html.push_str(&render_warning(&render_markdown(&md))),
+            Segment::Extra { title, md } => {
+                html.push_str(&render_extra(&title, &render_markdown(&md)));
             }
         }
     }
@@ -349,6 +375,28 @@ fn render_exercise(md: &str, solution_md: &str) -> String {
     )
 }
 
+/// Renders an always-visible warning admonition. The symbol comes from CSS
+/// (`.cb-warning::before`), keeping markup minimal.
+fn render_warning(inner_html: &str) -> String {
+    format!("<div class=\"cb-warning\">\n{inner_html}</div>\n")
+}
+
+/// Renders a collapsible extra block as a native `<details>` element, closed
+/// by default. An empty title falls back to "Contenido adicional".
+fn render_extra(title: &str, inner_html: &str) -> String {
+    let title = if title.is_empty() {
+        "Contenido adicional"
+    } else {
+        title
+    };
+    format!(
+        "<details class=\"cb-extra\">\n\
+         <summary>{}</summary>\n\
+         <div class=\"cb-extra-cuerpo\">\n{inner_html}</div>\n</details>\n",
+        escape_html(title)
+    )
+}
+
 fn render_solution(inner_html: &str) -> String {
     format!(
         "<div class=\"solucion\">\n\
@@ -470,6 +518,137 @@ mod tests {
             segs,
             vec![Segment::Markdown("Text\n:::\nMore text\n".to_owned())]
         );
+    }
+
+    // ── warning / extra fences ────────────────────────────────────────────
+
+    #[test]
+    fn warning_between_prose_yields_three_segments() {
+        let body = "Before.\n::: warning\nDanger.\n:::\nAfter.\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![
+                Segment::Markdown("Before.\n".to_owned()),
+                Segment::Warning("Danger.\n".to_owned()),
+                Segment::Markdown("After.\n".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn warning_with_arguments_is_plain_markdown() {
+        let body = "::: warning extra-text\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(
+                "::: warning extra-text\nX.\n:::\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn unclosed_warning_errors() {
+        assert!(matches!(
+            split_solutions("::: warning\nX.\n"),
+            Err(Error::UnclosedWarning)
+        ));
+    }
+
+    #[test]
+    fn nested_warning_inside_warning_errors() {
+        assert!(matches!(
+            split_solutions("::: warning\n::: warning\n:::\n:::\n"),
+            Err(Error::NestedWarning)
+        ));
+    }
+
+    #[test]
+    fn warning_inside_solution_errors() {
+        assert!(matches!(
+            split_solutions("::: solucion\n::: warning\n:::\n:::\n"),
+            Err(Error::NestedWarning)
+        ));
+    }
+
+    #[test]
+    fn solution_inside_warning_errors() {
+        assert!(matches!(
+            split_solutions("::: warning\n::: solucion\n:::\n:::\n"),
+            Err(Error::NestedSolution)
+        ));
+    }
+
+    #[test]
+    fn extra_with_title_yields_extra_segment() {
+        let body = "::: extra ¿Qué es un repositorio remoto?\nTexto.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Extra {
+                title: "¿Qué es un repositorio remoto?".to_owned(),
+                md: "Texto.\n".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn extra_without_title_yields_empty_title() {
+        let body = "::: extra\nTexto.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Extra {
+                title: String::new(),
+                md: "Texto.\n".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn extra_title_trims_whitespace() {
+        let body = "::: extra   Comandos de git   \nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Extra {
+                title: "Comandos de git".to_owned(),
+                md: "X.\n".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn unclosed_extra_errors() {
+        assert!(matches!(
+            split_solutions("::: extra T\nX.\n"),
+            Err(Error::UnclosedExtra)
+        ));
+    }
+
+    #[test]
+    fn extra_inside_slide_errors() {
+        assert!(matches!(
+            split_solutions(":::slide\n::: extra T\n:::\n:::\n"),
+            Err(Error::NestedExtra)
+        ));
+    }
+
+    #[test]
+    fn warning_inside_slide_errors() {
+        assert!(matches!(
+            split_solutions(":::slide\n::: warning\n:::\n:::\n"),
+            Err(Error::NestedWarning)
+        ));
+    }
+
+    #[test]
+    fn extra_inside_warning_errors() {
+        assert!(matches!(
+            split_solutions("::: warning\n::: extra T\n:::\n:::\n"),
+            Err(Error::NestedExtra)
+        ));
     }
 
     // ── render_section_body tests ─────────────────────────────────────────
@@ -750,6 +929,62 @@ mod tests {
     #[test]
     fn render_section_body_no_slides_has_empty_slide_html() {
         let result = render_section_body("Plain text.\n").unwrap();
+        assert!(!result.uses_slides);
+        assert!(result.slide_html.is_empty());
+    }
+
+    // ── warning / extra rendering ─────────────────────────────────────────
+
+    #[test]
+    fn warning_renders_admonition_div_with_inner_markdown() {
+        let body = "::: warning\n**Atención**: [aviso](https://example.com).\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.html.contains("<div class=\"cb-warning\">"));
+        assert!(result.html.contains("<strong>Atención</strong>"));
+        assert!(result.html.contains("<a href=\"https://example.com\">"));
+    }
+
+    #[test]
+    fn extra_renders_closed_details_with_summary_title() {
+        let body = "::: extra ¿Qué es un remoto?\nUn remoto es…\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.html.contains("<details class=\"cb-extra\">"));
+        assert!(
+            result
+                .html
+                .contains("<summary>¿Qué es un remoto?</summary>")
+        );
+        assert!(result.html.contains("Un remoto es…"));
+        assert!(!result.html.contains("<details open"));
+    }
+
+    #[test]
+    fn extra_without_title_uses_fallback() {
+        let body = "::: extra\nX.\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(
+            result
+                .html
+                .contains("<summary>Contenido adicional</summary>")
+        );
+    }
+
+    #[test]
+    fn extra_title_is_html_escaped() {
+        let body = "::: extra Uso de <code> & otros\nX.\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(
+            result
+                .html
+                .contains("<summary>Uso de &lt;code&gt; &amp; otros</summary>")
+        );
+    }
+
+    #[test]
+    fn warning_and_extra_omitted_from_slides_and_do_not_set_flags() {
+        let body = "::: warning\nW.\n:::\n::: extra T\nE.\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(!result.uses_solutions);
         assert!(!result.uses_slides);
         assert!(result.slide_html.is_empty());
     }
