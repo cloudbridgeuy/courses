@@ -30,6 +30,18 @@ pub enum Error {
     #[error("nested `:::slide` block")]
     NestedSlide,
 
+    #[error("unclosed `::: warning` block")]
+    UnclosedWarning,
+
+    #[error("nested `::: warning` block")]
+    NestedWarning,
+
+    #[error("unclosed `::: extra` block")]
+    UnclosedExtra,
+
+    #[error("nested `::: extra` block")]
+    NestedExtra,
+
     #[error("duplicate anchor: {0}")]
     DuplicateAnchor(String),
 
@@ -106,6 +118,35 @@ mod tests {
     #[test]
     fn display_nested_slide() {
         assert_eq!(Error::NestedSlide.to_string(), "nested `:::slide` block");
+    }
+
+    #[test]
+    fn display_unclosed_warning() {
+        assert_eq!(
+            Error::UnclosedWarning.to_string(),
+            "unclosed `::: warning` block"
+        );
+    }
+
+    #[test]
+    fn display_nested_warning() {
+        assert_eq!(
+            Error::NestedWarning.to_string(),
+            "nested `::: warning` block"
+        );
+    }
+
+    #[test]
+    fn display_unclosed_extra() {
+        assert_eq!(
+            Error::UnclosedExtra.to_string(),
+            "unclosed `::: extra` block"
+        );
+    }
+
+    #[test]
+    fn display_nested_extra() {
+        assert_eq!(Error::NestedExtra.to_string(), "nested `::: extra` block");
     }
 
     #[test]
