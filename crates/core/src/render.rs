@@ -206,12 +206,12 @@ pub fn render_slideshow_page(
     let sections: String = slides_html
         .iter()
         .map(|slide| {
-            let class = if slide.light {
-                " class=\"cb-light\""
+            let attrs = if slide.light {
+                " class=\"cb-light\" data-background=\"#f5f4f2\""
             } else {
                 ""
             };
-            format!("<section{class}>\n{}</section>\n", slide.html)
+            format!("<section{attrs}>\n{}</section>\n", slide.html)
         })
         .collect();
 
@@ -718,7 +718,9 @@ mod tests {
         ];
         let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
         assert!(html.contains("<section>\n<p>Dark</p>"));
-        assert!(html.contains("<section class=\"cb-light\">\n<p>Light</p>"));
+        assert!(
+            html.contains("<section class=\"cb-light\" data-background=\"#f5f4f2\">\n<p>Light</p>")
+        );
     }
 
     // ── render_site ───────────────────────────────────────────────────────

@@ -114,10 +114,6 @@
 
 /* Light slide variant: :::slide light → <section class="cb-light">. */
 
-.reveal section.cb-light {
-  background: #f5f4f2;
-}
-
 .reveal section.cb-light h1,
 .reveal section.cb-light h2,
 .reveal section.cb-light h3 {
