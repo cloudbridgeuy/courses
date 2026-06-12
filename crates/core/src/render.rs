@@ -233,7 +233,10 @@ Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition
 document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
 </script>\n\
          <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
-aria-label=\"Cerrar diapositivas\">✕</a>\n\
+aria-label=\"Cerrar diapositivas\">\
+<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">\
+<path d=\"M6 6l12 12M18 6L6 18\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\
+</svg></a>\n\
          </body>\n</html>\n"
     )
 }
