@@ -404,9 +404,12 @@ mod tests {
         let landing_html = render_landing_page(&loaded);
         assert!(landing_html.contains("Taller &lt;AWS&gt; &amp; DevOps"));
         assert!(!landing_html.contains("Taller <AWS>"));
-        // Session title: render_session_page puts the session title in <h1>.
-        let session_html = render_session_page(&sample_session_page(&loaded));
-        assert!(session_html.contains("Semana 1"));
+        // Session title: render_session_page escapes the session title in <h1> and <title>.
+        let mut loaded_unsafe = sample();
+        loaded_unsafe.course.sessions[0].title = "Semana <1> & Intro".to_owned();
+        let session_html = render_session_page(&sample_session_page(&loaded_unsafe));
+        assert!(session_html.contains("Semana &lt;1&gt; &amp; Intro"));
+        assert!(!session_html.contains("Semana <1>"));
     }
 
     #[test]

@@ -95,6 +95,7 @@
   height: 2.2rem;
   border-radius: 50%;
   color: #fff;
+  background: rgba(0, 0, 0, 0.25);
   opacity: 0.6;
   font-size: 1.4rem;
   line-height: 1;
