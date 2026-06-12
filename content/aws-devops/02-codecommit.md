@@ -39,12 +39,12 @@ su primer nombre en minúsculas y sin acentos (por ejemplo: `taller-aws-maria`).
 
 ### Crear el repositorio
 
-4. Pulse **Create repository**.
-5. En **Repository name**, escriba `taller-aws-<su-nombre>`. Use su primer nombre en
+1. Pulse **Create repository**.
+2. En **Repository name**, escriba `taller-aws-<su-nombre>`. Use su primer nombre en
    minúsculas y sin acentos (por ejemplo: `taller-aws-carlos`).
-6. En **Description** (opcional), escriba una descripción breve, por ejemplo:
+3. En **Description** (opcional), escriba una descripción breve, por ejemplo:
    `Repositorio del taller AWS DevOps — Semana 1`.
-7. Deje las demás opciones con sus valores predeterminados y pulse **Create**.
+4. Deje las demás opciones con sus valores predeterminados y pulse **Create**.
 
 CodeCommit crea el repositorio vacío en segundos y lo lleva a la vista principal del
 repositorio.
@@ -55,13 +55,13 @@ El instructor le proveyó un archivo `.zip` con el código de la aplicación. Si
 pasos para cargarlo directamente desde la consola, sin necesidad de instalar Git
 localmente.
 
-8. En la vista del repositorio vacío, busque el botón **Add file** y despliegue el
+1. En la vista del repositorio vacío, busque el botón **Add file** y despliegue el
    menú. Seleccione **Upload file**.
-9. Pulse **Choose file** y seleccione el primer archivo del `.zip` descomprimido.
+2. Pulse **Choose file** y seleccione el primer archivo del `.zip` descomprimido.
    Escriba su nombre y correo en los campos **Author name** y **Email address** —
    aparecerán en el historial de commits.
-10. En **Commit message**, escriba `Carga inicial del código de la aplicación`.
-11. Pulse **Commit changes**.
+3. En **Commit message**, escriba `Carga inicial del código de la aplicación`.
+4. Pulse **Commit changes**.
 
 > **Nota:** la consola de CodeCommit permite subir un archivo a la vez por este método.
 > El instructor indicará si el `.zip` incluye un script auxiliar para cargar múltiples
@@ -70,7 +70,7 @@ localmente.
 
 ### Explorar la vista del repositorio
 
-12. Una vez subido el código, navega por las pestañas de la vista del repositorio:
+1. Una vez subido el código, navega por las pestañas de la vista del repositorio:
     - **Code**: muestra los archivos y carpetas. Pulse cualquier archivo para ver su
       contenido.
     - **Commits**: muestra el historial. Pulse un commit para ver exactamente qué cambió.
@@ -85,18 +85,18 @@ separadas antes de incorporarlos.
 
 ### Crear la rama `desarrollo` desde la consola
 
-13. En la pestaña **Branches**, pulse **Create branch**.
-14. En **Branch name**, escriba `desarrollo`.
-15. En **Branch from**, seleccione `main` (la rama de la que derivará).
-16. Pulse **Create branch**.
+1. En la pestaña **Branches**, pulse **Create branch**.
+2. En **Branch name**, escriba `desarrollo`.
+3. En **Branch from**, seleccione `main` (la rama de la que derivará).
+4. Pulse **Create branch**.
 
 La rama `desarrollo` aparece ahora en la lista. Comparte todos los commits de `main`
 en este momento —es una copia exacta del estado actual.
 
 ### Localizar el ID del commit
 
-17. Pulse sobre el nombre de la rama `desarrollo` para abrirla.
-18. En la pestaña **Commits**, verá el historial. El **commit ID** es el identificador
+1. Pulse sobre el nombre de la rama `desarrollo` para abrirla.
+2. En la pestaña **Commits**, verá el historial. El **commit ID** es el identificador
     hexadecimal largo que aparece junto a cada commit (por ejemplo:
     `a1b2c3d4e5f6...`). Copie los primeros 8 caracteres —son suficientes para
     identificar un commit de forma única en este repositorio.

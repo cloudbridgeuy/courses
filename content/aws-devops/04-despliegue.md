@@ -50,54 +50,54 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 
 ### Crear el stack
 
-3. Pulse **Create stack** y seleccione **With new resources (standard)**.
-4. En la sección **Specify template**, seleccione **Upload a template file**.
-5. Pulse **Choose file** y seleccione el archivo `taller-semana1.yaml` provisto por
+1. Pulse **Create stack** y seleccione **With new resources (standard)**.
+2. En la sección **Specify template**, seleccione **Upload a template file**.
+3. Pulse **Choose file** y seleccione el archivo `taller-semana1.yaml` provisto por
    el instructor.
-6. Pulse **Next**.
+4. Pulse **Next**.
 
 ### Completar los parámetros
 
-7. En **Stack name**, escriba `taller-<su-nombre>` (por ejemplo: `taller-maria`). El
+1. En **Stack name**, escriba `taller-<su-nombre>` (por ejemplo: `taller-maria`). El
    nombre del stack identifica su ambiente en la consola y debe ser único en la región.
-8. En los parámetros de la plantilla, localice el campo correspondiente al **URI de
+2. En los parámetros de la plantilla, localice el campo correspondiente al **URI de
    la imagen**. Pegue el URI completo que copió de ECR al final de la sección anterior.
    El formato es:
    ```
    123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-<su-nombre>:latest
    ```
-9. Revise los demás parámetros. Déjelos con sus valores predeterminados a menos que el
+1. Revise los demás parámetros. Déjelos con sus valores predeterminados a menos que el
    instructor indique lo contrario.
-10. Pulse **Next**.
+2. Pulse **Next**.
 
 ### Configurar opciones del stack
 
-11. En la pantalla de opciones, no es necesario cambiar nada. Pulse **Next**.
+1. En la pantalla de opciones, no es necesario cambiar nada. Pulse **Next**.
 
 ### Confirmar y lanzar
 
-12. En la pantalla de revisión, desplácese hasta la sección **Capabilities** al pie
+1. En la pantalla de revisión, desplácese hasta la sección **Capabilities** al pie
     de la página. Verá un aviso sobre que la plantilla puede crear recursos de IAM.
     Marque la casilla **I acknowledge that AWS CloudFormation might create IAM
     resources with custom names**.
-13. Pulse **Submit** (o **Create stack**, según la versión de la consola).
+2. Pulse **Submit** (o **Create stack**, según la versión de la consola).
 
 ### Seguir la creación del stack
 
-14. CloudFormation lo lleva automáticamente a la vista del stack recién iniciado.
+1. CloudFormation lo lleva automáticamente a la vista del stack recién iniciado.
     Seleccione la pestaña **Events**. Verá cómo se van creando los recursos en tiempo
     real, uno por uno, con su estado.
-15. Espere hasta que el estado del stack (en la parte superior) cambie a
+2. Espere hasta que el estado del stack (en la parte superior) cambie a
     **CREATE_COMPLETE**. El proceso toma entre 3 y 8 minutos, dependiendo de la región.
     Si algún recurso falla, el estado cambia a **ROLLBACK_IN_PROGRESS** y CloudFormation
     deshará los cambios automáticamente —revise el evento fallido para entender el motivo.
 
 ### Obtener la URL de la aplicación
 
-16. Una vez en **CREATE_COMPLETE**, seleccione la pestaña **Outputs**.
-17. Verá una salida llamada `ALBUrl` (o similar, según la plantilla). Copie el valor
+1. Una vez en **CREATE_COMPLETE**, seleccione la pestaña **Outputs**.
+2. Verá una salida llamada `ALBUrl` (o similar, según la plantilla). Copie el valor
     —es la URL pública del Application Load Balancer.
-18. Abra esa URL en una nueva pestaña del navegador. En unos segundos verá cargarse
+3. Abra esa URL en una nueva pestaña del navegador. En unos segundos verá cargarse
     esta guía del taller, servida desde el contenedor que acaba de desplegar en su
     propio ECS.
 

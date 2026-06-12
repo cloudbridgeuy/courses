@@ -93,12 +93,12 @@ reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 
 ### Crear el repositorio de imágenes
 
-3. Pulse **Create repository**.
-4. En **Repository name**, escriba `taller-aws-<su-nombre>` (el mismo nombre que usó
+1. Pulse **Create repository**.
+2. En **Repository name**, escriba `taller-aws-<su-nombre>` (el mismo nombre que usó
    en CodeCommit, por consistencia).
-5. Deje **Image tag mutability** en **Mutable** — esto permite reutilizar etiquetas
+3. Deje **Image tag mutability** en **Mutable** — esto permite reutilizar etiquetas
    como `latest` o `v1` entre builds sucesivos.
-6. Deje las demás opciones con sus valores predeterminados y pulse **Create repository**.
+4. Deje las demás opciones con sus valores predeterminados y pulse **Create repository**.
 
 El repositorio aparece en la lista. Pulse sobre su nombre y copie el **URI** completo
 —algo como `123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria`. Lo
@@ -108,29 +108,29 @@ necesitará al configurar CodeBuild.
 
 ### Abrir CodeBuild
 
-7. En la barra de búsqueda, escriba `CodeBuild` y ábralo.
-8. Pulse **Create build project**.
+1. En la barra de búsqueda, escriba `CodeBuild` y ábralo.
+2. Pulse **Create build project**.
 
 ### Configurar la fuente
 
-9. En **Project name**, escriba `taller-aws-<su-nombre>-build`.
-10. En la sección **Source**, seleccione **Source provider: AWS CodeCommit**.
-11. En **Repository**, seleccione su repositorio `taller-aws-<su-nombre>`.
-12. En **Reference type**, seleccione **Branch** y elija `main`.
+1. En **Project name**, escriba `taller-aws-<su-nombre>-build`.
+2. En la sección **Source**, seleccione **Source provider: AWS CodeCommit**.
+3. En **Repository**, seleccione su repositorio `taller-aws-<su-nombre>`.
+4. En **Reference type**, seleccione **Branch** y elija `main`.
 
 ### Configurar el entorno de construcción
 
-13. En la sección **Environment**, seleccione:
+1. En la sección **Environment**, seleccione:
     - **Environment image**: **Managed image**
     - **Compute**: **EC2**
     - **Operating system**: **Amazon Linux**
     - **Runtime(s)**: **Standard**
     - **Image**: seleccione la versión más reciente disponible (por ejemplo
       `aws/codebuild/standard:7.0`).
-14. Active **Privileged mode** marcando la casilla correspondiente. Este modo es
+2. Active **Privileged mode** marcando la casilla correspondiente. Este modo es
     **obligatorio** para que CodeBuild pueda ejecutar el daemon de Docker y construir
     imágenes de contenedor.
-15. En **Service role**, seleccione **New service role**. CodeBuild creará
+3. En **Service role**, seleccione **New service role**. CodeBuild creará
     automáticamente un rol de IAM con los permisos básicos. Anote el nombre del rol
     —necesitará agregarle permisos de ECR a continuación.
 
@@ -139,15 +139,15 @@ necesitará al configurar CodeBuild.
 El rol creado automáticamente puede acceder a CodeCommit, pero aún no tiene permiso
 para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 
-16. En una nueva pestaña del navegador, abra **IAM → Roles** y busque el rol recién
+1. En una nueva pestaña del navegador, abra **IAM → Roles** y busque el rol recién
     creado (su nombre comienza con `codebuild-taller-aws-<su-nombre>`).
-17. Pulse **Add permissions → Attach policies**.
-18. Busque `AmazonEC2ContainerRegistryPowerUser` y selecciónelo.
-19. Pulse **Add permissions**. Vuelva a la pestaña de CodeBuild.
+2. Pulse **Add permissions → Attach policies**.
+3. Busque `AmazonEC2ContainerRegistryPowerUser` y selecciónelo.
+4. Pulse **Add permissions**. Vuelva a la pestaña de CodeBuild.
 
 ### Configurar las variables de entorno
 
-20. En la sección **Environment**, desplácese hasta **Additional configuration →
+1. En la sección **Environment**, desplácese hasta **Additional configuration →
     Environment variables** y agregue las siguientes variables:
 
     | Name | Value | Type |
@@ -161,26 +161,26 @@ para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
 
 ### Finalizar la configuración
 
-21. En la sección **Buildspec**, deje seleccionado **Use a buildspec file** —CodeBuild
+1. En la sección **Buildspec**, deje seleccionado **Use a buildspec file** —CodeBuild
     buscará automáticamente el archivo `buildspec.yml` en la raíz del repositorio.
-22. En la sección **Artifacts**, seleccione **No artifacts** —el resultado del build
+2. En la sección **Artifacts**, seleccione **No artifacts** —el resultado del build
     es la imagen publicada en ECR, no un artefacto de archivo.
-23. Pulse **Create build project**.
+3. Pulse **Create build project**.
 
 ### Ejecutar el build y seguir los logs
 
-24. En la vista del proyecto recién creado, pulse **Start build**.
-25. CodeBuild provisiona el entorno y comienza a ejecutar los comandos del
+1. En la vista del proyecto recién creado, pulse **Start build**.
+2. CodeBuild provisiona el entorno y comienza a ejecutar los comandos del
     `buildspec.yml`. La pestaña **Build logs** muestra la salida en tiempo real.
-26. Siga los logs. Verá las tres fases: autenticación con ECR, `docker build`, y
+3. Siga los logs. Verá las tres fases: autenticación con ECR, `docker build`, y
     `docker push`. El proceso tarda entre 2 y 5 minutos la primera vez.
-27. Al terminar, el estado cambia a **Succeeded** (en verde) o **Failed** (en rojo).
+4. Al terminar, el estado cambia a **Succeeded** (en verde) o **Failed** (en rojo).
     Si falla, el log indica en qué línea ocurrió el error.
 
 ### Verificar la imagen en ECR
 
-28. Vuelva a la consola de ECR y abra su repositorio `taller-aws-<su-nombre>`.
-29. En la pestaña **Images**, verá la imagen recién publicada con la etiqueta `latest`
+1. Vuelva a la consola de ECR y abra su repositorio `taller-aws-<su-nombre>`.
+2. En la pestaña **Images**, verá la imagen recién publicada con la etiqueta `latest`
     y la fecha y hora del push. Copie el **Image URI** completo —lo necesitará en la
     siguiente sección para lanzar el stack de CloudFormation.
 
