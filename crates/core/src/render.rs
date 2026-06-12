@@ -229,7 +229,10 @@ pub fn render_slideshow_page(
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          <script>\
+var cbSlideKey='cb-slide:'+location.pathname;\
+if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
 Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
+Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);}});\
 document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
 </script>\n\
          <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
