@@ -30,11 +30,20 @@
   background: var(--cb-ink);
 }
 
+.reveal {
+  font-family: "Montserrat", system-ui, sans-serif;
+  font-size: 38px;
+  color: #ffffff;
+}
+
 .reveal h1,
 .reveal h2,
 .reveal h3 {
+  font-family: "Montserrat", system-ui, sans-serif;
+  color: #ffffff;
   font-weight: 700;
   letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .reveal h2 {
