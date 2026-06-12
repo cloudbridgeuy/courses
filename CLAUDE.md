@@ -41,6 +41,18 @@ fails; full output is always written to `target/xtask-lint.log`.
 6. **Language.** Code, identifiers, comments, developer docs, URLs, and platform
    chrome are English. Course content, and in-guide labels, are Spanish.
 
+## Context docs
+
+Topic-specific context lives under `.claude/context/` — read the relevant file
+before working on that area:
+
+- `.claude/context/content-authoring.md` — Markdown directives (`:::slide`,
+  `::: solucion`, `{#name}`/`{{name}}`), frontmatter, heading slug rules.
+- `.claude/context/guide-and-slides-ui.md` — guide/slides CSS conventions, floating
+  buttons, sessionStorage keys, reveal.js theme rules.
+- `.claude/context/dev-workflow.md` — local server ports, browser verification,
+  lint, and repo hygiene (plans/designs stay out of git; conventional commits).
+
 ## Workspace
 
 ```
