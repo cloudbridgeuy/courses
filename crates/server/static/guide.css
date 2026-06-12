@@ -373,6 +373,81 @@ details.cb-tree-course > summary::-webkit-details-marker {
   border-top: 1px solid var(--cb-border);
 }
 
+/* Warning admonitions */
+
+.cb-warning {
+  margin: 1.25rem 0;
+  padding: 0.85rem 1rem 0.85rem 2.75rem;
+  position: relative;
+  background: #fdf6e3;
+  border: 1px solid #f0d9a0;
+  border-left: 4px solid #d97706;
+  border-radius: 8px;
+}
+
+.cb-warning::before {
+  content: "⚠";
+  position: absolute;
+  left: 1rem;
+  top: 0.8rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #d97706;
+}
+
+.cb-warning > :first-child {
+  margin-top: 0;
+}
+
+.cb-warning > :last-child {
+  margin-bottom: 0;
+}
+
+/* Extra (collapsible deep-dive) blocks */
+
+details.cb-extra {
+  margin: 1.25rem 0;
+  border: 1px solid var(--cb-border);
+  border-left: 4px solid var(--cb-grey);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+details.cb-extra > summary {
+  padding: 0.7rem 1rem;
+  font-weight: 600;
+  color: var(--cb-ink);
+  background: #f5f6f7;
+  cursor: pointer;
+  list-style: none;
+  transition: background 0.15s ease;
+}
+
+details.cb-extra > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.cb-extra > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.5rem;
+  color: var(--cb-grey);
+  transition: transform 0.15s ease;
+}
+
+details.cb-extra[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details.cb-extra > summary:hover {
+  background: #eceeef;
+}
+
+.cb-extra-cuerpo {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--cb-border);
+}
+
 /* Scroll-to-top button — only appears in wide viewports (margin space available) */
 
 #cb-top-btn,
