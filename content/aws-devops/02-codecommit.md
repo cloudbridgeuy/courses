@@ -35,9 +35,14 @@ git config --global user.name "Su Nombre"
 git config --global user.email su-correo@ejemplo.com
 ```
 
-Hay tres vías de acceso. **Las opciones 3 y 4 requieren un usuario IAM**; si su
-organización usa AWS Identity Center (SSO) para iniciar sesión, no tiene un usuario
-IAM — vaya directamente a la opción 5. Elija la vía que corresponda a su cuenta.
+Hay tres vías de acceso. Elija la que corresponda a su cuenta.
+
+::: warning
+**Las opciones 3 y 4 requieren un usuario IAM.** Si su organización usa AWS Identity
+Center (SSO) para iniciar sesión, su identidad es federada y no tiene un usuario IAM
+— esas dos opciones no estarán disponibles. En ese caso, vaya directamente a la
+opción 5.
+:::
 
 ### 3. Acceso HTTPS (cuenta con usuario IAM)
 
