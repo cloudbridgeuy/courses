@@ -114,7 +114,9 @@ pub struct RenderedBody {
 /// separately and omitted from the guide HTML.
 ///
 /// A line `{#name}` in plain Markdown anchors the block that follows (until a
-/// blank line, or the closing fence for a code fence). The marker line is
+/// blank line; a whole code fence; or, when the block opens with a heading,
+/// the whole subsection up to the next heading, `---` rule, or `::: solucion`
+/// block). The marker line is
 /// stripped from the guide HTML; the block itself still renders in the guide.
 /// Inside a `:::slide` block, a line `{{name}}` inserts the anchored Markdown.
 /// Anchors are scoped to the section body.
@@ -191,7 +193,10 @@ fn strip_anchors(md: &str, anchors: &mut HashMap<String, String>) -> Result<Stri
     Ok(out)
 }
 
-/// End (exclusive) of the block starting at `start`: a whole code fence, or
+/// End (exclusive) of the block starting at `start`: a whole code fence, a
+/// whole subsection when the block opens with a heading (until the next
+/// heading, a `---` rule, or the end of the segment — a `::: solucion` fence
+/// already ends the segment, so solutions are never captured), or otherwise
 /// the run of lines up to the next blank line.
 fn anchored_block_end(lines: &[&str], start: usize) -> usize {
     if lines
@@ -203,6 +208,13 @@ fn anchored_block_end(lines: &[&str], start: usize) -> usize {
             end += 1;
         }
         return (end + 1).min(lines.len());
+    }
+    if lines.get(start).is_some_and(|l| l.starts_with('#')) {
+        let mut end = start + 1;
+        while end < lines.len() && !lines[end].starts_with('#') && lines[end].trim() != "---" {
+            end += 1;
+        }
+        return end;
     }
     let mut end = start;
     while end < lines.len() && !lines[end].trim().is_empty() {
@@ -591,6 +603,36 @@ mod tests {
         let body = ":::slide\n{{con espacio}}\n:::\n";
         let result = render_section_body(body).unwrap();
         assert!(result.slide_html[0].html.contains("{{con espacio}}"));
+    }
+
+    #[test]
+    fn heading_anchor_captures_subsection_until_next_heading() {
+        let body = "{#ej-1}\n### Ejercicio 1\n\nEnunciado uno.\n\nMás texto.\n\n### Otra sección\n\nFuera.\n\n:::slide\n{{ej-1}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("Ejercicio 1"));
+        assert!(slide.contains("Enunciado uno."));
+        assert!(slide.contains("Más texto."));
+        assert!(!slide.contains("Otra sección"));
+        assert!(!slide.contains("Fuera."));
+    }
+
+    #[test]
+    fn heading_anchor_stops_at_thematic_break() {
+        let body =
+            "{#ej}\n### Ejercicio\n\nEnunciado.\n\n---\n\nDespués.\n\n:::slide\n{{ej}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.slide_html[0].html.contains("Enunciado."));
+        assert!(!result.slide_html[0].html.contains("Después."));
+    }
+
+    #[test]
+    fn heading_anchor_excludes_solution_block() {
+        let body = "{#ej}\n### Ejercicio\n\nEnunciado.\n\n::: solucion\nRespuesta secreta.\n:::\n\n:::slide\n{{ej}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.slide_html[0].html.contains("Enunciado."));
+        assert!(!result.slide_html[0].html.contains("Respuesta secreta."));
+        assert!(result.html.contains("Respuesta secreta."));
     }
 
     #[test]

@@ -103,6 +103,7 @@ en este momento —es una copia exacta del estado actual.
 
 ---
 
+{#ejercicio-1}
 ### Ejercicio 1 — Cree su repositorio
 
 Cree un repositorio de CodeCommit llamado `taller-aws-<su-nombre>`, y suba al menos
@@ -125,6 +126,7 @@ un archivo del código de la aplicación provisto por el instructor.
 
 ---
 
+{#ejercicio-2}
 ### Ejercicio 2 — Cree una rama, y encuentre su commit
 
 Desde la consola de CodeCommit, cree la rama `desarrollo` a partir de `main`. Luego
@@ -142,4 +144,12 @@ localice el ID del commit más reciente en esa rama.
 8. El **commit ID** es el identificador hexadecimal largo junto al commit. Los primeros
    8 caracteres son suficientes para identificarlo de forma única. Anótelos — los
    usará como referencia en la Semana 2.
+:::
+
+:::slide light
+{{ejercicio-1}}
+:::
+
+:::slide light
+{{ejercicio-2}}
 :::
