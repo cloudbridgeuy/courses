@@ -950,7 +950,7 @@ mod tests {
         let result = render_section_body(body).unwrap();
         assert!(result.html.contains("<div class=\"cb-warning\">"));
         assert!(result.html.contains("<strong>Atención</strong>"));
-        assert!(result.html.contains("<a href=\"https://example.com\">"));
+        assert!(result.html.contains("target=\"_blank\""));
     }
 
     #[test]

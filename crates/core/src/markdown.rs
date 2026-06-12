@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use pulldown_cmark::{Event, Tag, TagEnd};
 
+use crate::render::escape_html;
+
 /// Renders Markdown to HTML (CommonMark plus tables, footnotes, strikethrough).
 ///
 /// Raw HTML in the source passes through verbatim — content is trusted,
@@ -15,7 +17,7 @@ pub fn render_markdown(markdown: &str) -> String {
         | pulldown_cmark::Options::ENABLE_FOOTNOTES
         | pulldown_cmark::Options::ENABLE_STRIKETHROUGH;
     let parser = pulldown_cmark::Parser::new_ext(markdown, options);
-    let events = anchor_headings(parser);
+    let events = open_external_links_in_new_tab(anchor_headings(parser));
     let mut html = String::new();
     pulldown_cmark::html::push_html(&mut html, events.into_iter());
     html
@@ -57,6 +59,38 @@ fn anchor_headings<'a>(parser: impl Iterator<Item = Event<'a>>) -> Vec<Event<'a>
         }
     }
     out
+}
+
+/// Rewrites links to external sites (`http://` / `https://`) so they open in a
+/// new tab, with `rel="noopener noreferrer"` to sever the opener reference.
+///
+/// Relative links (course pages `/…`, heading anchors `#…`) and the heading
+/// self-links — which are already raw `Event::Html` — are left untouched, so
+/// in-site navigation stays in the same tab.
+fn open_external_links_in_new_tab(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
+    let mut out = Vec::with_capacity(events.len());
+    for event in events {
+        match event {
+            Event::Start(Tag::Link {
+                dest_url, title, ..
+            }) if is_external(&dest_url) => {
+                let mut tag = format!("<a href=\"{}\"", escape_html(&dest_url));
+                if !title.is_empty() {
+                    tag.push_str(&format!(" title=\"{}\"", escape_html(&title)));
+                }
+                tag.push_str(" target=\"_blank\" rel=\"noopener noreferrer\">");
+                // `TagEnd::Link` still renders as `</a>`, closing this tag.
+                out.push(Event::Html(tag.into()));
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// True for absolute `http`/`https` URLs — links that leave the site.
+fn is_external(dest_url: &str) -> bool {
+    dest_url.starts_with("http://") || dest_url.starts_with("https://")
 }
 
 /// Lowercases, strips Spanish diacritics, and maps runs of non-alphanumerics
@@ -189,5 +223,50 @@ mod tests {
     #[test]
     fn slugify_empty_falls_back() {
         assert_eq!(slugify("—"), "titulo");
+    }
+
+    // ── external links ───────────────────────────────────────────────────
+
+    #[test]
+    fn external_https_link_opens_in_new_tab() {
+        let html = render_markdown("[AWS](https://aws.amazon.com/blogs/).\n");
+        assert!(html.contains(
+            "<a href=\"https://aws.amazon.com/blogs/\" \
+             target=\"_blank\" rel=\"noopener noreferrer\">AWS</a>"
+        ));
+    }
+
+    #[test]
+    fn external_http_link_opens_in_new_tab() {
+        let html = render_markdown("[x](http://example.com)\n");
+        assert!(html.contains("target=\"_blank\""));
+        assert!(html.contains("rel=\"noopener noreferrer\""));
+    }
+
+    #[test]
+    fn external_link_title_is_preserved_and_escaped() {
+        let html = render_markdown("[x](https://example.com \"Más <info>\")\n");
+        assert!(html.contains("title=\"Más &lt;info&gt;\""));
+        assert!(html.contains("target=\"_blank\""));
+    }
+
+    #[test]
+    fn relative_link_stays_in_same_tab() {
+        let html = render_markdown("[Sección](/courses/aws-devops/x)\n");
+        assert!(html.contains("<a href=\"/courses/aws-devops/x\">Sección</a>"));
+        assert!(!html.contains("target=\"_blank\""));
+    }
+
+    #[test]
+    fn anchor_link_stays_in_same_tab() {
+        let html = render_markdown("[Arriba](#top)\n");
+        assert!(html.contains("<a href=\"#top\">Arriba</a>"));
+        assert!(!html.contains("target=\"_blank\""));
+    }
+
+    #[test]
+    fn heading_self_link_is_not_marked_external() {
+        let html = render_markdown("## Título\n");
+        assert!(!html.contains("target=\"_blank\""));
     }
 }
