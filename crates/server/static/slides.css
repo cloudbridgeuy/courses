@@ -270,3 +270,30 @@
   font-size: 0.6em;
   text-align: left;
 }
+
+/* Code-copy buttons on slides (markup injected by toggle.js) */
+
+.reveal .cb-code {
+  position: relative;
+}
+
+.reveal .cb-copy {
+  position: absolute;
+  top: 0.3em;
+  right: 0.3em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25em;
+  color: #e8e8e8;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.4em;
+  cursor: pointer;
+}
+
+.reveal .cb-copy.cb-copied {
+  color: var(--cb-ink);
+  background: var(--cb-teal);
+  border-color: var(--cb-teal);
+}
