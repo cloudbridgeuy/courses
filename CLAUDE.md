@@ -38,6 +38,8 @@ fails; full output is always written to `target/xtask-lint.log`.
    Params struct.
 5. **Files.** No `.rs` file under `crates/*/src/`, or `xtask/src/`, may exceed 1000
    lines.
+6. **Language.** Code, identifiers, comments, developer docs, URLs, and platform
+   chrome are English. Course content, and in-guide labels, are Spanish.
 
 ## Workspace
 

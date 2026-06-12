@@ -1,0 +1,19 @@
+title = "Taller AWS DevOps"
+
+[[session]]
+slug = "del-codigo-a-la-imagen"
+title = "Del código a la imagen"
+sections = [
+  "01-introduccion.md",
+  "02-codecommit.md",
+  "03-codebuild-ecr.md",
+]
+
+[[session]]
+slug = "la-aplicacion-en-linea"
+title = "La aplicación en línea"
+sections = [
+  "04-despliegue.md",
+  "05-teardown.md",
+  "06-preguntas-puente.md",
+]

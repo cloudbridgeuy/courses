@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 
@@ -110,8 +112,14 @@ pub struct RenderedBody {
 /// Renders a section's Markdown body, expanding `::: solucion` blocks into
 /// toggle markup (button plus hidden panel). `:::slide` blocks are collected
 /// separately and omitted from the guide HTML.
+///
+/// A line `{#name}` in plain Markdown anchors the block that follows (until a
+/// blank line, or the closing fence for a code fence). The marker line is
+/// stripped from the guide HTML; the block itself still renders in the guide.
+/// Inside a `:::slide` block, a line `{{name}}` inserts the anchored Markdown.
+/// Anchors are scoped to the section body.
 pub fn render_section_body(body: &str) -> Result<RenderedBody> {
-    let segments = split_solutions(body)?;
+    let (segments, anchors) = extract_anchors(split_solutions(body)?)?;
     let mut html = String::new();
     let mut slide_html = Vec::new();
     let mut uses_solutions = false;
@@ -125,6 +133,7 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
             }
             Segment::Slide { md, light } => {
                 uses_slides = true;
+                let md = substitute_refs(&md, &anchors)?;
                 slide_html.push(SlideFragment {
                     html: render_markdown(&md),
                     light,
@@ -138,6 +147,107 @@ pub fn render_section_body(body: &str) -> Result<RenderedBody> {
         uses_solutions,
         uses_slides,
     })
+}
+
+/// Collects `{#name}` anchors from Markdown segments, stripping the marker
+/// lines while leaving the anchored blocks in place.
+fn extract_anchors(segments: Vec<Segment>) -> Result<(Vec<Segment>, HashMap<String, String>)> {
+    let mut anchors = HashMap::new();
+    let mut out = Vec::with_capacity(segments.len());
+    for segment in segments {
+        match segment {
+            Segment::Markdown(md) => {
+                out.push(Segment::Markdown(strip_anchors(&md, &mut anchors)?));
+            }
+            other => out.push(other),
+        }
+    }
+    Ok((out, anchors))
+}
+
+fn strip_anchors(md: &str, anchors: &mut HashMap<String, String>) -> Result<String> {
+    let lines: Vec<&str> = md.lines().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let Some(name) = parse_anchor_marker(lines[i]) else {
+            out.push_str(lines[i]);
+            out.push('\n');
+            i += 1;
+            continue;
+        };
+        let start = i + 1;
+        let end = anchored_block_end(&lines, start);
+        if end == start {
+            return Err(Error::EmptyAnchor(name.to_owned()));
+        }
+        let block: String = lines[start..end].iter().map(|l| format!("{l}\n")).collect();
+        if anchors.insert(name.to_owned(), block.clone()).is_some() {
+            return Err(Error::DuplicateAnchor(name.to_owned()));
+        }
+        out.push_str(&block);
+        i = end;
+    }
+    Ok(out)
+}
+
+/// End (exclusive) of the block starting at `start`: a whole code fence, or
+/// the run of lines up to the next blank line.
+fn anchored_block_end(lines: &[&str], start: usize) -> usize {
+    if lines
+        .get(start)
+        .is_some_and(|l| l.trim_start().starts_with("```"))
+    {
+        let mut end = start + 1;
+        while end < lines.len() && !lines[end].trim_start().starts_with("```") {
+            end += 1;
+        }
+        return (end + 1).min(lines.len());
+    }
+    let mut end = start;
+    while end < lines.len() && !lines[end].trim().is_empty() {
+        end += 1;
+    }
+    end
+}
+
+/// Parses a `{#name}` marker line; returns the name if the line is one.
+fn parse_anchor_marker(line: &str) -> Option<&str> {
+    let name = line.trim().strip_prefix("{#")?.strip_suffix('}')?;
+    is_valid_anchor_name(name).then_some(name)
+}
+
+fn is_valid_anchor_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Replaces `{{name}}` lines in slide Markdown with the anchored block.
+fn substitute_refs(md: &str, anchors: &HashMap<String, String>) -> Result<String> {
+    let mut out = String::new();
+    for line in md.lines() {
+        let reference = line
+            .trim()
+            .strip_prefix("{{")
+            .and_then(|r| r.strip_suffix("}}"))
+            .map(str::trim)
+            .filter(|name| is_valid_anchor_name(name));
+        match reference {
+            Some(name) => {
+                let block = anchors
+                    .get(name)
+                    .ok_or_else(|| Error::UnknownSlideRef(name.to_owned()))?;
+                out.push_str(block);
+            }
+            None => {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn render_solution(inner_html: &str) -> String {
@@ -400,6 +510,87 @@ mod tests {
         assert_eq!(result.slide_html.len(), 1);
         assert!(result.slide_html[0].light);
         assert!(result.slide_html[0].html.contains("<strong>Bold</strong>"));
+    }
+
+    // ── anchor / reference tests ──────────────────────────────────────────
+
+    #[test]
+    fn anchor_marker_stripped_block_stays_in_guide() {
+        let body = "Intro.\n\n{#tabla}\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\nOutro.\n";
+        let result = render_section_body(body).unwrap();
+        assert!(!result.html.contains("{#tabla}"));
+        assert!(result.html.contains("<table>"));
+    }
+
+    #[test]
+    fn slide_ref_inserts_anchored_block() {
+        let body =
+            "{#tabla}\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n:::slide\n## T\n\n{{tabla}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert_eq!(result.slide_html.len(), 1);
+        assert!(result.slide_html[0].html.contains("<table>"));
+        assert!(!result.slide_html[0].html.contains("{{tabla}}"));
+    }
+
+    #[test]
+    fn slide_ref_works_when_slide_precedes_anchor() {
+        let body = ":::slide\n{{nota}}\n:::\n\n{#nota}\n**Importante.**\n";
+        let result = render_section_body(body).unwrap();
+        assert!(
+            result.slide_html[0]
+                .html
+                .contains("<strong>Importante.</strong>")
+        );
+    }
+
+    #[test]
+    fn anchored_code_fence_captured_whole_including_blank_lines() {
+        let body = "{#code}\n```\nline 1\n\nline 2\n```\n\n:::slide\n{{code}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.slide_html[0].html.contains("line 1"));
+        assert!(result.slide_html[0].html.contains("line 2"));
+        assert!(result.html.contains("line 2"));
+    }
+
+    #[test]
+    fn unknown_slide_ref_errors() {
+        let body = ":::slide\n{{no-existe}}\n:::\n";
+        assert!(matches!(
+            render_section_body(body),
+            Err(Error::UnknownSlideRef(ref n)) if n == "no-existe"
+        ));
+    }
+
+    #[test]
+    fn duplicate_anchor_errors() {
+        let body = "{#x}\nuno\n\n{#x}\ndos\n";
+        assert!(matches!(
+            render_section_body(body),
+            Err(Error::DuplicateAnchor(ref n)) if n == "x"
+        ));
+    }
+
+    #[test]
+    fn anchor_without_block_errors() {
+        let body = "{#vacio}\n\nTexto.\n";
+        assert!(matches!(
+            render_section_body(body),
+            Err(Error::EmptyAnchor(ref n)) if n == "vacio"
+        ));
+    }
+
+    #[test]
+    fn invalid_anchor_name_is_plain_markdown() {
+        let body = "{#con espacio}\nTexto.\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.html.contains("{#con espacio}"));
+    }
+
+    #[test]
+    fn non_ref_braces_in_slide_left_alone() {
+        let body = ":::slide\n{{con espacio}}\n:::\n";
+        let result = render_section_body(body).unwrap();
+        assert!(result.slide_html[0].html.contains("{{con espacio}}"));
     }
 
     #[test]

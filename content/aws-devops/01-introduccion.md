@@ -31,13 +31,7 @@ Cada ejercicio incluye su solución oculta — botón **Ver solución** en la gu
 :::slide
 ## Servicios del taller
 
-| Servicio | Rol en el pipeline |
-| --- | --- |
-| CodeCommit | Repositorio de código fuente |
-| CodeBuild | Construcción de la imagen |
-| ECR | Registro de imágenes Docker |
-| CloudFormation | Infraestructura como código |
-| ECS + Fargate | Ejecución de contenedores |
+{{tabla-servicios}}
 :::
 
 ## La narrativa del taller
@@ -48,6 +42,15 @@ concreto de la misma historia. Al terminar la Semana 4, habrá recorrido el fluj
 de un equipo moderno de desarrollo:
 
 **CodeCommit → CodeBuild → ECR → ECS → CloudWatch**
+
+{#tabla-servicios}
+| Servicio | Rol en el pipeline |
+| --- | --- |
+| CodeCommit | Repositorio de código fuente |
+| CodeBuild | Construcción de la imagen |
+| ECR | Registro de imágenes Docker |
+| CloudFormation | Infraestructura como código |
+| ECS + Fargate | Ejecución de contenedores |
 
 El repositorio de código, la imagen Docker, el clúster de contenedores, y el monitoreo
 —todo en AWS, todo creado por usted desde la consola, todo conectado entre sí.

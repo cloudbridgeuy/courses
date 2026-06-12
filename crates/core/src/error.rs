@@ -30,6 +30,15 @@ pub enum Error {
     #[error("nested `:::slide` block")]
     NestedSlide,
 
+    #[error("duplicate anchor: {0}")]
+    DuplicateAnchor(String),
+
+    #[error("anchor {0} is not followed by a block")]
+    EmptyAnchor(String),
+
+    #[error("slide references unknown anchor: {0}")]
+    UnknownSlideRef(String),
+
     #[error("in section {file}: {message}")]
     InvalidSection { file: String, message: String },
 }
@@ -97,6 +106,30 @@ mod tests {
     #[test]
     fn display_nested_slide() {
         assert_eq!(Error::NestedSlide.to_string(), "nested `:::slide` block");
+    }
+
+    #[test]
+    fn display_duplicate_anchor() {
+        assert_eq!(
+            Error::DuplicateAnchor("tabla".to_owned()).to_string(),
+            "duplicate anchor: tabla"
+        );
+    }
+
+    #[test]
+    fn display_empty_anchor() {
+        assert_eq!(
+            Error::EmptyAnchor("tabla".to_owned()).to_string(),
+            "anchor tabla is not followed by a block"
+        );
+    }
+
+    #[test]
+    fn display_unknown_slide_ref() {
+        assert_eq!(
+            Error::UnknownSlideRef("tabla".to_owned()).to_string(),
+            "slide references unknown anchor: tabla"
+        );
     }
 
     #[test]

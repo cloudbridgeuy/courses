@@ -2,6 +2,7 @@
 
 //! Imperative shell: axum server for the courses platform.
 
+mod content;
 mod routes;
 
 use std::net::{Ipv4Addr, SocketAddr};
@@ -40,13 +41,14 @@ async fn main() -> Result<()> {
         .init();
 
     let config = Config::from_env()?;
+    let site = std::sync::Arc::new(content::load_site()?);
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .wrap_err_with(|| format!("failed to bind {addr}"))?;
     tracing::info!("listening on http://{addr}");
 
-    axum::serve(listener, routes::router())
+    axum::serve(listener, routes::router(site))
         .with_graceful_shutdown(shutdown_signal())
         .await
         .wrap_err("server error")?;

@@ -6,9 +6,10 @@ under `content/`, one subdirectory per course.
 
 ## Language
 
-The domain speaks Spanish to users, and English in code: identifiers, types,
-comments, and developer docs are English; all user-facing strings, and course
-content, are Spanish. The glossary maps both.
+The domain speaks Spanish only in course content: guide text, and in-guide labels
+(e.g. the «Ver solución» toggle). Everything else — code, identifiers, comments,
+developer docs, URLs, and platform chrome (index page, error pages) — is English.
+The glossary maps both.
 
 **Course** (es: *taller*):
 One deliverable workshop — a slug, a title, and its guide content.
@@ -46,4 +47,4 @@ _Avoid_: demo, simulation, button
 
 ## Flagged ambiguities
 
-- Page language: `lang="es"` is hard-coded in `render_guide_page` — resolved: acceptable while every Course is Spanish; it becomes a **Course** field the day a non-Spanish Course exists.
+- Page language: guide pages use `lang="es"` in `render_guide_page` — resolved: acceptable while every Course is Spanish; it becomes a **Course** field the day a non-Spanish Course exists. The index page, and the 404 page, are platform chrome and use `lang="en"`.

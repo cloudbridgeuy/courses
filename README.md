@@ -5,8 +5,8 @@ guides, and a scenario console that provokes observable infrastructure behavior
 (CPU bursts, error-log bursts, custom metrics).
 
 Each course's content lives under `content/<slug>/`; the server is course-agnostic.
-Course content, and every user-facing string, is Spanish; code, and developer docs,
-are English (see `CONTEXT.md`).
+Course content, and in-guide labels, are Spanish; code, developer docs, URLs, and
+platform chrome are English (see `CONTEXT.md`).
 
 ## Layout
 
@@ -16,6 +16,30 @@ are English (see `CONTEXT.md`).
 | `crates/server` | `courses_server` | Imperative shell: axum binary. |
 | `xtask` | `xtask` | Repository task runner. |
 | `content/` | — | Course content, one subdirectory per slug. |
+
+## Routes
+
+| Method | Path | Response |
+|--------|------|----------|
+| `GET` | `/` | Index page: full course→session→section tree (`lang="en"`). |
+| `GET` | `/courses/{slug}` | Course landing page: title + scoped tree (`lang="es"`); unknown slug → 404. |
+| `GET` | `/courses/{slug}/{session}` | Session page: section nav, sections, prev/next footer nav (`lang="es"`); unknown slug or session → 404. |
+| `GET` | `/static/{file}` | Embedded platform assets (`toggle.js`, `guide.css`, `montserrat.ttf`, `cloudbridge.png`), each with its Content-Type; unknown file returns 404. |
+| `GET` | `/health` | Plain-text `ok` — used by load-balancer health checks. |
+
+## Embedded content
+
+Content under `content/` compiles into the binary via `include_dir`. The server
+parses and pre-renders every course once at startup; a content error aborts the boot,
+naming the file and reason. Editing content requires a rebuild. See
+`content/README.md` for the authoring format.
+
+## Brand assets
+
+The pages follow the CloudBridge brand. `crates/server/static/` holds the embedded
+Montserrat variable font (`montserrat.ttf`), the brand logo (`cloudbridge.png`), and
+the stylesheet (`guide.css`). `OFL.txt` ships the font license beside the font, as the
+SIL Open Font License requires; it stays in the repo and is not served.
 
 ## Development
 
