@@ -2,6 +2,75 @@
 title = "El origen del código — CodeCommit"
 +++
 
+::: warning
+Desde el **25 de julio de 2024**, AWS CodeCommit no acepta nuevos clientes. Solo
+las cuentas que ya usaban el servicio antes de esa fecha conservan acceso completo.
+La cuenta del taller fue creada antes del corte, por lo que todos los laboratorios
+funcionan con normalidad — pero **no intente replicar esta sesión en una cuenta
+personal nueva**: la opción de crear repositorios no estará disponible. Puede leer
+el anuncio oficial en el blog de AWS: [How to migrate your AWS CodeCommit
+repository to another Git provider](https://aws.amazon.com/blogs/devops/how-to-migrate-your-aws-codecommit-repository-to-another-git-provider/).
+:::
+
+## Pre-requisitos
+
+Complete estos pasos **antes de la sesión**.
+
+### 1. Instalar git
+
+- **Windows**: descargue e instale [Git for Windows](https://git-scm.com/download/win).
+- **Mac**: ejecute `xcode-select --install` en la Terminal, o si tiene Homebrew:
+  `brew install git` ([git-scm.com/download/mac](https://git-scm.com/download/mac)).
+
+Verifique la instalación:
+
+```bash
+git --version
+```
+
+### 2. Configuración mínima
+
+```bash
+git config --global user.name "Su Nombre"
+git config --global user.email su-correo@ejemplo.com
+```
+
+### 3. Acceso HTTPS
+
+En la consola de IAM → su usuario → pestaña **Security credentials** → sección
+**HTTPS Git credentials for AWS CodeCommit** → pulse **Generate credentials**.
+Guarde el usuario y la contraseña generados; los necesitará al hacer `git push`.
+
+### 4. Acceso SSH
+
+Genere un par de claves si aún no tiene uno:
+
+```bash
+ssh-keygen -t rsa -b 4096
+```
+
+Luego, en la consola de IAM → su usuario → **Security credentials** →
+**SSH keys for AWS CodeCommit** → **Upload SSH public key**. Copie el contenido
+de `~/.ssh/id_rsa.pub` y péguelo. Anote el **SSH key ID** que IAM asigna
+(comienza con `APKA…`).
+
+Configure `~/.ssh/config`:
+
+```
+Host git-codecommit.*.amazonaws.com
+  User APKA................
+  IdentityFile ~/.ssh/id_rsa
+```
+
+Ambas vías tienen el mismo peso en el taller; elija la que prefiera.
+
+::: extra HTTPS vs SSH: ¿cuál elegir?
+**HTTPS** es más simple de configurar (solo usuario y contraseña generados en IAM),
+pero pide credenciales en cada operación salvo que use un *credential helper*.
+**SSH** requiere generar y registrar una clave, pero después autentica de forma
+transparente. Para el taller cualquiera de los dos funciona igual de bien.
+:::
+
 ## El problema del código sin versionar
 
 Imagine que trabaja en equipo sobre los mismos archivos: ¿cómo sabe quién cambió qué
@@ -49,24 +118,63 @@ su primer nombre en minúsculas y sin acentos (por ejemplo: `taller-aws-maria`).
 CodeCommit crea el repositorio vacío en segundos y lo lleva a la vista principal del
 repositorio.
 
-### Subir el código de la aplicación
+### Clonar el código desde GitHub
 
-El instructor le proveyó un archivo `.zip` con el código de la aplicación. Siga estos
-pasos para cargarlo directamente desde la consola, sin necesidad de instalar Git
-localmente.
+::: extra Los comandos de git que usaremos
+- `git clone <url>` — copia un repositorio remoto completo a su máquina, con todo su historial.
+- `git remote -v` — lista los remotos configurados y sus URLs.
+- `git remote add <nombre> <url>` — registra un remoto adicional bajo un nombre.
+- `git push -u <remoto> <rama>` — sube los commits de una rama al remoto, y con `-u` recuerda la asociación para futuros `git push`.
+- `git status` — muestra el estado del directorio de trabajo.
+- `git log` — muestra el historial de commits.
+:::
 
-1. En la vista del repositorio vacío, busque el botón **Add file** y despliegue el
-   menú. Seleccione **Upload file**.
-2. Pulse **Choose file** y seleccione el primer archivo del `.zip` descomprimido.
-   Escriba su nombre y correo en los campos **Author name** y **Email address** —
-   aparecerán en el historial de commits.
-3. En **Commit message**, escriba `Carga inicial del código de la aplicación`.
-4. Pulse **Commit changes**.
+Clone el repositorio del taller desde GitHub y entre al directorio:
 
-> **Nota:** la consola de CodeCommit permite subir un archivo a la vez por este método.
-> El instructor indicará si el `.zip` incluye un script auxiliar para cargar múltiples
-> archivos vía HTTPS, o si se usará otra vía para la carga completa. Lo importante
-> conceptualmente es que cada archivo que sube genera un commit rastreable.
+```bash
+git clone https://github.com/cloudbridgeuy/courses
+cd courses
+```
+
+### Conectar el repositorio de CodeCommit
+
+En la vista del repositorio recién creado en la consola, pulse el botón **Clone URL**
+y copie la URL correspondiente al método de acceso que configuró:
+
+- **HTTPS**: `https://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
+- **SSH**: `ssh://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
+
+Agregue CodeCommit como remoto adicional:
+
+```bash
+git remote add codecommit <url-copiada>
+```
+
+Verifique que ambos remotos estén registrados:
+
+```bash
+git remote -v
+```
+
+Debe ver `origin` (GitHub) y `codecommit`.
+
+::: extra ¿Qué es un repositorio remoto?
+Un *remoto* es una copia del repositorio alojada en otro servidor. `origin` es solo
+el nombre convencional del remoto desde el que se clonó. Un mismo repositorio local
+puede tener varios remotos: aquí GitHub queda como fuente de lectura (`origin`) y
+CodeCommit como destino de trabajo (`codecommit`).
+:::
+
+### Subir el código
+
+Suba la rama `main` a CodeCommit:
+
+```bash
+git push -u codecommit main
+```
+
+Con HTTPS, git pedirá el usuario y la contraseña generados en IAM. Con SSH, la
+autenticación es transparente gracias al archivo `~/.ssh/config`.
 
 ### Explorar la vista del repositorio
 
@@ -104,24 +212,44 @@ en este momento —es una copia exacta del estado actual.
 ---
 
 {#ejercicio-1}
-### Ejercicio 1 — Cree su repositorio
+### Ejercicio 1 — Clone, conecte y suba el código
 
-Cree un repositorio de CodeCommit llamado `taller-aws-<su-nombre>`, y suba al menos
-un archivo del código de la aplicación provisto por el instructor.
+Clone el repositorio `https://github.com/cloudbridgeuy/courses` desde GitHub, cree
+un repositorio de CodeCommit llamado `taller-aws-<su-nombre>`, agréguelo como
+remoto, y suba la rama `main`.
 
 ::: solucion
-1. En la consola de AWS, busque **CodeCommit** en la barra de búsqueda y ábralo.
-2. Pulse **Create repository**.
-3. En **Repository name**, escriba `taller-aws-<su-nombre>` (su primer nombre en
-   minúsculas, sin acentos).
-4. Pulse **Create** para confirmar la creación.
-5. En la vista del repositorio vacío, pulse **Add file → Upload file**.
-6. Pulse **Choose file** y seleccione un archivo del `.zip` descomprimido por el
-   instructor.
-7. Complete los campos **Author name** y **Email address**.
-8. En **Commit message**, escriba `Carga inicial del código de la aplicación`.
-9. Pulse **Commit changes**. El archivo aparecerá ahora en la vista **Code** del
-   repositorio.
+1. Clone el código y entre al directorio:
+
+   ```bash
+   git clone https://github.com/cloudbridgeuy/courses
+   cd courses
+   ```
+
+2. En la consola de AWS, busque **CodeCommit**, pulse **Create repository**, y
+   cree `taller-aws-<su-nombre>` (su primer nombre en minúsculas, sin acentos).
+3. Copie la **Clone URL** del nuevo repositorio (HTTPS o SSH, según el acceso que
+   configuró en los pre-requisitos) y agréguelo como remoto:
+
+   ```bash
+   # Variante HTTPS
+   git remote add codecommit https://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>
+
+   # Variante SSH
+   git remote add codecommit ssh://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>
+   ```
+
+4. Verifique los remotos con `git remote -v` — debe ver `origin` (GitHub) y
+   `codecommit`.
+5. Suba la rama `main`:
+
+   ```bash
+   git push -u codecommit main
+   ```
+
+   Con HTTPS, git pedirá el usuario y la contraseña generados en IAM.
+6. En la consola de CodeCommit, abra su repositorio: los archivos aparecen en la
+   pestaña **Code**.
 :::
 
 ---
