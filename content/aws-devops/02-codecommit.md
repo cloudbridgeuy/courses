@@ -35,13 +35,17 @@ git config --global user.name "Su Nombre"
 git config --global user.email su-correo@ejemplo.com
 ```
 
-### 3. Acceso HTTPS
+Hay tres vías de acceso. **Las opciones 3 y 4 requieren un usuario IAM**; si su
+organización usa AWS Identity Center (SSO) para iniciar sesión, no tiene un usuario
+IAM — vaya directamente a la opción 5. Elija la vía que corresponda a su cuenta.
+
+### 3. Acceso HTTPS (cuenta con usuario IAM)
 
 En la [consola de IAM](https://console.aws.amazon.com/iam/home) → su usuario → pestaña **Security credentials** → sección
 **HTTPS Git credentials for AWS CodeCommit** → pulse **Generate credentials**.
 Guarde el usuario y la contraseña generados; los necesitará al hacer `git push`.
 
-### 4. Acceso SSH
+### 4. Acceso SSH (cuenta con usuario IAM)
 
 Genere un par de claves si aún no tiene uno:
 
@@ -62,13 +66,41 @@ Host git-codecommit.*.amazonaws.com
   IdentityFile ~/.ssh/id_rsa
 ```
 
-Ambas vías tienen el mismo peso en el taller; elija la que prefiera.
+### 5. Acceso con IAM Identity Center (SSO)
 
-::: extra HTTPS vs SSH: ¿cuál elegir?
-**HTTPS** es más simple de configurar (solo usuario y contraseña generados en IAM),
-pero pide credenciales en cada operación salvo que use un *credential helper*.
+Si inicia sesión con **AWS IAM Identity Center** (antes AWS SSO), su identidad es
+federada y **no tiene un usuario IAM**, por lo que las opciones 3 y 4 no aplican.
+Use `git-remote-codecommit`, que autentica con las credenciales de su perfil del
+AWS CLI.
+
+1. Instale **AWS CLI v2** ([guía oficial](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)).
+2. Configure un perfil con SSO y anote el **nombre del perfil** que asigne:
+
+   ```bash
+   aws configure sso
+   ```
+
+3. Instale el ayudante de git (requiere Python):
+
+   ```bash
+   pip install git-remote-codecommit
+   ```
+
+4. Con esta vía, las URLs de CodeCommit toman la forma
+   `codecommit::<región>://<perfil>@<nombre-del-repositorio>`; no necesita
+   credenciales HTTPS ni claves SSH.
+
+Elija la vía que corresponda a su cuenta. Si tiene un usuario IAM, cualquiera de las
+opciones 3, 4 o 5 funciona; si usa Identity Center, use la opción 5.
+
+::: extra HTTPS, SSH o Identity Center: ¿cuál elegir?
+**HTTPS** es la más simple de configurar (solo usuario y contraseña generados en
+IAM), pero pide credenciales en cada operación salvo que use un *credential helper*.
 **SSH** requiere generar y registrar una clave, pero después autentica de forma
-transparente. Para el taller cualquiera de los dos funciona igual de bien.
+transparente. Ambas necesitan un **usuario IAM**. Si su cuenta usa **Identity
+Center**, no tiene usuario IAM: la única vía es `git-remote-codecommit` (opción 5),
+que reutiliza su sesión del AWS CLI. Para el taller, use la que corresponda a cómo
+inicia sesión en AWS.
 :::
 
 ## El problema del código sin versionar
@@ -143,6 +175,8 @@ y copie la URL correspondiente al método de acceso que configuró:
 
 - **HTTPS**: `https://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
 - **SSH**: `ssh://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
+- **Identity Center (grc)**: `codecommit::<región>://<perfil>@taller-aws-<su-nombre>`
+  (no aparece en el botón **Clone URL**; constrúyala con su región y el nombre del perfil).
 
 Agregue CodeCommit como remoto adicional:
 
@@ -228,15 +262,18 @@ remoto, y suba la rama `main`.
 
 2. En la consola de AWS, busque [**CodeCommit**](https://console.aws.amazon.com/codesuite/codecommit/home), pulse **Create repository**, y
    cree `taller-aws-<su-nombre>` (su primer nombre en minúsculas, sin acentos).
-3. Copie la **Clone URL** del nuevo repositorio (HTTPS o SSH, según el acceso que
-   configuró en los pre-requisitos) y agréguelo como remoto:
+3. Agregue CodeCommit como remoto, según el acceso que configuró en los
+   pre-requisitos:
 
    ```bash
-   # Variante HTTPS
+   # Variante HTTPS (usuario IAM) — copie la Clone URL del repositorio
    git remote add codecommit https://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>
 
-   # Variante SSH
+   # Variante SSH (usuario IAM) — copie la Clone URL del repositorio
    git remote add codecommit ssh://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>
+
+   # Variante Identity Center (grc) — constrúyala con su región y perfil
+   git remote add codecommit codecommit::<región>://<perfil>@taller-aws-<su-nombre>
    ```
 
 4. Verifique los remotos con `git remote -v` — debe ver `origin` (GitHub) y
@@ -247,7 +284,8 @@ remoto, y suba la rama `main`.
    git push -u codecommit main
    ```
 
-   Con HTTPS, git pedirá el usuario y la contraseña generados en IAM.
+   Con HTTPS, git pedirá el usuario y la contraseña generados en IAM. Con
+   Identity Center (grc), reutiliza su sesión activa del AWS CLI.
 6. En la [consola de CodeCommit](https://console.aws.amazon.com/codesuite/codecommit/home), abra su repositorio: los archivos aparecen en la
    pestaña **Code**.
 :::
