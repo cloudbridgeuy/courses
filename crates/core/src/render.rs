@@ -168,7 +168,8 @@ pub fn render_session_page(input: &SessionPage<'_>) -> String {
         let title = escape_html(&section.title);
         nav_items.push_str(&format!("<li><a href=\"#seccion-{n}\">{title}</a></li>\n"));
         sections.push_str(&format!(
-            "<section id=\"seccion-{n}\">\n<h2>{title}</h2>\n{}\n</section>\n",
+            "<section id=\"seccion-{n}\">\n\
+             <h2><a class=\"cb-hlink\" href=\"#seccion-{n}\">{title}</a></h2>\n{}\n</section>\n",
             section.body_html
         ));
     }

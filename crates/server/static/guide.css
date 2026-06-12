@@ -113,6 +113,32 @@ a {
   text-decoration-color: var(--cb-blue);
 }
 
+/* Perma-linkable titles: heading text links to its own anchor. */
+
+section,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  scroll-margin-top: 1rem;
+}
+
+.cb-hlink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cb-hlink:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--cb-teal);
+}
+
+.cb-hlink:hover::after {
+  content: " #";
+  color: var(--cb-teal);
+}
+
 /* Section nav */
 
 nav[aria-label="Contenido"] {

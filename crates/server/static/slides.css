@@ -218,6 +218,15 @@
   border-top-color: #e3e0dd;
 }
 
+/* Heading self-links come from the shared Markdown renderer; inert on slides
+   (a hash click would fight reveal.js's #/n navigation). */
+
+.reveal .cb-hlink {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: none;
+}
+
 /* Close button: top-right, circular ghost, back to the session guide. */
 
 .cb-slides-close {
