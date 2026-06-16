@@ -60,8 +60,15 @@ para el despliegue de una aplicación, desde su desarrollo hasta su operación:
 | CloudFormation | Infraestructura como código |
 | ECS + Fargate | Ejecución de contenedores |
 
+:::slide light
+## La narrativa del taller
 
-:::title-slide
+Una sola historia a lo largo de cuatro semanas:
+
+**CodeCommit → CodeBuild → ECR → ECS → CloudWatch**
+:::
+
+:::title-slide Semana 1
 :::
 
 ## Semana 1
@@ -98,6 +105,15 @@ borra el stack de CloudFormation, se espera a que termine, y se lo vuelve a lanz
 parámetros, dejandolo en punto de partida anterior. El costo de un error se reduce a
 minutos de espera.
 
+:::slide
+## El mecanismo de recuperación
+
+Desde el primer día practicamos **destruir y recrear** el ambiente completo.
+
+Si algo sale mal: borre el stack de CloudFormation, espere a que termine, y vuelva a
+lanzarlo con los mismos parámetros. El costo de un error se reduce a minutos de espera.
+:::
+
 ## Cómo usar esta guía
 
 Cada sección combina teoría breve con práctica guiada paso a paso. El esquema es
@@ -116,7 +132,21 @@ siempre el mismo:
    Piénselas antes de la siguiente sesión.
 
 :::slide
-## ¿Como utilizar esta guia?
+## ¿Cómo utilizar esta guía?
+
+1. **Teoría** — el problema del día y el servicio de AWS que lo resuelve.
+2. **Práctica guiada** — siga los pasos numerados; intente antes de ver la solución.
+3. **Solución oculta** — pulse **Ver solución** si se atasca.
+4. **Preguntas puente** — conectan el miércoles (presencial) con el viernes (remota).
+:::
+
+:::slide
+## Requisitos previos
+
+- **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation,
+  ECS/Fargate y DynamoDB.
+- **Navegador** actualizado (Chrome o Firefox).
+- **Plantilla** `taller-semana1.yaml`, provista por el instructor.
 :::
 
 ## Requisitos previos
