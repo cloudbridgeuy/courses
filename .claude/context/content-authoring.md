@@ -24,6 +24,24 @@ session title (e.g. `del-codigo-a-la-imagen`), NOT filenames. All content is Spa
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
 | `{{name}}` inside a `:::slide` | Embeds the anchored subsection as an exercise hero card |
 
+### Nesting
+
+`::: solucion`, `::: warning`, and `::: extra` nest freely — inside each other and
+inside `:::slide`/`:::inline-slide` (slides carry matching reveal.js CSS). A bare
+`:::` closes the innermost open block, so balance fences carefully:
+
+```
+:::slide
+## Título
+::: warning
+Cuidado.
+:::      <- closes the warning
+:::      <- closes the slide
+```
+
+Slide-family directives (`:::slide`, `:::inline-slide`, `:::title-slide`) are
+top-level only; nesting one inside any block is an error.
+
 `{#name}`/`{{name}}` is custom syntax handled by the segment parser — do NOT enable
 pulldown-cmark's heading-attributes option; it would collide with `{#name}`.
 
