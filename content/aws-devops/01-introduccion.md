@@ -83,8 +83,10 @@ la Semana 2.
 :::slide
 ## Semana 1
 
+::: warning
 En caso de que su sistema no funcione, utilizaremos CloudFormation para reiniciar
 el estado de su `pod`, eliminando todos los recursos, para luego volverlos a crear.
+:::
 :::
 
 ## El mecanismo de recuperación

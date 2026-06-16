@@ -1,11 +1,14 @@
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
-use crate::slides::{extract_anchors, render_slide};
+use crate::slides::{extract_anchors, render_slide_content};
 
-/// One segment of a section body: plain Markdown, a hidden solution, a
-/// slides-only block, an inline slide (rendered in both guide and slides), a
+/// One top-level segment of a section body: plain Markdown, a hidden solution,
+/// a slides-only block, an inline slide (rendered in both guide and slides), a
 /// title-only slide, an always-visible warning, or a collapsible extra block.
+///
+/// A directive's payload (`md`) is captured verbatim — it may itself contain
+/// nested directives, which the recursive renderers expand.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Segment {
     Markdown(String),
@@ -24,120 +27,125 @@ pub struct SlideFragment {
     pub light: bool,
 }
 
-/// Splits a Markdown body on `::: solucion`, `:::slide`, `:::inline-slide`,
-/// `:::title-slide`, `::: warning`, and `::: extra <title>` fenced blocks
-/// (closed by `:::`).
-///
-/// Fences must sit alone on their line. Nesting is rejected; an unclosed
-/// block is rejected.
-///
-/// Note: the slide fences (`:::slide`, `:::inline-slide`, `:::title-slide`)
-/// take no space; the others use a space. `:::slide` and `:::inline-slide`
-/// accept an optional `light` modifier. `::: warning` takes no arguments —
-/// with trailing text it is plain Markdown. `::: extra` takes an optional
-/// title after the keyword.
+/// A directive opener recognized at the start of a fenced block.
+enum Opener {
+    Solution,
+    Slide { light: bool },
+    InlineSlide { light: bool },
+    TitleSlide,
+    Warning,
+    Extra { title: String },
+}
+
+/// Recognizes a directive opener on its own line. The slide fences
+/// (`:::slide`, `:::inline-slide`, `:::title-slide`) take no space and accept
+/// an optional `light` modifier (except title-slide). `::: warning` takes no
+/// arguments — with trailing text it is plain Markdown. `::: extra` takes an
+/// optional title after the keyword.
+fn opener(fence: &str) -> Option<Opener> {
+    if fence == "::: solucion" {
+        Some(Opener::Solution)
+    } else if fence == ":::slide" || fence == ":::slide light" {
+        Some(Opener::Slide {
+            light: fence == ":::slide light",
+        })
+    } else if fence == ":::inline-slide" || fence == ":::inline-slide light" {
+        Some(Opener::InlineSlide {
+            light: fence == ":::inline-slide light",
+        })
+    } else if fence == ":::title-slide" {
+        Some(Opener::TitleSlide)
+    } else if fence == "::: warning" {
+        Some(Opener::Warning)
+    } else if let Some(rest) = fence.strip_prefix("::: extra") {
+        (rest.is_empty() || rest.starts_with(' ')).then(|| Opener::Extra {
+            title: rest.trim().to_owned(),
+        })
+    } else {
+        None
+    }
+}
+
+impl Opener {
+    fn into_segment(self, md: String) -> Result<Segment> {
+        Ok(match self {
+            Opener::Solution => Segment::Solution(md),
+            Opener::Slide { light } => Segment::Slide { md, light },
+            Opener::InlineSlide { light } => Segment::InlineSlide { md, light },
+            Opener::TitleSlide => {
+                if !md.trim().is_empty() {
+                    return Err(Error::TitleSlideNotEmpty);
+                }
+                Segment::TitleSlide
+            }
+            Opener::Warning => Segment::Warning(md),
+            Opener::Extra { title } => Segment::Extra { title, md },
+        })
+    }
+
+    fn unclosed_error(&self) -> Error {
+        match self {
+            Opener::Solution => Error::UnclosedSolution,
+            Opener::Slide { .. } => Error::UnclosedSlide,
+            Opener::InlineSlide { .. } => Error::UnclosedInlineSlide,
+            Opener::TitleSlide => Error::UnclosedTitleSlide,
+            Opener::Warning => Error::UnclosedWarning,
+            Opener::Extra { .. } => Error::UnclosedExtra,
+        }
+    }
+}
+
+/// Splits a Markdown body into top-level [`Segment`]s. Directive blocks open
+/// with their fence (`::: solucion`, `:::slide`, …) and close with a bare
+/// `:::`. Blocks nest: an opener seen inside a block increments the depth and
+/// its line is captured verbatim for the recursive renderer; the matching
+/// `:::` closes the innermost block (depth returns to zero). Fences must sit
+/// alone on their line. An unclosed block at end of input is an error.
 pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
-    enum State {
-        Outside,
-        InSolution,
-        InSlide { light: bool },
-        InInlineSlide { light: bool },
-        InTitleSlide,
-        InWarning,
-        InExtra { title: String },
-    }
-
-    fn opener(fence: &str) -> Option<State> {
-        if fence == "::: solucion" {
-            Some(State::InSolution)
-        } else if fence == ":::slide" || fence == ":::slide light" {
-            Some(State::InSlide {
-                light: fence == ":::slide light",
-            })
-        } else if fence == ":::inline-slide" || fence == ":::inline-slide light" {
-            Some(State::InInlineSlide {
-                light: fence == ":::inline-slide light",
-            })
-        } else if fence == ":::title-slide" {
-            Some(State::InTitleSlide)
-        } else if fence == "::: warning" {
-            Some(State::InWarning)
-        } else if let Some(rest) = fence.strip_prefix("::: extra") {
-            (rest.is_empty() || rest.starts_with(' ')).then(|| State::InExtra {
-                title: rest.trim().to_owned(),
-            })
-        } else {
-            None
-        }
-    }
-
-    fn nested_error(state: &State) -> Error {
-        match state {
-            State::InSolution => Error::NestedSolution,
-            State::InSlide { .. } => Error::NestedSlide,
-            State::InInlineSlide { .. } => Error::NestedInlineSlide,
-            State::InTitleSlide => Error::NestedTitleSlide,
-            State::InWarning => Error::NestedWarning,
-            State::InExtra { .. } => Error::NestedExtra,
-            State::Outside => unreachable!("opener never returns Outside"),
-        }
-    }
-
     let mut segments = Vec::new();
-    let mut state = State::Outside;
     let mut buf = String::new();
+    let mut open: Option<Opener> = None;
+    let mut depth: usize = 0;
 
     for line in body.lines() {
         let fence = line.trim_end();
-        match state {
-            State::Outside => {
-                if let Some(open) = opener(fence) {
-                    if !buf.is_empty() {
-                        segments.push(Segment::Markdown(std::mem::take(&mut buf)));
-                    }
-                    state = open;
-                } else {
-                    buf.push_str(line);
-                    buf.push('\n');
+        if open.is_none() {
+            if let Some(op) = opener(fence) {
+                if !buf.is_empty() {
+                    segments.push(Segment::Markdown(std::mem::take(&mut buf)));
                 }
+                open = Some(op);
+                depth = 1;
+            } else {
+                buf.push_str(line);
+                buf.push('\n');
             }
-            ref open_state => {
-                if let Some(inner) = opener(fence) {
-                    return Err(nested_error(&inner));
-                } else if fence == ":::" {
-                    let md = std::mem::take(&mut buf);
-                    let segment = match std::mem::replace(&mut state, State::Outside) {
-                        State::InSolution => Segment::Solution(md),
-                        State::InSlide { light } => Segment::Slide { md, light },
-                        State::InInlineSlide { light } => Segment::InlineSlide { md, light },
-                        State::InTitleSlide => {
-                            if !md.trim().is_empty() {
-                                return Err(Error::TitleSlideNotEmpty);
-                            }
-                            Segment::TitleSlide
-                        }
-                        State::InWarning => Segment::Warning(md),
-                        State::InExtra { title } => Segment::Extra { title, md },
-                        State::Outside => unreachable!("matched non-Outside arm"),
-                    };
-                    segments.push(segment);
-                } else {
-                    let _ = open_state;
-                    buf.push_str(line);
-                    buf.push('\n');
+            continue;
+        }
+        if opener(fence).is_some() {
+            depth += 1;
+            buf.push_str(line);
+            buf.push('\n');
+        } else if fence == ":::" {
+            depth -= 1;
+            if depth == 0 {
+                let md = std::mem::take(&mut buf);
+                match open.take() {
+                    Some(op) => segments.push(op.into_segment(md)?),
+                    None => unreachable!("open is Some in this branch"),
                 }
+            } else {
+                buf.push_str(line);
+                buf.push('\n');
             }
+        } else {
+            buf.push_str(line);
+            buf.push('\n');
         }
     }
 
-    match state {
-        State::InSolution => return Err(Error::UnclosedSolution),
-        State::InSlide { .. } => return Err(Error::UnclosedSlide),
-        State::InInlineSlide { .. } => return Err(Error::UnclosedInlineSlide),
-        State::InTitleSlide => return Err(Error::UnclosedTitleSlide),
-        State::InWarning => return Err(Error::UnclosedWarning),
-        State::InExtra { .. } => return Err(Error::UnclosedExtra),
-        State::Outside => {}
+    if let Some(op) = open {
+        return Err(op.unclosed_error());
     }
     if !buf.is_empty() {
         segments.push(Segment::Markdown(buf));
@@ -154,22 +162,20 @@ pub struct RenderedBody {
     pub uses_slides: bool,
 }
 
-/// Renders a section's Markdown body, expanding `::: solucion` blocks into
-/// toggle markup (button plus hidden panel).
+/// Renders a section's Markdown body.
 ///
-/// `:::slide` blocks are collected separately and omitted from the guide HTML.
-/// `:::inline-slide` blocks render in BOTH places: as a slide fragment and,
-/// inline, as guide document content. `:::title-slide` produces a slide that
-/// shows only `title` (the section heading); its body must be empty.
-/// `::: warning` renders as an always-visible admonition div; `::: extra
-/// <title>` renders as a closed `<details>` block — both are guide-only.
+/// `::: solucion`, `::: warning`, and `::: extra` produce their guide markup
+/// and nest freely (a warning inside a solution, an extra inside a warning,
+/// etc.). `:::slide` blocks are collected separately and omitted from the
+/// guide HTML. `:::inline-slide` renders in BOTH places. `:::title-slide`
+/// produces a slide showing only `title` (the section heading); its body must
+/// be empty. Slide-family directives are top-level only — nesting one inside
+/// another block is an error.
 ///
-/// A line `{#name}` in plain Markdown anchors the block that follows (until a
-/// blank line; a whole code fence; or, when the block opens with a heading,
-/// the whole subsection up to the next heading, `---` rule, or `::: solucion`
-/// block). The marker line is stripped from the guide HTML; the block itself
-/// still renders in the guide. Inside a `:::slide` block, a line `{{name}}`
-/// inserts the anchored Markdown. Anchors are scoped to the section body.
+/// A line `{#name}` in top-level Markdown anchors the block that follows; a
+/// line `{{name}}` inside a slide inserts the anchored Markdown (or an
+/// exercise hero card). Anchors are scoped to the section body and resolved at
+/// the top level only.
 pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
     let (segments, anchors) = extract_anchors(split_solutions(body)?)?;
     let mut html = String::new();
@@ -181,22 +187,23 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
             Segment::Markdown(md) => html.push_str(&render_markdown(&md)),
             Segment::Solution(md) => {
                 uses_solutions = true;
-                html.push_str(&render_solution(&render_markdown(&md)));
+                let inner = render_guide_segments(&md, &mut uses_solutions)?;
+                html.push_str(&render_solution(&inner));
             }
             Segment::Slide { md, light } => {
                 uses_slides = true;
                 slide_html.push(SlideFragment {
-                    html: render_slide(&md, &anchors)?,
+                    html: render_slide_content(&md, &anchors)?,
                     light,
                 });
             }
             Segment::InlineSlide { md, light } => {
                 uses_slides = true;
                 slide_html.push(SlideFragment {
-                    html: render_slide(&md, &anchors)?,
+                    html: render_slide_content(&md, &anchors)?,
                     light,
                 });
-                html.push_str(&render_markdown(&md));
+                html.push_str(&render_guide_segments(&md, &mut uses_solutions)?);
             }
             Segment::TitleSlide => {
                 uses_slides = true;
@@ -205,9 +212,13 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
                     light: false,
                 });
             }
-            Segment::Warning(md) => html.push_str(&render_warning(&render_markdown(&md))),
+            Segment::Warning(md) => {
+                let inner = render_guide_segments(&md, &mut uses_solutions)?;
+                html.push_str(&render_warning(&inner));
+            }
             Segment::Extra { title, md } => {
-                html.push_str(&render_extra(&title, &render_markdown(&md)));
+                let inner = render_guide_segments(&md, &mut uses_solutions)?;
+                html.push_str(&render_extra(&title, &inner));
             }
         }
     }
@@ -219,6 +230,37 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
     })
 }
 
+/// Renders raw Markdown that may contain nested directives, in GUIDE context:
+/// `::: solucion`, `::: warning`, and `::: extra` produce their guide markup;
+/// nesting recurses. Slide directives are illegal here (slides live only at
+/// the top level) and produce the matching nested-slide error. `{{name}}`
+/// references are not expanded outside slides.
+fn render_guide_segments(md: &str, uses_solutions: &mut bool) -> Result<String> {
+    let mut html = String::new();
+    for segment in split_solutions(md)? {
+        match segment {
+            Segment::Markdown(m) => html.push_str(&render_markdown(&m)),
+            Segment::Solution(inner) => {
+                *uses_solutions = true;
+                let body = render_guide_segments(&inner, uses_solutions)?;
+                html.push_str(&render_solution(&body));
+            }
+            Segment::Warning(inner) => {
+                let body = render_guide_segments(&inner, uses_solutions)?;
+                html.push_str(&render_warning(&body));
+            }
+            Segment::Extra { title, md } => {
+                let body = render_guide_segments(&md, uses_solutions)?;
+                html.push_str(&render_extra(&title, &body));
+            }
+            Segment::Slide { .. } => return Err(Error::NestedSlide),
+            Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
+            Segment::TitleSlide => return Err(Error::NestedTitleSlide),
+        }
+    }
+    Ok(html)
+}
+
 /// Renders a title-only slide: the section heading as a hero, centered by the
 /// reveal.js layout. Styling comes from `.reveal .cb-title-slide`.
 fn render_title_slide(title: &str) -> String {
@@ -227,13 +269,13 @@ fn render_title_slide(title: &str) -> String {
 
 /// Renders an always-visible warning admonition. The symbol comes from CSS
 /// (`.cb-warning::before`), keeping markup minimal.
-fn render_warning(inner_html: &str) -> String {
+pub(crate) fn render_warning(inner_html: &str) -> String {
     format!("<div class=\"cb-warning\">\n{inner_html}</div>\n")
 }
 
 /// Renders a collapsible extra block as a native `<details>` element, closed
 /// by default. An empty title falls back to "Contenido adicional".
-fn render_extra(title: &str, inner_html: &str) -> String {
+pub(crate) fn render_extra(title: &str, inner_html: &str) -> String {
     let title = if title.is_empty() {
         "Contenido adicional"
     } else {
@@ -308,40 +350,8 @@ mod tests {
     }
 
     #[test]
-    fn solution_at_start_of_body() {
-        let body = "::: solucion\nAnswer\n:::\nAfter\n";
-        let segs = split_solutions(body).unwrap();
-        assert_eq!(
-            segs,
-            vec![
-                Segment::Solution("Answer\n".to_owned()),
-                Segment::Markdown("After\n".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
-    fn solution_at_end_of_body() {
-        let body = "Before\n::: solucion\nAnswer\n:::\n";
-        let segs = split_solutions(body).unwrap();
-        assert_eq!(
-            segs,
-            vec![
-                Segment::Markdown("Before\n".to_owned()),
-                Segment::Solution("Answer\n".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
     fn empty_body_yields_empty_vec() {
         assert_eq!(split_solutions("").unwrap(), vec![]);
-    }
-
-    #[test]
-    fn nested_solution_block_errors() {
-        let body = "::: solucion\n::: solucion\n:::\n:::\n";
-        assert!(matches!(split_solutions(body), Err(Error::NestedSolution)));
     }
 
     #[test]
@@ -361,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn bare_close_fence_outside_solution_is_plain_markdown() {
+    fn bare_close_fence_outside_block_is_plain_markdown() {
         let body = "Text\n:::\nMore text\n";
         let segs = split_solutions(body).unwrap();
         assert_eq!(
@@ -370,21 +380,48 @@ mod tests {
         );
     }
 
-    // ── warning / extra fences ────────────────────────────────────────────
+    // ── nesting: inner content captured verbatim ──────────────────────────
 
     #[test]
-    fn warning_between_prose_yields_three_segments() {
-        let body = "Before.\n::: warning\nDanger.\n:::\nAfter.\n";
+    fn nested_block_payload_captured_verbatim() {
+        let body = "::: warning\nCuidado.\n::: extra Detalle\nTexto.\n:::\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Warning(
+                "Cuidado.\n::: extra Detalle\nTexto.\n:::\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn innermost_close_matches_innermost_open() {
+        // Two `:::` close warning then solution; trailing markdown follows.
+        let body = "::: solucion\n::: warning\nW.\n:::\nrest of answer\n:::\nAfter.\n";
         let segs = split_solutions(body).unwrap();
         assert_eq!(
             segs,
             vec![
-                Segment::Markdown("Before.\n".to_owned()),
-                Segment::Warning("Danger.\n".to_owned()),
+                Segment::Solution("::: warning\nW.\n:::\nrest of answer\n".to_owned()),
                 Segment::Markdown("After.\n".to_owned()),
             ]
         );
     }
+
+    #[test]
+    fn slide_with_nested_warning_payload_is_verbatim() {
+        let body = ":::slide\n## T\n::: warning\nW.\n:::\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Slide {
+                md: "## T\n::: warning\nW.\n:::\n".to_owned(),
+                light: false,
+            }]
+        );
+    }
+
+    // ── warning / extra fences ────────────────────────────────────────────
 
     #[test]
     fn warning_with_arguments_is_plain_markdown() {
@@ -403,30 +440,6 @@ mod tests {
         assert!(matches!(
             split_solutions("::: warning\nX.\n"),
             Err(Error::UnclosedWarning)
-        ));
-    }
-
-    #[test]
-    fn nested_warning_inside_warning_errors() {
-        assert!(matches!(
-            split_solutions("::: warning\n::: warning\n:::\n:::\n"),
-            Err(Error::NestedWarning)
-        ));
-    }
-
-    #[test]
-    fn warning_inside_solution_errors() {
-        assert!(matches!(
-            split_solutions("::: solucion\n::: warning\n:::\n:::\n"),
-            Err(Error::NestedWarning)
-        ));
-    }
-
-    #[test]
-    fn solution_inside_warning_errors() {
-        assert!(matches!(
-            split_solutions("::: warning\n::: solucion\n:::\n:::\n"),
-            Err(Error::NestedSolution)
         ));
     }
 
@@ -477,30 +490,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn extra_inside_slide_errors() {
-        assert!(matches!(
-            split_solutions(":::slide\n::: extra T\n:::\n:::\n"),
-            Err(Error::NestedExtra)
-        ));
-    }
-
-    #[test]
-    fn warning_inside_slide_errors() {
-        assert!(matches!(
-            split_solutions(":::slide\n::: warning\n:::\n:::\n"),
-            Err(Error::NestedWarning)
-        ));
-    }
-
-    #[test]
-    fn extra_inside_warning_errors() {
-        assert!(matches!(
-            split_solutions("::: warning\n::: extra T\n:::\n:::\n"),
-            Err(Error::NestedExtra)
-        ));
-    }
-
     // ── slide / inline-slide / title-slide fences ─────────────────────────
 
     #[test]
@@ -521,43 +510,9 @@ mod tests {
     }
 
     #[test]
-    fn slide_and_solution_in_same_body() {
-        let body = ":::slide\nSlide content.\n:::\n::: solucion\nAnswer.\n:::\n";
-        let segs = split_solutions(body).unwrap();
-        assert_eq!(
-            segs,
-            vec![
-                Segment::Slide {
-                    md: "Slide content.\n".to_owned(),
-                    light: false
-                },
-                Segment::Solution("Answer.\n".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
     fn unclosed_slide_block_errors() {
         let body = ":::slide\nNo closing fence.\n";
         assert!(matches!(split_solutions(body), Err(Error::UnclosedSlide)));
-    }
-
-    #[test]
-    fn nested_slide_inside_slide_errors() {
-        let body = ":::slide\n:::slide\n:::\n:::\n";
-        assert!(matches!(split_solutions(body), Err(Error::NestedSlide)));
-    }
-
-    #[test]
-    fn slide_inside_solution_errors() {
-        let body = "::: solucion\n:::slide\n:::\n:::\n";
-        assert!(matches!(split_solutions(body), Err(Error::NestedSlide)));
-    }
-
-    #[test]
-    fn solution_inside_slide_errors() {
-        let body = ":::slide\n::: solucion\n:::\n:::\n";
-        assert!(matches!(split_solutions(body), Err(Error::NestedSolution)));
     }
 
     #[test]
@@ -569,19 +524,6 @@ mod tests {
             vec![Segment::Slide {
                 md: "## Light slide\n".to_owned(),
                 light: true
-            }]
-        );
-    }
-
-    #[test]
-    fn slide_without_modifier_produces_dark_fragment() {
-        let body = ":::slide\n## Dark slide\n:::\n";
-        let segs = split_solutions(body).unwrap();
-        assert_eq!(
-            segs,
-            vec![Segment::Slide {
-                md: "## Dark slide\n".to_owned(),
-                light: false
             }]
         );
     }
@@ -621,14 +563,6 @@ mod tests {
     }
 
     #[test]
-    fn nested_inline_slide_errors() {
-        assert!(matches!(
-            split_solutions(":::inline-slide\n:::inline-slide\n:::\n:::\n"),
-            Err(Error::NestedInlineSlide)
-        ));
-    }
-
-    #[test]
     fn title_slide_produces_title_slide_segment() {
         let body = ":::title-slide\n:::\n";
         let segs = split_solutions(body).unwrap();
@@ -655,14 +589,6 @@ mod tests {
         assert!(matches!(
             split_solutions(":::title-slide\n"),
             Err(Error::UnclosedTitleSlide)
-        ));
-    }
-
-    #[test]
-    fn nested_title_slide_errors() {
-        assert!(matches!(
-            split_solutions(":::title-slide\n:::title-slide\n:::\n:::\n"),
-            Err(Error::NestedTitleSlide)
         ));
     }
 
@@ -729,18 +655,9 @@ mod tests {
         assert!(result.uses_slides);
         assert_eq!(result.slide_html.len(), 1);
         assert!(result.slide_html[0].html.contains("<strong>Bold</strong>"));
-        // also present inline in the guide document
         assert!(result.html.contains("<strong>Bold</strong>"));
         assert!(result.html.contains("Before."));
         assert!(result.html.contains("After."));
-    }
-
-    #[test]
-    fn inline_slide_light_sets_light_fragment() {
-        let body = ":::inline-slide light\n## Resumen\n:::\n";
-        let result = render_section_body("Sección", body).unwrap();
-        assert_eq!(result.slide_html.len(), 1);
-        assert!(result.slide_html[0].light);
     }
 
     #[test]
@@ -773,6 +690,55 @@ mod tests {
         let result = render_section_body("Sección", "Plain text.\n").unwrap();
         assert!(!result.uses_slides);
         assert!(result.slide_html.is_empty());
+    }
+
+    // ── nested rendering (guide context) ──────────────────────────────────
+
+    #[test]
+    fn warning_inside_solution_renders_both() {
+        let body = "::: solucion\nRespuesta.\n::: warning\nCuidado.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_solutions);
+        assert!(result.html.contains("class=\"solucion\""));
+        assert!(result.html.contains("<div class=\"cb-warning\">"));
+        assert!(result.html.contains("Cuidado."));
+    }
+
+    #[test]
+    fn extra_inside_warning_renders_nested_details() {
+        let body = "::: warning\nAviso.\n::: extra Más\nDetalle.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("<div class=\"cb-warning\">"));
+        assert!(result.html.contains("<details class=\"cb-extra\">"));
+        assert!(result.html.contains("<summary>Más</summary>"));
+        assert!(result.html.contains("Detalle."));
+    }
+
+    #[test]
+    fn deeply_nested_solution_inside_extra_inside_warning() {
+        let body = "::: warning\nA.\n::: extra T\nB.\n::: solucion\nC.\n:::\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_solutions);
+        assert!(result.html.contains("Ver solución"));
+        assert!(result.html.contains("C."));
+    }
+
+    #[test]
+    fn slide_nested_in_warning_errors() {
+        let body = "::: warning\n:::slide\n:::\n:::\n";
+        assert!(matches!(
+            render_section_body("Sección", body),
+            Err(Error::NestedSlide)
+        ));
+    }
+
+    #[test]
+    fn slide_nested_in_solution_errors() {
+        let body = "::: solucion\n:::slide\n:::\n:::\n";
+        assert!(matches!(
+            render_section_body("Sección", body),
+            Err(Error::NestedSlide)
+        ));
     }
 
     // ── warning / extra rendering ─────────────────────────────────────────

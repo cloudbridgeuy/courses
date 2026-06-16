@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
-use crate::solutions::{Segment, render_solution};
+use crate::solutions::{Segment, render_extra, render_solution, render_warning, split_solutions};
 
 /// An anchored block: plain Markdown, or an exercise (a heading-opened
 /// subsection whose `::: solucion` block immediately follows it).
@@ -139,10 +139,37 @@ fn is_valid_anchor_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// Renders slide Markdown to HTML, expanding `{{name}}` lines: block anchors
-/// are inlined as Markdown; exercise anchors render as a hero card with a
-/// solution toggle.
-pub(crate) fn render_slide(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
+/// Renders a slide's raw payload to HTML. Nested directives are expanded with
+/// slide semantics: `::: solucion`, `::: warning`, and `::: extra` produce
+/// their usual markup (the slide stylesheet has matching rules), and `{{name}}`
+/// references inside them still resolve. Nested slide-family directives are an
+/// error — slides live only at the top level.
+pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
+    let mut html = String::new();
+    for segment in split_solutions(md)? {
+        match segment {
+            Segment::Markdown(m) => html.push_str(&render_slide_markdown(&m, anchors)?),
+            Segment::Solution(inner) => {
+                html.push_str(&render_solution(&render_slide_content(&inner, anchors)?));
+            }
+            Segment::Warning(inner) => {
+                html.push_str(&render_warning(&render_slide_content(&inner, anchors)?));
+            }
+            Segment::Extra { title, md } => {
+                html.push_str(&render_extra(&title, &render_slide_content(&md, anchors)?));
+            }
+            Segment::Slide { .. } => return Err(Error::NestedSlide),
+            Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
+            Segment::TitleSlide => return Err(Error::NestedTitleSlide),
+        }
+    }
+    Ok(html)
+}
+
+/// Renders one Markdown chunk of a slide, expanding `{{name}}` lines: block
+/// anchors are inlined as Markdown; exercise anchors render as a hero card with
+/// a solution toggle.
+fn render_slide_markdown(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
     let mut html = String::new();
     let mut buf = String::new();
     for line in md.lines() {
@@ -347,6 +374,44 @@ mod tests {
         let slide = &result.slide_html[0].html;
         assert!(!slide.contains("cb-ejercicio"));
         assert!(slide.contains("Texto."));
+    }
+
+    #[test]
+    fn warning_nested_inside_slide_renders_in_fragment() {
+        let body = ":::slide\n## Título\n::: warning\nCuidado.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("<div class=\"cb-warning\">"));
+        assert!(slide.contains("Cuidado."));
+        // the warning is slide-only here, so the guide does not show it
+        assert!(!result.html.contains("Cuidado."));
+    }
+
+    #[test]
+    fn solution_nested_inside_slide_renders_toggle_in_fragment() {
+        let body = ":::slide\nEnunciado.\n::: solucion\nRespuesta.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("class=\"solucion\""));
+        assert!(slide.contains("Respuesta."));
+    }
+
+    #[test]
+    fn ref_inside_nested_warning_in_slide_still_resolves() {
+        let body = "{#nota}\n**Importante.**\n\n:::slide\n::: warning\n{{nota}}\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("<div class=\"cb-warning\">"));
+        assert!(slide.contains("<strong>Importante.</strong>"));
+    }
+
+    #[test]
+    fn nested_slide_inside_slide_errors_at_render() {
+        let body = ":::slide\n:::slide\n:::\n:::\n";
+        assert!(matches!(
+            render_section_body("Sección", body),
+            Err(Error::NestedSlide)
+        ));
     }
 
     #[test]
