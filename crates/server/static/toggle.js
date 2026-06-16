@@ -1,5 +1,81 @@
 // Guide/slides client behavior: solution toggles and code-copy buttons.
 
+// On slides, reveal.js renders a fixed-size deck scaled to the viewport and
+// centered, so tall viewports leave vertical whitespace above and below. When
+// a slide has an open solution, top-align the deck to reclaim the top
+// whitespace, then grow the solution's scroll panel to fill the available
+// height (capping so the card never spills past the viewport). All no-ops
+// outside the slideshow, where window.Reveal is undefined.
+const CB_SLIDE_MARGIN = 24; // device px breathing room against viewport edges
+
+function cbReveal() {
+  return window.Reveal && typeof Reveal.getCurrentSlide === "function"
+    ? Reveal
+    : null;
+}
+
+// Pin the deck to the top of the viewport, preserving reveal's current scale.
+function cbAlignDeckTop() {
+  const slides = document.querySelector(".reveal .slides");
+  if (!slides) return;
+  const m = /scale\(([^)]+)\)/.exec(slides.style.transform);
+  const scale = m ? m[1] : "1";
+  slides.style.top = CB_SLIDE_MARGIN + "px";
+  // Pivot the scale from the top so the deck grows downward from the anchor.
+  slides.style.transformOrigin = "50% 0";
+  slides.style.transform = `translate(-50%, 0) scale(${scale})`;
+}
+
+// Grow each open solution panel on `slide` to fill the available height.
+function cbFitSlideSolutions(slide) {
+  const scale = Reveal.getScale() || 1;
+  for (const panel of slide.querySelectorAll(".solucion-cuerpo")) {
+    if (panel.hasAttribute("hidden")) {
+      panel.style.maxHeight = "";
+      continue;
+    }
+    const card = panel.closest(".cb-ejercicio") || panel.closest(".solucion");
+    panel.style.maxHeight = "none";
+    // Converge in a few passes: shrinking the panel shifts the card's box.
+    for (let pass = 0; pass < 6; pass++) {
+      const rect = (card || panel).getBoundingClientRect();
+      const over =
+        Math.max(rect.bottom - (window.innerHeight - CB_SLIDE_MARGIN), 0) +
+        Math.max(CB_SLIDE_MARGIN - rect.top, 0);
+      if (over <= 1) break;
+      const panelH = panel.getBoundingClientRect().height;
+      panel.style.maxHeight = Math.max(60, (panelH - over) / scale) + "px";
+    }
+  }
+}
+
+// Undo cbAlignDeckTop, handing positioning back to reveal's centering.
+function cbRestoreDeck() {
+  const slides = document.querySelector(".reveal .slides");
+  if (!slides) return;
+  slides.style.top = "";
+  slides.style.transformOrigin = "";
+  Reveal.layout();
+}
+
+// Lay out the active slide: top-align + fill when a solution is open, else hand
+// back to reveal's centering. Safe to call on every ready/slidechanged/resize.
+function cbLayoutSlide() {
+  const reveal = cbReveal();
+  if (!reveal) return;
+  const slide = reveal.getCurrentSlide();
+  if (!slide) return;
+  const hasOpen = [...slide.querySelectorAll(".solucion-cuerpo")].some(
+    (p) => !p.hasAttribute("hidden"),
+  );
+  if (!hasOpen) {
+    cbRestoreDeck();
+    return;
+  }
+  cbAlignDeckTop();
+  cbFitSlideSolutions(slide);
+}
+
 // Solution toggles: each .solucion block holds a button and a hidden panel.
 // The button flips the panel's `hidden` attribute, and its own label.
 document.addEventListener("DOMContentLoaded", () => {
@@ -16,7 +92,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       button.setAttribute("aria-expanded", String(reveal));
       button.textContent = reveal ? "Ocultar solución" : "Ver solución";
+      // Re-lay out the slide: top-align + fill when opening, restore on close.
+      if (cbReveal()) requestAnimationFrame(cbLayoutSlide);
     });
+  }
+
+  if (window.Reveal && typeof Reveal.on === "function") {
+    const relayout = () => requestAnimationFrame(cbLayoutSlide);
+    Reveal.on("ready", relayout);
+    Reveal.on("slidechanged", relayout);
+    Reveal.on("resize", relayout);
   }
 });
 
