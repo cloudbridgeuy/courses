@@ -277,13 +277,22 @@
    only styles a literal <div class="cb-warning"> embedded as raw HTML. */
 
 .reveal .cb-warning {
+  position: relative;
   background: #fdf6e3;
   border-left: 4px solid #d97706;
   border-radius: 8px;
   color: var(--cb-ink);
-  padding: 0.5em 0.8em;
+  padding: 0.5em 0.8em 0.5em 2em;
   font-size: 0.6em;
   text-align: left;
+}
+
+.reveal .cb-warning::before {
+  content: "⚠";
+  position: absolute;
+  left: 0.7em;
+  top: 0.5em;
+  color: #d97706;
 }
 
 /* Code-copy buttons on slides (markup injected by toggle.js) */
