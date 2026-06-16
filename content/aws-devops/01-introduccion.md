@@ -8,16 +8,16 @@ title = "Introducción"
 Una combinación de prácticas culturales, servicios y herramientas que aumentan la
 capacidad de entregar software a alta velocidad.
 
-El objetivo es unificar las áreas de desarrollo y operaciones, las cuales comunmente
-suelen estar completamente separadas para conseguir un mejor flujo desde el código
+El objetivo es unificar las áreas de desarrollo y operaciones, las cuales comúnmente
+suelen estar completamente separadas, para conseguir un mejor flujo desde el código
 a la aplicación desplegada.
 :::
 
 :::inline-slide light
 ## Pipeline de entrega continua
 
-Buscan automatizar el flujo desde los últimos cambios realizados a la aplicación
-hasta se despliegue en producción, asegurando que cumple con lo requisitos básicos
+Busca automatizar el flujo desde los últimos cambios realizados a la aplicación
+hasta su despliegue en producción, asegurando que cumple con los requisitos básicos
 de calidad, así como con el contexto necesario para su monitoreo continuo en día 2.
 
 ```
@@ -88,7 +88,7 @@ obtiene un ambiente funcional en minutos. Cómo está construida por dentro es e
 la Semana 2.
 
 :::slide
-## Semana 1
+## El seguro del taller
 
 ::: warning
 En caso de que su sistema no funcione, utilizaremos CloudFormation para reiniciar
@@ -102,7 +102,7 @@ Desde el primer día se practica destruir el ambiente completo y recrearlo desde
 Esto no es un ejercicio de destrucción: es el seguro del taller. Si algo sale mal en
 cualquier sesión posterior (una configuración equivocada, un recurso corrompido) se
 borra el stack de CloudFormation, se espera a que termine, y se lo vuelve a lanzar con los mismos
-parámetros, dejandolo en punto de partida anterior. El costo de un error se reduce a
+parámetros, dejándolo en el punto de partida anterior. El costo de un error se reduce a
 minutos de espera.
 
 :::slide
