@@ -17,8 +17,10 @@ session title (e.g. `del-codigo-a-la-imagen`), NOT filenames. All content is Spa
 | `::: solucion` … `:::` | Collapsible solution card (button toggle) in guide and slides |
 | `::: warning` … `:::` | Always-visible amber admonition (guide only). Takes NO arguments — `::: warning anything` is plain Markdown |
 | `::: extra <title>` … `:::` | Collapsible deep-dive `<details>` block, closed by default (guide only). Title optional; empty falls back to "Contenido adicional" |
-| `:::slide` … `:::` | reveal.js slide (dark, default theme) |
+| `:::slide` … `:::` | reveal.js slide (dark, default theme); slides only |
 | `:::slide light` … `:::` | Light slide variant (`<section class="cb-light">`) |
+| `:::inline-slide` … `:::` | Like `:::slide`, but the content ALSO renders inline in the guide as document content (dark slide). Accepts `light`. Keep content self-contained — `{{name}}` references are NOT expanded in the guide copy |
+| `:::title-slide` … `:::` | Title-only slide showing the section heading (from frontmatter `title`). Body MUST be empty; non-empty body is an error |
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
 | `{{name}}` inside a `:::slide` | Embeds the anchored subsection as an exercise hero card |
 

@@ -218,6 +218,21 @@
   border-top-color: #e3e0dd;
 }
 
+/* Title-only slide (:::title-slide): the section heading as a centered hero. */
+
+.reveal .cb-title-slide {
+  display: inline-block;
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.1;
+  padding-bottom: 0.3em;
+  border-bottom: 4px solid var(--cb-teal);
+}
+
+.reveal section.cb-light .cb-title-slide {
+  color: var(--cb-ink);
+}
+
 /* Heading self-links come from the shared Markdown renderer; inert on slides
    (a hash click would fight reveal.js's #/n navigation). */
 

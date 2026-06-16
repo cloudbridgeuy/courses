@@ -13,6 +13,7 @@ mod manifest;
 mod markdown;
 mod render;
 mod section;
+mod slides;
 mod solutions;
 
 pub use assets::{

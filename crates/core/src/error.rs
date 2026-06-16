@@ -30,6 +30,21 @@ pub enum Error {
     #[error("nested `:::slide` block")]
     NestedSlide,
 
+    #[error("unclosed `:::inline-slide` block")]
+    UnclosedInlineSlide,
+
+    #[error("nested `:::inline-slide` block")]
+    NestedInlineSlide,
+
+    #[error("unclosed `:::title-slide` block")]
+    UnclosedTitleSlide,
+
+    #[error("nested `:::title-slide` block")]
+    NestedTitleSlide,
+
+    #[error("`:::title-slide` block must be empty")]
+    TitleSlideNotEmpty,
+
     #[error("unclosed `::: warning` block")]
     UnclosedWarning,
 
@@ -118,6 +133,46 @@ mod tests {
     #[test]
     fn display_nested_slide() {
         assert_eq!(Error::NestedSlide.to_string(), "nested `:::slide` block");
+    }
+
+    #[test]
+    fn display_unclosed_inline_slide() {
+        assert_eq!(
+            Error::UnclosedInlineSlide.to_string(),
+            "unclosed `:::inline-slide` block"
+        );
+    }
+
+    #[test]
+    fn display_nested_inline_slide() {
+        assert_eq!(
+            Error::NestedInlineSlide.to_string(),
+            "nested `:::inline-slide` block"
+        );
+    }
+
+    #[test]
+    fn display_unclosed_title_slide() {
+        assert_eq!(
+            Error::UnclosedTitleSlide.to_string(),
+            "unclosed `:::title-slide` block"
+        );
+    }
+
+    #[test]
+    fn display_nested_title_slide() {
+        assert_eq!(
+            Error::NestedTitleSlide.to_string(),
+            "nested `:::title-slide` block"
+        );
+    }
+
+    #[test]
+    fn display_title_slide_not_empty() {
+        assert_eq!(
+            Error::TitleSlideNotEmpty.to_string(),
+            "`:::title-slide` block must be empty"
+        );
     }
 
     #[test]

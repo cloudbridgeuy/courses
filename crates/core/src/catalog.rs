@@ -77,7 +77,8 @@ fn assemble_session(
 
         let (raw_frontmatter, body) = split_frontmatter(contents).map_err(|e| in_file(file, &e))?;
         let frontmatter = parse_frontmatter(raw_frontmatter).map_err(|e| in_file(file, &e))?;
-        let rendered = render_section_body(body).map_err(|e| in_file(file, &e))?;
+        let rendered =
+            render_section_body(&frontmatter.title, body).map_err(|e| in_file(file, &e))?;
 
         uses_solutions |= rendered.uses_solutions;
         all_slides.extend(rendered.slide_html);
