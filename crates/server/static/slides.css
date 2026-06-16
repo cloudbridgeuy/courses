@@ -81,12 +81,22 @@
 
 .reveal pre {
   background: #221f1d;
+  color: #e8e8e8;
   border-left: 4px solid var(--cb-teal);
   border-radius: 4px;
   padding: 0.6em 0.9em;
   font-size: 0.6em;
   line-height: 1.5;
   box-shadow: none;
+}
+
+/* Code keeps the light pre color even on light slides, where the cb-light
+   rules would otherwise darken inherited text to ink. */
+.reveal pre,
+.reveal pre code,
+.reveal section.cb-light pre,
+.reveal section.cb-light pre code {
+  color: #e8e8e8;
 }
 
 .reveal table {
