@@ -160,7 +160,7 @@ pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) 
             }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
-            Segment::TitleSlide => return Err(Error::NestedTitleSlide),
+            Segment::TitleSlide { .. } => return Err(Error::NestedTitleSlide),
         }
     }
     Ok(html)

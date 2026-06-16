@@ -15,7 +15,7 @@ pub enum Segment {
     Solution(String),
     Slide { md: String, light: bool },
     InlineSlide { md: String, light: bool },
-    TitleSlide,
+    TitleSlide { text: String },
     Warning(String),
     Extra { title: String, md: String },
 }
@@ -32,7 +32,7 @@ enum Opener {
     Solution,
     Slide { light: bool },
     InlineSlide { light: bool },
-    TitleSlide,
+    TitleSlide { text: String },
     Warning,
     Extra { title: String },
 }
@@ -53,8 +53,10 @@ fn opener(fence: &str) -> Option<Opener> {
         Some(Opener::InlineSlide {
             light: fence == ":::inline-slide light",
         })
-    } else if fence == ":::title-slide" {
-        Some(Opener::TitleSlide)
+    } else if let Some(rest) = fence.strip_prefix(":::title-slide") {
+        (rest.is_empty() || rest.starts_with(' ')).then(|| Opener::TitleSlide {
+            text: rest.trim().to_owned(),
+        })
     } else if fence == "::: warning" {
         Some(Opener::Warning)
     } else if let Some(rest) = fence.strip_prefix("::: extra") {
@@ -72,11 +74,11 @@ impl Opener {
             Opener::Solution => Segment::Solution(md),
             Opener::Slide { light } => Segment::Slide { md, light },
             Opener::InlineSlide { light } => Segment::InlineSlide { md, light },
-            Opener::TitleSlide => {
+            Opener::TitleSlide { text } => {
                 if !md.trim().is_empty() {
                     return Err(Error::TitleSlideNotEmpty);
                 }
-                Segment::TitleSlide
+                Segment::TitleSlide { text }
             }
             Opener::Warning => Segment::Warning(md),
             Opener::Extra { title } => Segment::Extra { title, md },
@@ -88,7 +90,7 @@ impl Opener {
             Opener::Solution => Error::UnclosedSolution,
             Opener::Slide { .. } => Error::UnclosedSlide,
             Opener::InlineSlide { .. } => Error::UnclosedInlineSlide,
-            Opener::TitleSlide => Error::UnclosedTitleSlide,
+            Opener::TitleSlide { .. } => Error::UnclosedTitleSlide,
             Opener::Warning => Error::UnclosedWarning,
             Opener::Extra { .. } => Error::UnclosedExtra,
         }
@@ -205,10 +207,11 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
                 });
                 html.push_str(&render_guide_segments(&md, &mut uses_solutions)?);
             }
-            Segment::TitleSlide => {
+            Segment::TitleSlide { text } => {
                 uses_slides = true;
+                let label = if text.is_empty() { title } else { &text };
                 slide_html.push(SlideFragment {
-                    html: render_title_slide(title),
+                    html: render_title_slide(label),
                     light: false,
                 });
             }
@@ -255,7 +258,7 @@ fn render_guide_segments(md: &str, uses_solutions: &mut bool) -> Result<String> 
             }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
-            Segment::TitleSlide => return Err(Error::NestedTitleSlide),
+            Segment::TitleSlide { .. } => return Err(Error::NestedTitleSlide),
         }
     }
     Ok(html)
@@ -566,14 +569,44 @@ mod tests {
     fn title_slide_produces_title_slide_segment() {
         let body = ":::title-slide\n:::\n";
         let segs = split_solutions(body).unwrap();
-        assert_eq!(segs, vec![Segment::TitleSlide]);
+        assert_eq!(
+            segs,
+            vec![Segment::TitleSlide {
+                text: String::new()
+            }]
+        );
     }
 
     #[test]
     fn title_slide_with_only_blank_lines_is_empty() {
         let body = ":::title-slide\n\n  \n:::\n";
         let segs = split_solutions(body).unwrap();
-        assert_eq!(segs, vec![Segment::TitleSlide]);
+        assert_eq!(
+            segs,
+            vec![Segment::TitleSlide {
+                text: String::new()
+            }]
+        );
+    }
+
+    #[test]
+    fn title_slide_with_custom_text_captures_it() {
+        let body = ":::title-slide Semana 1\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::TitleSlide {
+                text: "Semana 1".to_owned()
+            }]
+        );
+    }
+
+    #[test]
+    fn title_slide_with_text_still_rejects_body() {
+        assert!(matches!(
+            split_solutions(":::title-slide Semana 1\nTexto.\n:::\n"),
+            Err(Error::TitleSlideNotEmpty)
+        ));
     }
 
     #[test]
@@ -672,6 +705,17 @@ mod tests {
                 .contains("class=\"cb-title-slide\">El origen del código</h1>")
         );
         assert!(!result.slide_html[0].light);
+    }
+
+    #[test]
+    fn title_slide_custom_text_overrides_section_title() {
+        let body = ":::title-slide Semana 1\n:::\n";
+        let result = render_section_body("Introducción", body).unwrap();
+        assert!(
+            result.slide_html[0]
+                .html
+                .contains("class=\"cb-title-slide\">Semana 1</h1>")
+        );
     }
 
     #[test]
