@@ -1,4 +1,4 @@
-use crate::assets::{PageAssets, TOGGLE_JS_PATH};
+use crate::assets::{MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH};
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
 use crate::manifest::{SessionEntry, parse_manifest};
@@ -66,6 +66,7 @@ fn assemble_session(
     let mut assets = PageAssets::base();
     let mut sections = Vec::with_capacity(entry.sections.len());
     let mut uses_solutions = false;
+    let mut uses_mermaid = false;
     let mut all_slides = Vec::new();
 
     for file in &entry.sections {
@@ -81,6 +82,7 @@ fn assemble_session(
             render_section_body(&frontmatter.title, body).map_err(|e| in_file(file, &e))?;
 
         uses_solutions |= rendered.uses_solutions;
+        uses_mermaid |= rendered.uses_mermaid;
         all_slides.extend(rendered.slide_html);
 
         for href in &frontmatter.styles {
@@ -97,6 +99,10 @@ fn assemble_session(
 
     if uses_solutions {
         assets.push_script(TOGGLE_JS_PATH);
+    }
+    if uses_mermaid {
+        assets.push_script(MERMAID_JS_PATH);
+        assets.push_script(MERMAID_INIT_JS_PATH);
     }
 
     Ok((

@@ -11,6 +11,7 @@ mod course;
 mod error;
 mod manifest;
 mod markdown;
+mod notifications;
 mod render;
 mod section;
 mod slides;
@@ -24,6 +25,7 @@ pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 pub use error::{Error, Result};
 pub use manifest::{Manifest, parse_manifest};
 pub use markdown::render_markdown;
+pub use notifications::{Notification, SnsMessage, parse_sns_message, token_matches};
 pub use render::{
     RenderedSite, SessionPage, escape_html, render_index_page, render_landing_page,
     render_not_found_page, render_session_page, render_site, render_slideshow_page, render_tree,

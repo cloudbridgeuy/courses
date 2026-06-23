@@ -162,6 +162,7 @@ pub struct RenderedBody {
     pub slide_html: Vec<SlideFragment>,
     pub uses_solutions: bool,
     pub uses_slides: bool,
+    pub uses_mermaid: bool,
 }
 
 /// Renders a section's Markdown body.
@@ -225,11 +226,19 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
             }
         }
     }
+    // Mermaid markup is emitted by the Markdown renderer as `<pre class="mermaid">`;
+    // a page only loads mermaid.js when at least one diagram is present, in the
+    // guide body or in any slide.
+    let uses_mermaid = html.contains("<pre class=\"mermaid\">")
+        || slide_html
+            .iter()
+            .any(|slide| slide.html.contains("<pre class=\"mermaid\">"));
     Ok(RenderedBody {
         html,
         slide_html,
         uses_solutions,
         uses_slides,
+        uses_mermaid,
     })
 }
 

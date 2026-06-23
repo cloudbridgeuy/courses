@@ -68,6 +68,9 @@ pub enum Error {
 
     #[error("in section {file}: {message}")]
     InvalidSection { file: String, message: String },
+
+    #[error("malformed SNS payload: {0}")]
+    MalformedNotification(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

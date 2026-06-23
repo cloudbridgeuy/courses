@@ -331,3 +331,123 @@
   background: var(--cb-teal);
   border-color: var(--cb-teal);
 }
+
+/* Mermaid diagrams on slides: centered, no code-block chrome, bounded to the
+   slide box. Authored on light slides (`:::slide light`) for contrast. */
+.reveal pre.mermaid {
+  position: relative;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 1em;
+  visibility: hidden;
+}
+.reveal pre.mermaid[data-processed="true"] {
+  visibility: visible;
+}
+.reveal pre.mermaid svg {
+  max-width: 100%;
+  max-height: 520px;
+  height: auto;
+}
+
+/* Maximize button on slide diagrams. */
+.reveal .cb-diagram-zoom {
+  position: absolute;
+  top: 0.2em;
+  right: 0.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  font-size: 0.5em;
+  line-height: 1;
+  color: var(--cb-ink);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.3em;
+  cursor: pointer;
+}
+
+/* Full-viewport overlay (mermaid-init.js appends it to <body>, outside .reveal). */
+.cb-diagram-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 3vmin;
+  background: rgba(20, 18, 16, 0.94);
+  cursor: zoom-out;
+}
+.cb-diagram-overlay.cb-open {
+  display: flex;
+}
+.cb-diagram-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cb-diagram-stage svg {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Live toasts on slide decks (same client as the guide). Sized in px since the
+   deck font-size is the scaled reveal context, not the document. */
+.cb-toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 11000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 360px;
+  pointer-events: none;
+}
+.cb-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  border-left: 4px solid #888;
+  background: #2d2926;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-family: "Montserrat", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.3;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.cb-toast.cb-toast-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.cb-toast-pod {
+  font-weight: 700;
+}
+.cb-toast-body {
+  opacity: 0.9;
+}
+.cb-toast-ok {
+  border-left-color: #3fb950;
+}
+.cb-toast-fail {
+  border-left-color: #f85149;
+}
+.cb-toast-info {
+  border-left-color: var(--cb-teal);
+}

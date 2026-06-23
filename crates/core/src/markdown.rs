@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use pulldown_cmark::{Event, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 
 use crate::render::escape_html;
 
@@ -17,7 +17,7 @@ pub fn render_markdown(markdown: &str) -> String {
         | pulldown_cmark::Options::ENABLE_FOOTNOTES
         | pulldown_cmark::Options::ENABLE_STRIKETHROUGH;
     let parser = pulldown_cmark::Parser::new_ext(markdown, options);
-    let events = open_external_links_in_new_tab(anchor_headings(parser));
+    let events = render_mermaid_blocks(open_external_links_in_new_tab(anchor_headings(parser)));
     let mut html = String::new();
     pulldown_cmark::html::push_html(&mut html, events.into_iter());
     html
@@ -81,6 +81,39 @@ fn open_external_links_in_new_tab(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
                 tag.push_str(" target=\"_blank\" rel=\"noopener noreferrer\">");
                 // `TagEnd::Link` still renders as `</a>`, closing this tag.
                 out.push(Event::Html(tag.into()));
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Rewrites fenced ```` ```mermaid ```` blocks into `<pre class="mermaid">…</pre>`,
+/// the element mermaid.js renders. The diagram source is HTML-escaped so the
+/// markup is valid; the browser decodes it back as `textContent` for mermaid.
+///
+/// Any other fenced or indented code block is left untouched (rendered by
+/// pulldown-cmark as `<pre><code>` as usual).
+fn render_mermaid_blocks(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
+    let mut out = Vec::with_capacity(events.len());
+    let mut source: Option<String> = None;
+    for event in events {
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref info)))
+                if info.as_ref() == "mermaid" =>
+            {
+                source = Some(String::new());
+            }
+            Event::Text(text) if source.is_some() => {
+                if let Some(buffer) = source.as_mut() {
+                    buffer.push_str(&text);
+                }
+            }
+            Event::End(TagEnd::CodeBlock) if source.is_some() => {
+                let diagram = source.take().unwrap_or_default();
+                out.push(Event::Html(
+                    format!("<pre class=\"mermaid\">{}</pre>", escape_html(&diagram)).into(),
+                ));
             }
             other => out.push(other),
         }
@@ -157,6 +190,23 @@ mod tests {
         let html = render_markdown("```rust\nfn main() {}\n```\n");
         assert!(html.contains("<pre>"));
         assert!(html.contains("<code"));
+    }
+
+    #[test]
+    fn mermaid_fence_renders_pre_mermaid() {
+        let html = render_markdown("```mermaid\nflowchart LR\n  A --> B\n```\n");
+        assert!(html.contains("<pre class=\"mermaid\">"));
+        // The arrow is HTML-escaped inside the <pre>, not rendered as a code block.
+        assert!(html.contains("A --&gt; B"));
+        assert!(!html.contains("<code"));
+    }
+
+    #[test]
+    fn non_mermaid_fence_still_renders_code_block() {
+        let html = render_markdown("```yaml\nkey: value\n```\n");
+        assert!(html.contains("<pre>"));
+        assert!(html.contains("<code"));
+        assert!(!html.contains("class=\"mermaid\""));
     }
 
     #[test]

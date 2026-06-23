@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
-use crate::assets::{PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH};
+use crate::assets::{
+    MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, NOTIFICATIONS_JS_PATH, PageAssets, REVEAL_CSS_PATH,
+    REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
+};
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
 use crate::solutions::SlideFragment;
@@ -69,6 +72,8 @@ fn page(lang: &str, title_html: &str, head_extra: &str, main_html: &str) -> Stri
     format!(
         "<!doctype html>\n<html id=\"top\" lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+         <link rel=\"icon\" href=\"/favicon.ico\" sizes=\"any\">\n\
+         <link rel=\"icon\" type=\"image/png\" href=\"/static/favicon.png\">\n\
          <title>{title_html}</title>\n{head_extra}</head>\n<body>\n\
          {header}<main>\n{main_html}</main>\n{footer}\
          <a href=\"#top\" id=\"cb-top-btn\" aria-label=\"Volver arriba\">↑</a>\n\
@@ -83,6 +88,7 @@ sessionStorage.removeItem(k);scrollTo({{top:y}});}});\
 window.addEventListener('scroll',u);u();\
 new IntersectionObserver(function(e){{b.style.bottom=e[0].isIntersecting?(f.offsetHeight+12)+'px':'';}}).observe(f);\
 </script>\n\
+         <script defer src=\"{NOTIFICATIONS_JS_PATH}\"></script>\n\
          </body>\n</html>\n"
     )
 }
@@ -223,10 +229,27 @@ pub fn render_slideshow_page(
         })
         .collect();
 
+    // Load mermaid only when a slide carries a diagram. mermaid-init.js loads
+    // before the inline Reveal.initialize below, so it registers its own
+    // 'ready' handler and renders once the (scaled) deck exists.
+    let uses_mermaid = slides_html
+        .iter()
+        .any(|slide| slide.html.contains("<pre class=\"mermaid\">"));
+    let mermaid_script = if uses_mermaid {
+        format!(
+            "<script src=\"{MERMAID_JS_PATH}\"></script>\n\
+             <script src=\"{MERMAID_INIT_JS_PATH}\"></script>\n"
+        )
+    } else {
+        String::new()
+    };
+
     format!(
         "<!doctype html>\n<html lang=\"es\">\n<head>\n\
          <meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+         <link rel=\"icon\" href=\"/favicon.ico\" sizes=\"any\">\n\
+         <link rel=\"icon\" type=\"image/png\" href=\"/static/favicon.png\">\n\
          <title>{title} — Diapositivas</title>\n\
          <link rel=\"stylesheet\" href=\"{REVEAL_CSS_PATH}\">\n\
          <link rel=\"stylesheet\" href=\"{SLIDES_CSS_PATH}\">\n\
@@ -236,6 +259,7 @@ pub fn render_slideshow_page(
          </div>\n</div>\n\
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
+         {mermaid_script}\
          <script>\
 var cbSlideKey='cb-slide:'+location.pathname;\
 if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
@@ -248,6 +272,7 @@ aria-label=\"Cerrar diapositivas\">\
 <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">\
 <path d=\"M6 6l12 12M18 6L6 18\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\
 </svg></a>\n\
+         <script defer src=\"{NOTIFICATIONS_JS_PATH}\"></script>\n\
          </body>\n</html>\n"
     )
 }

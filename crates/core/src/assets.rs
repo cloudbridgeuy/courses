@@ -8,6 +8,12 @@ pub const REVEAL_JS_PATH: &str = "/static/reveal.min.js";
 pub const REVEAL_CSS_PATH: &str = "/static/reveal.min.css";
 /// URL path of the CloudBridge slideshow theme stylesheet.
 pub const SLIDES_CSS_PATH: &str = "/static/slides.css";
+/// URL path of the mermaid.js bundle, injected when a page renders diagrams.
+pub const MERMAID_JS_PATH: &str = "/static/mermaid.min.js";
+/// URL path of the mermaid initializer, injected after the bundle on guide pages.
+pub const MERMAID_INIT_JS_PATH: &str = "/static/mermaid-init.js";
+/// URL path of the live-toast client (SSE notifications), loaded on all pages.
+pub const NOTIFICATIONS_JS_PATH: &str = "/static/notifications.js";
 
 /// The stylesheets, and scripts, a rendered page must reference, in order,
 /// without duplicates.
