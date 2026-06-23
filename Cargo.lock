@@ -743,8 +743,11 @@ dependencies = [
 name = "courses_server"
 version = "0.0.0"
 dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb",
  "axum",
  "color-eyre",
+ "courses_apps",
  "courses_core",
  "include_dir",
  "reqwest",

@@ -205,6 +205,51 @@ pub fn is_public_collection(whitelist: &[String], collection: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Gate configuration parsing (pure)
+// ---------------------------------------------------------------------------
+
+/// The result of parsing gate configuration from raw env strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GateConfig {
+    pub gate: Gate,
+    /// Kind names in `CB_APPS_GATED` that did not match a known handler. The
+    /// shell logs these; parsing stays pure.
+    pub unknown_kinds: Vec<String>,
+}
+
+/// Parses the gate from the optional secret and the optional `CB_APPS_GATED`
+/// value ("all", or a comma-separated list of handler-kind names). No secret
+/// yields `Gate::Open`. A secret with `gated` absent or "all" yields
+/// `Gate::All`. A secret with a kind list yields `Gate::Some` over the known
+/// kinds; unknown names are collected into `unknown_kinds`.
+pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
+    let Some(secret) = secret else {
+        return GateConfig { gate: Gate::Open, unknown_kinds: Vec::new() };
+    };
+    let Some(raw) = gated else {
+        // Secret present, no explicit gated config → default to All (gate everything).
+        return GateConfig { gate: Gate::All(secret.to_string()), unknown_kinds: Vec::new() };
+    };
+    if raw.trim().eq_ignore_ascii_case("all") {
+        return GateConfig { gate: Gate::All(secret.to_string()), unknown_kinds: Vec::new() };
+    }
+    let mut kinds = Vec::new();
+    let mut unknown_kinds = Vec::new();
+    for entry in raw.split(',') {
+        let name = entry.trim();
+        if name.is_empty() {
+            continue;
+        }
+        match name {
+            "cpu-burst" => kinds.push(HandlerKind::CpuBurst),
+            "counter" => kinds.push(HandlerKind::Counter),
+            other => unknown_kinds.push(other.to_string()),
+        }
+    }
+    GateConfig { gate: Gate::Some { secret: secret.to_string(), kinds }, unknown_kinds }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -412,6 +457,78 @@ mod tests {
             CpuBurstConfig::parse(r#"{"seconds":10}"#),
             Err(crate::Error::MalformedEvent(_))
         ));
+    }
+
+    // A8 — parse_gate
+    #[test]
+    fn parse_gate_no_secret_is_open() {
+        let cfg = parse_gate(None, None);
+        assert_eq!(cfg.gate, Gate::Open);
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_no_secret_ignores_gated() {
+        let cfg = parse_gate(None, Some("all"));
+        assert_eq!(cfg.gate, Gate::Open);
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_no_gated_is_all() {
+        let cfg = parse_gate(Some("s3cr3t"), None);
+        assert_eq!(cfg.gate, Gate::All("s3cr3t".into()));
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_gated_all_is_all() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("all"));
+        assert_eq!(cfg.gate, Gate::All("s3cr3t".into()));
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_gated_all_case_insensitive() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("ALL"));
+        assert_eq!(cfg.gate, Gate::All("s3cr3t".into()));
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_kind_list_both_known() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("cpu-burst,counter"));
+        assert_eq!(
+            cfg.gate,
+            Gate::Some {
+                secret: "s3cr3t".into(),
+                kinds: vec![HandlerKind::CpuBurst, HandlerKind::Counter],
+            }
+        );
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_kind_list_with_unknown() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("cpu-burst,bogus"));
+        assert_eq!(
+            cfg.gate,
+            Gate::Some { secret: "s3cr3t".into(), kinds: vec![HandlerKind::CpuBurst] }
+        );
+        assert_eq!(cfg.unknown_kinds, vec!["bogus".to_string()]);
+    }
+
+    #[test]
+    fn parse_gate_trims_whitespace_and_ignores_empty_entries() {
+        let cfg = parse_gate(Some("s3cr3t"), Some(" cpu-burst , , counter , "));
+        assert_eq!(
+            cfg.gate,
+            Gate::Some {
+                secret: "s3cr3t".into(),
+                kinds: vec![HandlerKind::CpuBurst, HandlerKind::Counter],
+            }
+        );
+        assert!(cfg.unknown_kinds.is_empty());
     }
 
     // A7 — is_public_collection

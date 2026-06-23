@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
         .wrap_err_with(|| format!("failed to bind {addr}"))?;
     tracing::info!("listening on http://{addr}");
 
-    axum::serve(listener, routes::router(site))
+    axum::serve(listener, routes::router(site).await)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .wrap_err("server error")?;
