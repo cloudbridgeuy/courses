@@ -17,3 +17,48 @@ sections = [
   "05-teardown.md",
   "06-preguntas-puente.md",
 ]
+
+[[session]]
+slug = "abrir-la-caja-negra"
+title = "Abrir la caja negra"
+sections = [
+  "07-cloudformation-anatomia.md",
+  "08-leer-el-template.md",
+  "09-actualizar-stacks.md",
+  "10-preguntas-puente.md",
+]
+
+[[session]]
+slug = "los-primeros-contenedores"
+title = "Los primeros contenedores"
+sections = [
+  "11-buenas-practicas-troubleshooting.md",
+  "12-primeros-contenedores.md",
+]
+
+[[session]]
+slug = "operar-el-workload"
+title = "Operar el workload"
+sections = [
+  "13-operar-contenedores.md",
+  "14-cicd-y-el-pipeline.md",
+  "15-preguntas-puente.md",
+]
+
+[[session]]
+slug = "automatizar-y-observar"
+title = "Automatizar y observar"
+sections = [
+  "16-codepipeline-en-la-practica.md",
+  "17-notificaciones-teams.md",
+  "18-observabilidad-metrics-logs.md",
+]
+
+[[session]]
+slug = "observabilidad-y-cierre"
+title = "Observabilidad y cierre"
+sections = [
+  "19-dashboards-y-alarmas.md",
+  "20-container-insights-trazabilidad.md",
+  "21-cierre-del-curso.md",
+]
