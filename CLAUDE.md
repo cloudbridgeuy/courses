@@ -43,6 +43,10 @@ fails; full output is always written to `target/xtask-lint.log`.
 
 ## Context docs
 
+`CONTEXT.md` (repo root) is the living record of project state, decisions, and
+important parameters (active course, week plan, AWS service status, lab parameters,
+notifications design). Read it first; update it whenever a durable fact changes.
+
 Topic-specific context lives under `.claude/context/` — read the relevant file
 before working on that area:
 
@@ -52,6 +56,9 @@ before working on that area:
   buttons, sessionStorage keys, reveal.js theme rules.
 - `.claude/context/dev-workflow.md` — local server ports, browser verification,
   lint, and repo hygiene (plans/designs stay out of git; conventional commits).
+- `.claude/context/notifications.md` — live SSE toast subsystem: SNS webhook flow,
+  `POST /hooks/notifications` + `GET /hooks/stream`, the `CB_HOOK_TOKEN` shared
+  secret, pod attribution, and where the pure/shell/client code lives.
 
 ## Workspace
 

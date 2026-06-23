@@ -23,6 +23,21 @@ session title (e.g. `del-codigo-a-la-imagen`), NOT filenames. All content is Spa
 | `:::title-slide` … `:::` | Title-only slide. Shows the section heading (frontmatter `title`) by default, or a custom label: `:::title-slide Semana 1`. Body MUST be empty; non-empty body is an error |
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
 | `{{name}}` inside a `:::slide` | Embeds the anchored subsection as an exercise hero card |
+| ```` ```mermaid ```` fenced block | Renders a mermaid.js diagram (`<pre class="mermaid">`). Works in guide and slides; mermaid.js loads only on pages that use it |
+
+### Mermaid diagrams
+
+A fenced code block tagged `mermaid` renders as a diagram instead of a code block.
+The page loads `mermaid.min.js` + `mermaid-init.js` only when at least one diagram is
+present (mirrors the `toggle.js` solution-script rule); `mermaid-init.js` handles both
+guide and slide decks. Use the `neutral` theme — for slides, author diagrams on a
+**light** slide (`:::slide light`) for contrast. Keep node labels short; use `<br/>`
+for line breaks inside a label.
+
+Each rendered diagram gets a maximize button (hover, top-right) that opens it in a
+full-viewport overlay (click backdrop or Escape to close), shared by guide and slides.
+On slides, a diagram renders when its slide first becomes active (mermaid must measure
+a visible slide), so diagrams off the first slide appear on navigation, not before.
 
 ### Nesting
 
