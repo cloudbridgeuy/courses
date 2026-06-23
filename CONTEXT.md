@@ -140,6 +140,29 @@ Week 3.
 - **CodeStar Notifications** (prefix `codestar-notifications`): **still available**,
   not renamed. Source of our pipeline notifications.
 
+### Apps event contract
+
+Generic, app-agnostic event bus for in-guide interactive scenarios (**built**
+2026-06-23). Browser custom elements emit typed events to their own pod's server;
+the server runs gated side-effecting handlers and broadcasts feedback on a unified
+SSE bus.
+
+- **Envelope**: `Event { id, type, payload }` — same struct both directions.
+- **Endpoints**:
+  - `POST /events` — parse → dedup → gate → dispatch; 202/200/403/400.
+  - `GET /events/stream` — unified SSE bus (unauthenticated, read-only).
+  - `GET /state/{collection}/{key}` — read-only DynamoDB query side.
+- **Env vars**: `CB_APPS_SECRET` (gate unlock), `CB_APPS_GATED` (`"all"` or kind
+  list), `CB_APPS_TABLE` (DynamoDB table, default `courses-apps`),
+  `CB_APPS_PUBLIC_COLLECTIONS` (default `counters`).
+- **Crates**: pure logic in `courses_core::events`; I/O (DynamoDB, CPU load, handler
+  dispatch) in the new `courses_apps` crate; routes wired in `courses_server`.
+- **Client**: `static/apps.js` — `<cb-cpu-burst>`, `<cb-counter>`, unlock UI,
+  multiplexed `EventSource`. Loaded when `uses_apps` flag is set (via `:::app`).
+- **Notifications folded in**: notifications arrive on `/events/stream` as
+  `Event{type:"notification"}`. The old `/hooks/stream` route is **retired**.
+- Topic guide: `.claude/context/apps-events.md`.
+
 ### Notifications / chat integration
 
 - Client uses **Microsoft Teams**, not Slack. Production path (CodeStar
@@ -147,8 +170,10 @@ Week 3.
 - Lab mechanism (**built** 2026-06-23): participant pipeline events → SNS HTTPS
   subscription → `courses_server` → SSE → per-pod toasts in guide + slides.
   - Pure parser: `courses_core::notifications` (`parse_sns_message`).
-  - Shell: `POST /hooks/notifications` (confirms subscription, broadcasts),
-    `GET /hooks/stream` (SSE), `static/notifications.js` toast client.
+  - Shell: `POST /hooks/notifications` (confirms subscription, broadcasts onto
+    `/events/stream` as `type: "notification"`). **SSE endpoint is now
+    `GET /events/stream`** (the old `GET /hooks/stream` is retired). Client is
+    `static/apps.js` (the old `notifications.js` is retired).
   - Auth: shared-secret token via `CB_HOOK_TOKEN` env — required as `?token=` on
     `/hooks/notifications` when set, open (with a startup warning) when unset.
     Emulates the unguessable-URL secret of real chat webhooks; not a hardened

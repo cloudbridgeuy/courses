@@ -928,13 +928,23 @@ mod tests {
         // `slide_html.iter().any(...)` branch in render_section_body must
         // detect the `<div class="cb-app">` in the slide fragment and set
         // uses_apps = true even though the guide html contains no app div.
-        let body = ":::slide\n## Herramienta\n:::app\n<cb-counter key=\"x\"></cb-counter>\n:::\n:::\n";
+        let body =
+            ":::slide\n## Herramienta\n:::app\n<cb-counter key=\"x\"></cb-counter>\n:::\n:::\n";
         let result = render_section_body("Sección", body).unwrap();
-        assert!(!result.html.contains("<div class=\"cb-app\">"),
-            "app div must not appear in guide html when inside a slide fence");
-        assert!(result.slide_html.iter().any(|s| s.html.contains("<div class=\"cb-app\">")),
-            "slide fragment must contain the cb-app div");
-        assert!(result.uses_apps,
-            "uses_apps must be true when cb-app appears only in slide_html");
+        assert!(
+            !result.html.contains("<div class=\"cb-app\">"),
+            "app div must not appear in guide html when inside a slide fence"
+        );
+        assert!(
+            result
+                .slide_html
+                .iter()
+                .any(|s| s.html.contains("<div class=\"cb-app\">")),
+            "slide fragment must contain the cb-app div"
+        );
+        assert!(
+            result.uses_apps,
+            "uses_apps must be true when cb-app appears only in slide_html"
+        );
     }
 }

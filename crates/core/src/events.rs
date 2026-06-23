@@ -89,7 +89,10 @@ impl Default for RecentIds {
 
 impl RecentIds {
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { order: VecDeque::new(), capacity: capacity.max(1) }
+        Self {
+            order: VecDeque::new(),
+            capacity: capacity.max(1),
+        }
     }
 
     /// Records `id`, returning the next state and whether it was already present.
@@ -133,7 +136,10 @@ pub enum Gate {
     /// A secret is configured and applies to all handler kinds.
     All(String),
     /// A secret is configured and applies only to the listed kinds.
-    Some { secret: String, kinds: Vec<HandlerKind> },
+    Some {
+        secret: String,
+        kinds: Vec<HandlerKind>,
+    },
 }
 
 /// The gate decision for one event.
@@ -193,9 +199,12 @@ struct CpuBurstRaw {
 impl CpuBurstConfig {
     /// Parses and clamps a cpu-burst payload.
     pub fn parse(payload: &str) -> Result<Self, crate::Error> {
-        let raw: CpuBurstRaw =
-            serde_json::from_str(payload).map_err(|e| crate::Error::MalformedEvent(e.to_string()))?;
-        Ok(Self { seconds: raw.seconds.min(MAX_BURST_SECONDS), intensity: raw.intensity })
+        let raw: CpuBurstRaw = serde_json::from_str(payload)
+            .map_err(|e| crate::Error::MalformedEvent(e.to_string()))?;
+        Ok(Self {
+            seconds: raw.seconds.min(MAX_BURST_SECONDS),
+            intensity: raw.intensity,
+        })
     }
 }
 
@@ -224,14 +233,23 @@ pub struct GateConfig {
 /// kinds; unknown names are collected into `unknown_kinds`.
 pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
     let Some(secret) = secret else {
-        return GateConfig { gate: Gate::Open, unknown_kinds: Vec::new() };
+        return GateConfig {
+            gate: Gate::Open,
+            unknown_kinds: Vec::new(),
+        };
     };
     let Some(raw) = gated else {
         // Secret present, no explicit gated config → default to All (gate everything).
-        return GateConfig { gate: Gate::All(secret.to_string()), unknown_kinds: Vec::new() };
+        return GateConfig {
+            gate: Gate::All(secret.to_string()),
+            unknown_kinds: Vec::new(),
+        };
     };
     if raw.trim().eq_ignore_ascii_case("all") {
-        return GateConfig { gate: Gate::All(secret.to_string()), unknown_kinds: Vec::new() };
+        return GateConfig {
+            gate: Gate::All(secret.to_string()),
+            unknown_kinds: Vec::new(),
+        };
     }
     let mut kinds = Vec::new();
     let mut unknown_kinds = Vec::new();
@@ -246,7 +264,13 @@ pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
             other => unknown_kinds.push(other.to_string()),
         }
     }
-    GateConfig { gate: Gate::Some { secret: secret.to_string(), kinds }, unknown_kinds }
+    GateConfig {
+        gate: Gate::Some {
+            secret: secret.to_string(),
+            kinds,
+        },
+        unknown_kinds,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -267,12 +291,18 @@ mod tests {
 
     #[test]
     fn event_id_parse_empty_err() {
-        assert!(matches!(EventId::parse(""), Err(crate::Error::MalformedEvent(_))));
+        assert!(matches!(
+            EventId::parse(""),
+            Err(crate::Error::MalformedEvent(_))
+        ));
     }
 
     #[test]
     fn event_id_parse_whitespace_err() {
-        assert!(matches!(EventId::parse("   "), Err(crate::Error::MalformedEvent(_))));
+        assert!(matches!(
+            EventId::parse("   "),
+            Err(crate::Error::MalformedEvent(_))
+        ));
     }
 
     #[test]
@@ -311,7 +341,10 @@ mod tests {
 
     #[test]
     fn parse_event_garbage() {
-        assert!(matches!(parse_event("not json"), Err(crate::Error::MalformedEvent(_))));
+        assert!(matches!(
+            parse_event("not json"),
+            Err(crate::Error::MalformedEvent(_))
+        ));
     }
 
     // A3 — RecentIds
@@ -388,20 +421,32 @@ mod tests {
     // A5 — gate
     #[test]
     fn gate_open_always_allow() {
-        assert_eq!(gate(HandlerKind::CpuBurst, &Gate::Open, None), Decision::Allow);
-        assert_eq!(gate(HandlerKind::CpuBurst, &Gate::Open, Some("wrong")), Decision::Allow);
+        assert_eq!(
+            gate(HandlerKind::CpuBurst, &Gate::Open, None),
+            Decision::Allow
+        );
+        assert_eq!(
+            gate(HandlerKind::CpuBurst, &Gate::Open, Some("wrong")),
+            Decision::Allow
+        );
     }
 
     #[test]
     fn gate_all_matching_secret_allow() {
         let cfg = Gate::All("secret".into());
-        assert_eq!(gate(HandlerKind::CpuBurst, &cfg, Some("secret")), Decision::Allow);
+        assert_eq!(
+            gate(HandlerKind::CpuBurst, &cfg, Some("secret")),
+            Decision::Allow
+        );
     }
 
     #[test]
     fn gate_all_wrong_secret_deny() {
         let cfg = Gate::All("secret".into());
-        assert_eq!(gate(HandlerKind::CpuBurst, &cfg, Some("wrong")), Decision::Deny);
+        assert_eq!(
+            gate(HandlerKind::CpuBurst, &cfg, Some("wrong")),
+            Decision::Deny
+        );
     }
 
     #[test]
@@ -412,14 +457,23 @@ mod tests {
 
     #[test]
     fn gate_some_covering_kind_behaves_like_all() {
-        let cfg = Gate::Some { secret: "s".into(), kinds: vec![HandlerKind::CpuBurst] };
-        assert_eq!(gate(HandlerKind::CpuBurst, &cfg, Some("s")), Decision::Allow);
+        let cfg = Gate::Some {
+            secret: "s".into(),
+            kinds: vec![HandlerKind::CpuBurst],
+        };
+        assert_eq!(
+            gate(HandlerKind::CpuBurst, &cfg, Some("s")),
+            Decision::Allow
+        );
         assert_eq!(gate(HandlerKind::CpuBurst, &cfg, None), Decision::Deny);
     }
 
     #[test]
     fn gate_some_not_covering_kind_allows_without_secret() {
-        let cfg = Gate::Some { secret: "s".into(), kinds: vec![HandlerKind::CpuBurst] };
+        let cfg = Gate::Some {
+            secret: "s".into(),
+            kinds: vec![HandlerKind::CpuBurst],
+        };
         assert_eq!(gate(HandlerKind::Counter, &cfg, None), Decision::Allow);
     }
 
@@ -513,7 +567,10 @@ mod tests {
         let cfg = parse_gate(Some("s3cr3t"), Some("cpu-burst,bogus"));
         assert_eq!(
             cfg.gate,
-            Gate::Some { secret: "s3cr3t".into(), kinds: vec![HandlerKind::CpuBurst] }
+            Gate::Some {
+                secret: "s3cr3t".into(),
+                kinds: vec![HandlerKind::CpuBurst]
+            }
         );
         assert_eq!(cfg.unknown_kinds, vec!["bogus".to_string()]);
     }

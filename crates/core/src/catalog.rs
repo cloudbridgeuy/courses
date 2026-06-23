@@ -1,4 +1,6 @@
-use crate::assets::{APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH};
+use crate::assets::{
+    APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH,
+};
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
 use crate::manifest::{SessionEntry, parse_manifest};

@@ -12,9 +12,14 @@ Participant's CodePipeline / CodeBuild (state change)
   → SNS topic
   → POST /hooks/notifications?token=…   (HTTPS subscription on the public server)
   → parse + broadcast
-  → GET /hooks/stream                   (SSE, one per open guide/slide page)
-  → toast in the browser
+  → GET /events/stream                  (unified SSE bus, one per open guide/slide page)
+  → toast in the browser (apps.js)
 ```
+
+> **Note:** `GET /hooks/stream` is **retired**. All SSE consumers use
+> `GET /events/stream`. Notifications ride the unified bus as
+> `Event { type: "notification", payload: <notification-json> }`.
+> See `.claude/context/apps-events.md` for the full event contract.
 
 Production target is Microsoft Teams (CodeStar Notifications → SNS → AWS Chatbot →
 Teams); the lab swaps only the last hop. See the CI/CD content (`17-notificaciones-teams`).
@@ -27,12 +32,14 @@ Teams); the lab swaps only the last hop. See the CI/CD content (`17-notificacion
   state, detail). `token_matches(expected, provided)` is the constant-time-ish auth
   check. Fully unit-tested inline.
 - **Shell (`crates/server/src/routes.rs`)** — `POST /hooks/notifications` (auth,
-  parse, confirm-or-broadcast), `GET /hooks/stream` (SSE over a `tokio::broadcast`
-  channel), `AppState` + `FromRef`. On a `SubscriptionConfirmation` it GETs the
-  `SubscribeURL` (reqwest) to confirm; on an event it broadcasts the JSON.
-- **Client (`crates/server/static/notifications.js`)** — `EventSource('/hooks/stream')`,
-  renders/auto-dismisses toasts. Loaded on all pages via `render.rs`. Toast CSS lives
-  in both `guide.css` and `slides.css`.
+  parse, confirm-or-broadcast), `AppState` + `FromRef`. On a
+  `SubscriptionConfirmation` it GETs the `SubscribeURL` (reqwest) to confirm; on an
+  event it broadcasts onto the unified `GET /events/stream` SSE bus as
+  `Event { type: "notification" }`. The old `GET /hooks/stream` route is retired.
+- **Client (`crates/server/static/apps.js`)** — multiplexed
+  `EventSource('/events/stream')` demultiplexed by `type`; the `"notification"`
+  type renders/auto-dismisses toasts. The old `notifications.js` is retired. Toast
+  CSS lives in both `guide.css` and `slides.css`.
 
 ## Auth
 
@@ -43,7 +50,7 @@ webhooks use — simple, not hardened.
   `https://<host>/hooks/notifications?token=<secret>`.
 - When set, a missing/wrong token → `401`. When unset, the endpoint is open and logs a
   startup warning.
-- `/hooks/stream` is unauthenticated by design (read-only public toasts).
+- The SSE bus `GET /events/stream` is unauthenticated by design (read-only public toasts).
 
 ## Pod attribution
 

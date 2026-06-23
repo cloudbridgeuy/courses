@@ -56,7 +56,11 @@ pub enum Outcome {
 fn emit_status(ctx: &AppsCtx, key: &str, payload: String) {
     match EventId::parse(format!("status-{key}")) {
         Ok(id) => {
-            let _ = ctx.bus.send(Event { id, kind: "app-status".into(), payload });
+            let _ = ctx.bus.send(Event {
+                id,
+                kind: "app-status".into(),
+                payload,
+            });
         }
         Err(e) => tracing::error!("bad status id: {e}"),
     }
@@ -81,12 +85,8 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
     }
 
     let result = match kind {
-        courses_core::HandlerKind::CpuBurst => {
-            handlers::cpu_burst(ctx, &event.payload).await
-        }
-        courses_core::HandlerKind::Counter => {
-            handlers::counter(ctx, &event.payload).await
-        }
+        courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(ctx, &event.payload).await,
+        courses_core::HandlerKind::Counter => handlers::counter(ctx, &event.payload).await,
     };
 
     if let Err(e) = result {

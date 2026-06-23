@@ -44,6 +44,56 @@ dice *cómo* es una tarea. Sus campos principales:
   y escribir logs.
 - **Configuración de logs**: a qué grupo de CloudWatch Logs envía la salida del
   contenedor.
+- **Variables de entorno**: pares clave-valor inyectados al contenedor en tiempo de
+  ejecución. Hay dos formas de pasarlos, y la diferencia importa.
+
+::: extra Variables de entorno vs. secretos en una task definition
+La task definition tiene dos campos distintos para configurar el contenedor con
+valores en tiempo de ejecución:
+
+**`environment`** — texto plano, almacenado dentro de la task definition:
+
+```json
+"environment": [
+  { "name": "CB_APPS_GATED", "value": "all" }
+]
+```
+
+**`secrets`** — referencia a un secreto en AWS Secrets Manager (o SSM Parameter
+Store); ECS lo resuelve y lo inyecta al arrancar la tarea:
+
+```json
+"secrets": [
+  {
+    "name": "CB_APPS_SECRET",
+    "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:cb-apps-secret-AbCdEf"
+  }
+]
+```
+
+El contenedor recibe `CB_APPS_SECRET` igual que una variable de entorno normal,
+pero el valor nunca queda escrito en la task definition.
+
+**Por qué el texto plano es un problema.** Una tarea definida con `environment`
+expone su valor en cualquier lugar donde la task definition sea legible:
+
+- `aws ecs describe-task-definition` lo devuelve en claro.
+- La consola de ECS lo muestra en la pestaña de configuración del contenedor.
+- Un template de CloudFormation con el valor hardcodeado queda en el repositorio.
+
+Para un secreto de acceso —como `CB_APPS_SECRET`, la clave que desbloquea los
+escenarios del taller— el texto plano significa que cualquier persona con permiso
+`ecs:DescribeTaskDefinition` puede leerlo.
+
+Con `secrets` + `valueFrom`, el valor vive en Secrets Manager. La task definition
+solo guarda el ARN. Para leerlo hace falta permiso sobre Secrets Manager, no sobre
+ECS.
+
+**Requisito de IAM.** El *execution role* de la tarea debe tener permiso
+`secretsmanager:GetSecretValue` (o `ssm:GetParameters`) sobre el recurso
+referenciado. ECS usa ese rol —no el task role— al resolver secretos antes de
+lanzar el contenedor.
+:::
 
 Las task definitions son **versionadas**: cada cambio crea una nueva *revisión*
 (`taller:1`, `taller:2`, …). Esto permite saber exactamente qué configuración está

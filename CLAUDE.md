@@ -57,14 +57,19 @@ before working on that area:
 - `.claude/context/dev-workflow.md` — local server ports, browser verification,
   lint, and repo hygiene (plans/designs stay out of git; conventional commits).
 - `.claude/context/notifications.md` — live SSE toast subsystem: SNS webhook flow,
-  `POST /hooks/notifications` + `GET /hooks/stream`, the `CB_HOOK_TOKEN` shared
-  secret, pod attribution, and where the pure/shell/client code lives.
+  `POST /hooks/notifications`, the `CB_HOOK_TOKEN` shared secret, pod attribution,
+  and where the pure/shell/client code lives.
+- `.claude/context/apps-events.md` — generic app event contract: `POST /events`,
+  `GET /events/stream` (unified SSE bus), `GET /state`, gating env vars, FC/IS
+  crate layout (`courses_core::events`, `courses_apps`), custom elements, `:::app`
+  directive, and the `CB_APPS_SECRET` Secrets Manager teaching hook.
 
 ## Workspace
 
 ```
 xtask/           — task runner (cargo xtask lint)
 crates/core/     — courses_core: pure domain (course model, HTML rendering)
+crates/apps/     — courses_apps: I/O crate (event handlers, DynamoDB, load gen)
 crates/server/   — courses_server: axum binary, imperative shell
 content/         — course content, one subdirectory per course slug
 ```

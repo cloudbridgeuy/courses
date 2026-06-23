@@ -1,0 +1,163 @@
+# Apps event contract
+
+A generic, app-agnostic event bus for in-guide interactive scenarios. Browser
+custom elements emit typed events to their own pod's server; the server runs
+gated side-effecting handlers and broadcasts feedback on a unified SSE bus.
+Read this before touching any code under `courses_core::events`, `courses_apps`,
+or the `/events` routes.
+
+## Envelope
+
+One struct in both directions:
+
+```rust
+Event { id: EventId, kind: String, payload: String }
+```
+
+- `id` — idempotency key (UUID or similar opaque string), set by the emitting client.
+- `kind` — selects the handler (inbound) or consumer (outbound). Serialised as
+  `"type"` in JSON (`#[serde(rename = "type")]`); the field is named `kind` in
+  Rust to avoid the keyword.
+- `payload` — opaque text; meaning is handler-specific.
+
+## Endpoints
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST /events` | inbound | optional (`?secret=`) | parse → dedup → gate → dispatch |
+| `GET /events/stream` | outbound SSE | none | unified bus; one `EventSource` per page |
+| `GET /state/{collection}/{key}` | read-only | none | DynamoDB read, CQRS query side |
+
+### POST /events — status codes
+
+| Code | Condition |
+|------|-----------|
+| 202 | Accepted and dispatched (or duplicate `id` → accepted, no-op) |
+| 200 | Unknown `kind` — no handler; event silently dropped |
+| 403 | Handler is gated and the provided secret is wrong or missing |
+| 400 | Malformed JSON |
+
+Duplicate detection uses `RecentIds` (a fixed-size ring buffer in
+`courses_core::events`). A duplicate returns 202 without re-dispatching.
+
+### GET /events/stream
+
+Unauthenticated SSE stream carrying `Event` values (JSON). The browser opens
+exactly one `EventSource('/events/stream')` and demultiplexes by `type`.
+Notifications and handler progress both ride this bus:
+
+- Notifications arrive as `Event { type: "notification", payload: <notification-json> }`.
+- Handler progress / feedback arrives as `Event { type: "app-status", payload }`.
+
+**The old `/hooks/stream` route is retired.** All SSE consumers must use
+`/events/stream`.
+
+### GET /state/{collection}/{key}
+
+Read-only DynamoDB lookup. Only collections listed in `CB_APPS_PUBLIC_COLLECTIONS`
+are reachable; any other collection returns 404. This is the CQRS query side:
+events are commands (`POST /events`), state reads are queries (`GET /state`).
+
+## Gating
+
+Handlers are optionally behind a secret. The gate is controlled by two env vars:
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `CB_APPS_SECRET` | unset (open) | Unlock secret; when unset all handlers run ungated |
+| `CB_APPS_GATED` | unset | `"all"` to gate every kind, or a comma-separated kind list |
+
+A gated `POST /events` request must supply `?secret=<value>`. The check reuses
+`token_matches` (constant-time comparison) from `courses_core`. The instructor
+enters the secret once in the guide UI; it is stored in `sessionStorage` under
+the key `cb-apps-secret` and attached automatically to gated emits as `?secret=`.
+
+## Same-origin topology
+
+`courses_server` IS the workload each participant deploys to their own AWS account.
+An app event hits that participant's own pod's server — there is no cross-pod
+fan-out. Consequences:
+
+- A CPU-burst handler burns CPU on that pod's ECS task → that pod's CloudWatch
+  metrics respond.
+- No CORS configuration is needed; browser and server share the same origin.
+- The SSE bus (`/events/stream`) is per-pod; each participant sees only their own
+  feedback.
+
+`/hooks/notifications` ingress is unchanged — the instructor's public server
+still receives SNS HTTPS subscription POSTs and broadcasts them on
+`/events/stream` as `type: "notification"` events.
+
+## Where the code lives
+
+### Pure — `courses_core::events`
+
+No I/O. Contains:
+
+- `Event` / `EventId` types + JSON de/serialisation.
+- `parse_event(body)` — deserialises and validates an inbound event.
+- `RecentIds` — fixed-size ring buffer for deduplication.
+- `select(kind)` — maps a kind string to a handler variant (or Unknown).
+- `gate(kind, secret, config)` / `parse_gate(env)` — gating logic.
+- `CpuBurstConfig` — pure config struct for the CPU-burst handler.
+- `is_public_collection(collection, whitelist)` — collection allowlist check.
+
+All of these are unit-tested inline.
+
+### I/O — `courses_apps`
+
+Depends on the AWS DynamoDB SDK (first AWS SDK in the repo). Contains:
+
+- `dispatch(event, ctx)` — executes the selected handler and returns an `Outcome`.
+- `cpu_burst(config)` — spawns a timed CPU load on the Fargate task.
+- `counter(key, table, client)` — atomic counter increment in DynamoDB.
+- `read_item(collection, key, ctx)` — DynamoDB `GetItem` for the query side.
+- `AppsCtx` — shared context struct (DynamoDB client, table name, broadcast sender).
+- `Outcome` — result type returned by `dispatch`.
+
+Nothing pure depends on `courses_apps`.
+
+### Shell — `courses_server`
+
+Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
+
+- `POST /events` — calls `parse_event`, dedup check, gate check, `dispatch`.
+- `GET /events/stream` — SSE over a `tokio::broadcast` channel.
+- `GET /state/{collection}/{key}` — calls `read_item` after allowlist check.
+
+## Client — `apps.js`
+
+`crates/server/static/apps.js` provides:
+
+- Custom elements `<cb-cpu-burst>` and `<cb-counter>`.
+- Unlock UI: a prompt that stores the instructor secret in `sessionStorage` under
+  `cb-apps-secret`.
+- A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
+- Toast renderer for `type: "notification"` events (replaces `notifications.js`).
+
+`apps.js` is injected only when the guide/slide content sets `uses_apps: true`
+(mirrors the `uses_mermaid` flag). The `:::app` Markdown directive wraps trusted
+custom-element tags in `<div class="cb-app">` and sets `uses_apps`.
+
+## Environment variables
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `CB_APPS_SECRET` | unset | Gate unlock secret |
+| `CB_APPS_GATED` | unset | `"all"` or comma kind list |
+| `CB_APPS_TABLE` | `"courses-apps"` | DynamoDB table name |
+| `CB_APPS_PUBLIC_COLLECTIONS` | `"counters"` | Comma-separated readable collections |
+
+## AWS Secrets Manager teaching hook
+
+`CB_APPS_SECRET` is the concrete example used in the workshop to contrast
+ECS `environment` (plaintext, visible via `DescribeTaskDefinition`) with
+`secrets` + `valueFrom` (pulls from Secrets Manager or SSM at task launch,
+never stored in the task definition). See the Week-2 ECS content
+(`12-primeros-contenedores`) for the in-guide treatment.
+
+## Open items
+
+- No replay: events missed while the SSE connection is closed are gone.
+- `RecentIds` ring buffer is in-process; a multi-replica deployment would need
+  an external dedup store (DynamoDB conditional write or ElastiCache).
