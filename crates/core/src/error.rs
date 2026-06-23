@@ -57,6 +57,12 @@ pub enum Error {
     #[error("nested `::: extra` block")]
     NestedExtra,
 
+    #[error("unclosed `:::app` block")]
+    UnclosedApp,
+
+    #[error("nested `:::app` block")]
+    NestedApp,
+
     #[error("duplicate anchor: {0}")]
     DuplicateAnchor(String),
 
@@ -208,6 +214,16 @@ mod tests {
     #[test]
     fn display_nested_extra() {
         assert_eq!(Error::NestedExtra.to_string(), "nested `::: extra` block");
+    }
+
+    #[test]
+    fn display_unclosed_app() {
+        assert_eq!(Error::UnclosedApp.to_string(), "unclosed `:::app` block");
+    }
+
+    #[test]
+    fn display_nested_app() {
+        assert_eq!(Error::NestedApp.to_string(), "nested `:::app` block");
     }
 
     #[test]

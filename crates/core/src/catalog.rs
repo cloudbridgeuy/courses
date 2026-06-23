@@ -1,4 +1,4 @@
-use crate::assets::{MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH};
+use crate::assets::{APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH};
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
 use crate::manifest::{SessionEntry, parse_manifest};
@@ -67,6 +67,7 @@ fn assemble_session(
     let mut sections = Vec::with_capacity(entry.sections.len());
     let mut uses_solutions = false;
     let mut uses_mermaid = false;
+    let mut uses_apps = false;
     let mut all_slides = Vec::new();
 
     for file in &entry.sections {
@@ -83,6 +84,7 @@ fn assemble_session(
 
         uses_solutions |= rendered.uses_solutions;
         uses_mermaid |= rendered.uses_mermaid;
+        uses_apps |= rendered.uses_apps;
         all_slides.extend(rendered.slide_html);
 
         for href in &frontmatter.styles {
@@ -103,6 +105,9 @@ fn assemble_session(
     if uses_mermaid {
         assets.push_script(MERMAID_JS_PATH);
         assets.push_script(MERMAID_INIT_JS_PATH);
+    }
+    if uses_apps {
+        assets.push_script(APPS_JS_PATH);
     }
 
     Ok((
@@ -393,6 +398,39 @@ mod tests {
         assert!(slides[0].html.contains("Slide A"));
         assert!(slides[1].html.contains("Slide B"));
         assert!(slides[2].html.contains("Slide C"));
+    }
+
+    #[test]
+    fn section_with_app_injects_apps_script() {
+        let body = ":::app\n<cb-cpu-burst></cb-cpu-burst>\n:::\n";
+        let files = make_files(&[("01-app.md", make_section("With App", body))]);
+        let input = CourseInput {
+            slug: "course-app",
+            manifest: &make_manifest_one_session("Course App", &["01-app.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&APPS_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn section_without_app_does_not_inject_apps_script() {
+        let files = make_files(&[("01-plain.md", make_section("Plain", "No apps.\n"))]);
+        let input = CourseInput {
+            slug: "course-no-app",
+            manifest: &make_manifest_one_session("Course No App", &["01-plain.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            !loaded.session_assets[0]
+                .scripts
+                .contains(&APPS_JS_PATH.to_owned())
+        );
     }
 
     #[test]

@@ -14,6 +14,8 @@ pub const MERMAID_JS_PATH: &str = "/static/mermaid.min.js";
 pub const MERMAID_INIT_JS_PATH: &str = "/static/mermaid-init.js";
 /// URL path of the live-toast client (SSE notifications), loaded on all pages.
 pub const NOTIFICATIONS_JS_PATH: &str = "/static/notifications.js";
+/// URL path of the interactive-app widgets bundle, injected when a page uses `:::app` blocks.
+pub const APPS_JS_PATH: &str = "/static/apps.js";
 
 /// The stylesheets, and scripts, a rendered page must reference, in order,
 /// without duplicates.

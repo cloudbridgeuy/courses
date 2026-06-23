@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
-use crate::solutions::{Segment, render_extra, render_solution, render_warning, split_solutions};
+use crate::solutions::{Segment, render_app, render_extra, render_solution, render_warning, split_solutions};
 
 /// An anchored block: plain Markdown, or an exercise (a heading-opened
 /// subsection whose `::: solucion` block immediately follows it).
@@ -157,6 +157,9 @@ pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) 
             }
             Segment::Extra { title, md } => {
                 html.push_str(&render_extra(&title, &render_slide_content(&md, anchors)?));
+            }
+            Segment::App(inner) => {
+                html.push_str(&render_app(&inner));
             }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),

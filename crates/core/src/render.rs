@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
 use crate::assets::{
-    MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, NOTIFICATIONS_JS_PATH, PageAssets, REVEAL_CSS_PATH,
-    REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
+    APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, NOTIFICATIONS_JS_PATH, PageAssets,
+    REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
 };
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
@@ -243,6 +243,14 @@ pub fn render_slideshow_page(
     } else {
         String::new()
     };
+    let uses_apps = slides_html
+        .iter()
+        .any(|slide| slide.html.contains("<div class=\"cb-app\">"));
+    let apps_script = if uses_apps {
+        format!("<script defer src=\"{APPS_JS_PATH}\"></script>\n")
+    } else {
+        String::new()
+    };
 
     format!(
         "<!doctype html>\n<html lang=\"es\">\n<head>\n\
@@ -260,6 +268,7 @@ pub fn render_slideshow_page(
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          {mermaid_script}\
+         {apps_script}\
          <script>\
 var cbSlideKey='cb-slide:'+location.pathname;\
 if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
@@ -800,5 +809,20 @@ mod tests {
         let courses = vec![make_loaded("aws-devops", "AWS DevOps")];
         let site = render_site(&courses);
         assert!(!site.pages.contains_key("aws-devops/s1/slides"));
+    }
+
+    #[test]
+    fn slideshow_page_with_cb_app_div_injects_apps_js_script_tag() {
+        // A slide whose HTML contains a `<div class="cb-app">` must cause
+        // render_slideshow_page to inject the apps.js <script> tag into the
+        // page output (the `uses_apps` detection branch in render.rs).
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<div class=\"cb-app\"><cb-counter key=\"x\"></cb-counter></div>\n".to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains("apps.js"),
+            "apps.js script tag must be present when a slide contains a cb-app div");
     }
 }

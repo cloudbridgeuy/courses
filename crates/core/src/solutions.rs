@@ -18,6 +18,7 @@ pub enum Segment {
     TitleSlide { text: String },
     Warning(String),
     Extra { title: String, md: String },
+    App(String),
 }
 
 /// A rendered slide HTML fragment with its display variant.
@@ -35,6 +36,7 @@ enum Opener {
     TitleSlide { text: String },
     Warning,
     Extra { title: String },
+    App,
 }
 
 /// Recognizes a directive opener on its own line. The slide fences
@@ -63,6 +65,8 @@ fn opener(fence: &str) -> Option<Opener> {
         (rest.is_empty() || rest.starts_with(' ')).then(|| Opener::Extra {
             title: rest.trim().to_owned(),
         })
+    } else if fence == ":::app" {
+        Some(Opener::App)
     } else {
         None
     }
@@ -82,6 +86,7 @@ impl Opener {
             }
             Opener::Warning => Segment::Warning(md),
             Opener::Extra { title } => Segment::Extra { title, md },
+            Opener::App => Segment::App(md),
         })
     }
 
@@ -93,6 +98,7 @@ impl Opener {
             Opener::TitleSlide { .. } => Error::UnclosedTitleSlide,
             Opener::Warning => Error::UnclosedWarning,
             Opener::Extra { .. } => Error::UnclosedExtra,
+            Opener::App => Error::UnclosedApp,
         }
     }
 }
@@ -163,6 +169,7 @@ pub struct RenderedBody {
     pub uses_solutions: bool,
     pub uses_slides: bool,
     pub uses_mermaid: bool,
+    pub uses_apps: bool,
 }
 
 /// Renders a section's Markdown body.
@@ -224,6 +231,9 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
                 let inner = render_guide_segments(&md, &mut uses_solutions)?;
                 html.push_str(&render_extra(&title, &inner));
             }
+            Segment::App(md) => {
+                html.push_str(&render_app(&md));
+            }
         }
     }
     // Mermaid markup is emitted by the Markdown renderer as `<pre class="mermaid">`;
@@ -233,12 +243,20 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
         || slide_html
             .iter()
             .any(|slide| slide.html.contains("<pre class=\"mermaid\">"));
+    // App widgets are emitted as `<div class="cb-app">`; a page only loads
+    // apps.js when at least one app widget is present, in the guide body or
+    // in any slide.
+    let uses_apps = html.contains("<div class=\"cb-app\">")
+        || slide_html
+            .iter()
+            .any(|slide| slide.html.contains("<div class=\"cb-app\">"));
     Ok(RenderedBody {
         html,
         slide_html,
         uses_solutions,
         uses_slides,
         uses_mermaid,
+        uses_apps,
     })
 }
 
@@ -264,6 +282,9 @@ fn render_guide_segments(md: &str, uses_solutions: &mut bool) -> Result<String> 
             Segment::Extra { title, md } => {
                 let body = render_guide_segments(&md, uses_solutions)?;
                 html.push_str(&render_extra(&title, &body));
+            }
+            Segment::App(md) => {
+                html.push_str(&render_app(&md));
             }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
@@ -299,6 +320,12 @@ pub(crate) fn render_extra(title: &str, inner_html: &str) -> String {
          <div class=\"cb-extra-cuerpo\">\n{inner_html}</div>\n</details>\n",
         escape_html(title)
     )
+}
+
+/// Renders an app container: a `<div class="cb-app">` that passes the inner
+/// content (custom-element tags, raw HTML) through verbatim without re-escaping.
+pub(crate) fn render_app(inner: &str) -> String {
+    format!("<div class=\"cb-app\">\n{inner}</div>\n")
 }
 
 pub(crate) fn render_solution(inner_html: &str) -> String {
@@ -500,6 +527,50 @@ mod tests {
             split_solutions("::: extra T\nX.\n"),
             Err(Error::UnclosedExtra)
         ));
+    }
+
+    // ── app fence ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn app_block_produces_app_segment() {
+        let body = ":::app\n<cb-counter key=\"x\"></cb-counter>\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::App(
+                "<cb-counter key=\"x\"></cb-counter>\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn unclosed_app_errors() {
+        assert!(matches!(
+            split_solutions(":::app\n<cb-counter></cb-counter>\n"),
+            Err(Error::UnclosedApp)
+        ));
+    }
+
+    #[test]
+    fn app_renders_cb_app_div_with_verbatim_inner() {
+        let body = ":::app\n<cb-cpu-burst></cb-cpu-burst>\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("<div class=\"cb-app\">"));
+        assert!(result.html.contains("<cb-cpu-burst></cb-cpu-burst>"));
+        assert!(result.uses_apps);
+    }
+
+    #[test]
+    fn body_without_app_uses_apps_is_false() {
+        let result = render_section_body("Sección", "Just plain text.\n").unwrap();
+        assert!(!result.uses_apps);
+    }
+
+    #[test]
+    fn body_with_cb_app_div_sets_uses_apps_true() {
+        let body = ":::app\n<cb-counter key=\"x\"></cb-counter>\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_apps);
     }
 
     // ── slide / inline-slide / title-slide fences ─────────────────────────
@@ -848,5 +919,22 @@ mod tests {
         assert!(!result.uses_solutions);
         assert!(!result.uses_slides);
         assert!(result.slide_html.is_empty());
+    }
+
+    #[test]
+    fn app_block_inside_slide_sets_uses_apps_via_slide_html_detection() {
+        // The :::app block here lives inside a :::slide fence, so it is
+        // rendered into slide_html rather than the guide html.  The
+        // `slide_html.iter().any(...)` branch in render_section_body must
+        // detect the `<div class="cb-app">` in the slide fragment and set
+        // uses_apps = true even though the guide html contains no app div.
+        let body = ":::slide\n## Herramienta\n:::app\n<cb-counter key=\"x\"></cb-counter>\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(!result.html.contains("<div class=\"cb-app\">"),
+            "app div must not appear in guide html when inside a slide fence");
+        assert!(result.slide_html.iter().any(|s| s.html.contains("<div class=\"cb-app\">")),
+            "slide fragment must contain the cb-app div");
+        assert!(result.uses_apps,
+            "uses_apps must be true when cb-app appears only in slide_html");
     }
 }
