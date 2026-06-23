@@ -31,7 +31,7 @@ Código → Build → Test → Deploy → Monitor
 1. Crear el repositorio, clonarlo desde su origen y subir el código a CodeCommit
 2. Construir la imagen con CodeBuild
 3. Publicar la imagen en ECR
-4. Desplegar la plantilla de CloudFormation para su despliegue inicial
+4. Desplegar el template de CloudFormation para su despliegue inicial
 
 Cada ejercicio incluye su solución oculta — botón **Ver solución** en la guía.
 :::
@@ -80,10 +80,10 @@ terminar la sesión del viernes contaremos con:
 - Un **pipeline de integración continua** en CodeBuild que, cada vez que lo ejecuta,
   compila la imagen y la publica en Amazon ECR.
 - La **aplicación en línea**: accesible desde el navegador a través de un Application
-  Load Balancer, desplegada con una plantilla de CloudFormation provista por el instructor,
+  Load Balancer, desplegada con un template de CloudFormation provisto por el instructor,
   sobre ECS/Fargate, conectada a una tabla de DynamoDB.
 
-La plantilla de CloudFormation se usa esta semana como una caja negra: se lanza y se
+El template de CloudFormation se usa esta semana como una caja negra: se lanza y se
 obtiene un ambiente funcional en minutos. Cómo está construida por dentro es el tema de
 la Semana 2.
 
@@ -146,7 +146,7 @@ siempre el mismo:
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation,
   ECS/Fargate y DynamoDB.
 - **Navegador** actualizado (Chrome o Firefox).
-- **Plantilla** `taller-semana1.yaml`, provista por el instructor.
+- **Template** `taller-semana1.yaml`, provisto por el instructor.
 :::
 
 ## Requisitos previos
@@ -156,5 +156,5 @@ Antes de comenzar, confirme que cuenta con lo siguiente:
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation, ECS y
   Fargate, y DynamoDB. Si no está seguro, consulte con el instructor.
 - **Navegador web** actualizado (Chrome o Firefox recomendados).
-- **Plantilla de CloudFormation** `taller-semana1.yaml`, también provista por el
+- **Template de CloudFormation** `taller-semana1.yaml`, también provisto por el
   instructor. La usará en la sección 4.

@@ -15,13 +15,13 @@ en un archivo YAML o JSON qué recursos quiere —un clúster ECS, un servicio F
 un ALB, una tabla DynamoDB, grupos de seguridad, roles de IAM— y CloudFormation los
 crea todos en el orden correcto, manejando las dependencias automáticamente.
 
-## La plantilla de esta semana
+## El template de esta semana
 
-El instructor le proveyó el archivo `taller-semana1.yaml`. Esta plantilla es, por ahora,
+El instructor le proveyó el archivo `taller-semana1.yaml`. Este template es, por ahora,
 una **caja negra**: usted la lanza con dos parámetros y obtiene un ambiente funcional
 en minutos. No necesita entender su contenido esta semana —eso es el tema de la Semana 2.
 
-Lo que despliega la plantilla:
+Lo que despliega el template:
 
 - Una **tabla de DynamoDB** para la aplicación.
 - Un **clúster ECS** y un **servicio Fargate** que ejecuta su imagen Docker.
@@ -31,7 +31,7 @@ Lo que despliega la plantilla:
   todo funcione junto.
 
 Los únicos parámetros que usted controla son el **nombre del stack** y el **URI de la
-imagen en ECR**. El resto lo gestiona la plantilla.
+imagen en ECR**. El resto lo gestiona el template.
 
 ## Un detalle que vale la pena notar
 
@@ -39,6 +39,17 @@ Cuando abra la URL del ALB en el navegador, verá cargarse esta misma guía: la
 plataforma del taller servida desde su propio despliegue en ECS. La aplicación que
 usted construyó, desplegó, y opera es exactamente el entorno desde el que lee estas
 instrucciones. No es un ejemplo genérico —es el sistema real.
+
+:::slide
+## La caja negra de la Semana 1
+
+Un template, dos parámetros, un ambiente completo:
+
+- DynamoDB · ECS + Fargate · Application Load Balancer
+- Roles de IAM, grupos de seguridad, red
+
+Usted controla el **nombre del stack** y el **URI de la imagen**.
+:::
 
 ## Práctica guiada: lanzar el stack de CloudFormation
 
@@ -60,7 +71,7 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 
 1. En **Stack name**, escriba `taller-<su-nombre>` (por ejemplo: `taller-maria`). El
    nombre del stack identifica su ambiente en la consola y debe ser único en la región.
-2. En los parámetros de la plantilla, localice el campo correspondiente al **URI de
+2. En los parámetros del template, localice el campo correspondiente al **URI de
    la imagen**. Pegue el URI completo que copió de ECR al final de la sección anterior.
    El formato es:
    ```
@@ -77,7 +88,7 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 ### Confirmar y lanzar
 
 1. En la pantalla de revisión, desplácese hasta la sección **Capabilities** al pie
-    de la página. Verá un aviso sobre que la plantilla puede crear recursos de IAM.
+    de la página. Verá un aviso sobre que el template puede crear recursos de IAM.
     Marque la casilla **I acknowledge that AWS CloudFormation might create IAM
     resources with custom names**.
 2. Pulse **Submit** (o **Create stack**, según la versión de la consola).
@@ -95,7 +106,7 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 ### Obtener la URL de la aplicación
 
 1. Una vez en **CREATE_COMPLETE**, seleccione la pestaña **Outputs**.
-2. Verá una salida llamada `ALBUrl` (o similar, según la plantilla). Copie el valor
+2. Verá una salida llamada `ALBUrl` (o similar, según el template). Copie el valor
     —es la URL pública del Application Load Balancer.
 3. Abra esa URL en una nueva pestaña del navegador. En unos segundos verá cargarse
     esta guía del taller, servida desde el contenedor que acaba de desplegar en su
@@ -103,9 +114,10 @@ instrucciones. No es un ejemplo genérico —es el sistema real.
 
 ---
 
+{#ejercicio-5}
 ### Ejercicio 5 — Despliegue la aplicación
 
-Lance el stack de CloudFormation con la plantilla `taller-semana1.yaml` provista por
+Lance el stack de CloudFormation con el template `taller-semana1.yaml` provisto por
 el instructor. Use como URI de la imagen el valor que copió de ECR al terminar el
 Ejercicio 4. Al terminar, abra la URL del ALB en el navegador y confirme que la
 aplicación está en línea.
@@ -128,4 +140,8 @@ aplicación está en línea.
 11. En la pestaña **Outputs**, copie el valor de **ALBUrl**.
 12. Abra esa URL en el navegador. Verá la plataforma del taller corriendo desde su
     propio despliegue.
+:::
+
+:::slide light
+{{ejercicio-5}}
 :::

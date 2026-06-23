@@ -8,7 +8,7 @@ En un sistema operado manualmente, un error puede dejar el ambiente en un estado
 inconsistente difícil de diagnosticar y corregir. El tiempo de recuperación depende de
 cuánto se recuerde de cómo se construyó originalmente, y de si esa memoria es precisa.
 
-Cuando el ambiente se define como código —en este caso, una plantilla de CloudFormation—
+Cuando el ambiente se define como código —en este caso, un template de CloudFormation—
 la situación cambia radicalmente. Si algo sale mal, la corrección no es reconstruir desde
 la memoria: es borrar y volver a crear. El proceso es el mismo que siguió hace unos
 minutos, tarda lo mismo, y produce exactamente el mismo resultado. El **costo de un
@@ -22,7 +22,7 @@ sea la urgencia sino la calma. Se borra, se recrea, se sigue.
 
 Antes de borrar el stack, es útil entender qué destruye CloudFormation y qué no.
 
-La plantilla `taller-semana1.yaml` crea y gestiona: el clúster ECS, el servicio Fargate,
+El template `taller-semana1.yaml` crea y gestiona: el clúster ECS, el servicio Fargate,
 el ALB, la tabla de DynamoDB, los roles de IAM, y la configuración de red. Todos esos
 recursos **se eliminan** cuando se borra el stack.
 
@@ -35,6 +35,16 @@ Lo que **no** forma parte del stack y por lo tanto **sobrevive**:
 Esto significa que al recrear el stack basta con volver a proporcionar el URI de la
 imagen en ECR: el ambiente completo se reconstituye en minutos, sin volver a hacer el
 build ni resubir el código.
+
+:::slide
+## El seguro del taller
+
+Borrar y recrear el stack devuelve el ambiente a un estado conocido en minutos.
+
+**Sobrevive** (fuera del stack): el repo de CodeCommit, la imagen en ECR, el proyecto
+de CodeBuild.
+**Se borra** (lo gestiona el stack): ECS, Fargate, ALB, DynamoDB, IAM, red.
+:::
 
 ## Práctica guiada: borrar el stack
 
@@ -68,8 +78,8 @@ build ni resubir el código.
 ### Lanzar el stack de nuevo
 
 1. Con el stack eliminado, pulse **Create stack → With new resources (standard)**.
-2. Suba nuevamente la plantilla `taller-semana1.yaml`. (Si la consola le ofrece
-   reutilizar la plantilla anterior porque la subió recientemente, puede hacerlo.)
+2. Suba nuevamente el template `taller-semana1.yaml`. (Si la consola le ofrece
+   reutilizar el template anterior porque lo subió recientemente, puede hacerlo.)
 3. En **Stack name**, use exactamente el mismo nombre: `taller-<su-nombre>`.
 4. En el campo del URI de la imagen, pegue el mismo URI de ECR que usó antes.
     La imagen sigue en ECR — no necesita volver a hacer el build.
@@ -85,6 +95,7 @@ build ni resubir el código.
 
 ---
 
+{#ejercicio-6}
 ### Ejercicio 6 — Destruya, y recree, su ambiente
 
 Elimine su stack de CloudFormation por completo. Confirme que la aplicación ya no
@@ -105,7 +116,7 @@ vuelve a estar en línea.
 **Recreación:**
 
 1. Pulse **Create stack → With new resources (standard)**.
-2. Suba la plantilla `taller-semana1.yaml` (o reutilice la cargada anteriormente).
+2. Suba el template `taller-semana1.yaml` (o reutilice el cargado anteriormente).
 3. En **Stack name**, escriba `taller-<su-nombre>`.
 4. En el campo del URI de la imagen, pegue el URI de ECR con la etiqueta `latest`.
    La imagen sigue disponible en ECR sin necesidad de un nuevo build.
@@ -114,4 +125,8 @@ vuelve a estar en línea.
 7. En la pestaña **Outputs**, copie la nueva URL del ALB.
 8. Ábrala en el navegador. La guía del taller debe cargarse de nuevo —el ambiente
     está completamente restaurado.
+:::
+
+:::slide light
+{{ejercicio-6}}
 :::

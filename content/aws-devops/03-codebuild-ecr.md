@@ -40,6 +40,18 @@ CodeBuild (lee buildspec.yml, construye la imagen)
 ECR (almacena la imagen con una etiqueta)
 ```
 
+:::slide
+## Del código a la imagen publicada
+
+```
+CodeCommit (código fuente)
+    → CodeBuild (lee buildspec.yml, construye)
+    → ECR (almacena la imagen etiquetada)
+```
+
+CodeBuild construye en un entorno limpio; ECR guarda el resultado.
+:::
+
 ## El archivo `buildspec.yml`
 
 El archivo `buildspec.yml` está incluido en el `.zip` de la aplicación, en la raíz del
@@ -82,6 +94,16 @@ Las tres fases y su propósito:
 Las variables de entorno (`$AWS_ACCOUNT_ID`, `$AWS_DEFAULT_REGION`, `$IMAGE_REPO_NAME`,
 `$IMAGE_TAG`) se definen en el proyecto de CodeBuild, no en el archivo. Esto permite
 reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
+
+:::slide
+## Las tres fases del build
+
+| Fase | Propósito |
+| --- | --- |
+| `pre_build` | Autenticar con ECR. |
+| `build` | `docker build` y etiquetar la imagen. |
+| `post_build` | `docker push` a ECR. |
+:::
 
 ## Práctica guiada: crear el repositorio ECR
 
@@ -183,8 +205,42 @@ para publicar en ECR. Siga estos pasos **antes** de ejecutar el build:
     y la fecha y hora del push. Copie el **Image URI** completo —lo necesitará en la
     siguiente sección para lanzar el stack de CloudFormation.
 
+## Un adelanto: enterarse cuando el build termina
+
+Hoy lanzó el build a mano y siguió los logs en pantalla. En un equipo real nadie se
+queda mirando la consola: el build avisa solo cuando termina —en éxito o en error— por
+el canal donde el equipo ya conversa. En este curso ese canal es **Microsoft Teams**.
+
+No lo configuramos esta semana, pero conviene ver el flujo desde ahora, porque es la
+pieza que cierra el pipeline en la Semana 3.
+
+::: extra Cómo se notifica un build a Microsoft Teams
+El evento de fin de build (o de un *stage* de CodePipeline) lo capturan las **reglas
+de notificación de los Developer Tools** —llamadas históricamente *CodeStar
+Notifications*— y lo publican en un **tema de Amazon SNS**. Desde SNS, **AWS Chatbot**
+lo entrega a un canal de Microsoft Teams.
+
+```
+CodeBuild / CodePipeline (evento)
+    → CodeStar Notifications (regla)
+    → Amazon SNS (tema)
+    → AWS Chatbot
+    → canal de Microsoft Teams
+```
+
+Una aclaración de nombres: el servicio **AWS CodeStar** (el de proyectos y dashboards)
+fue discontinuado en 2024. Las **reglas de notificación** que usamos aquí son otra
+cosa, siguen vigentes, y son parte de los Developer Tools.
+
+En el laboratorio no conectamos Teams por participante —sería inviable. En su lugar,
+los eventos de su cuenta llegan a la **aplicación del instructor**, que los muestra como
+avisos (*toasts*) en esta misma guía. El mecanismo del lab es un espejo del flujo real:
+lo que aquí aparece como un *toast*, en su organización aparecería en un canal de Teams.
+:::
+
 ---
 
+{#ejercicio-3}
 ### Ejercicio 3 — Cree el repositorio de imágenes
 
 Cree un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>`.
@@ -203,6 +259,7 @@ Cree un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>`
 
 ---
 
+{#ejercicio-4}
 ### Ejercicio 4 — Ejecute su primera build
 
 Configure un proyecto de CodeBuild que lea su repositorio de CodeCommit, construya la
@@ -235,4 +292,12 @@ etiqueta `latest`.
     **Succeeded**.
 16. En ECR, abra su repositorio y confirme que aparece una imagen con la etiqueta
     `latest` y la fecha de hace unos minutos.
+:::
+
+:::slide light
+{{ejercicio-3}}
+:::
+
+:::slide light
+{{ejercicio-4}}
 :::
