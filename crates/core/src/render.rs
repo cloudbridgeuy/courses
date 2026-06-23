@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
 use crate::assets::{
-    APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, NOTIFICATIONS_JS_PATH, PageAssets,
+    APPS_JS_PATH, CB_WIDGETS_CSS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets,
     REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
 };
 use crate::catalog::LoadedCourse;
@@ -88,7 +88,6 @@ sessionStorage.removeItem(k);scrollTo({{top:y}});}});\
 window.addEventListener('scroll',u);u();\
 new IntersectionObserver(function(e){{b.style.bottom=e[0].isIntersecting?(f.offsetHeight+12)+'px':'';}}).observe(f);\
 </script>\n\
-         <script defer src=\"{NOTIFICATIONS_JS_PATH}\"></script>\n\
          </body>\n</html>\n"
     )
 }
@@ -261,6 +260,7 @@ pub fn render_slideshow_page(
          <title>{title} — Diapositivas</title>\n\
          <link rel=\"stylesheet\" href=\"{REVEAL_CSS_PATH}\">\n\
          <link rel=\"stylesheet\" href=\"{SLIDES_CSS_PATH}\">\n\
+         <link rel=\"stylesheet\" href=\"{CB_WIDGETS_CSS_PATH}\">\n\
          </head>\n<body>\n\
          <div class=\"reveal\">\n<div class=\"slides\">\n\
          {sections}\
@@ -281,7 +281,6 @@ aria-label=\"Cerrar diapositivas\">\
 <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">\
 <path d=\"M6 6l12 12M18 6L6 18\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\
 </svg></a>\n\
-         <script defer src=\"{NOTIFICATIONS_JS_PATH}\"></script>\n\
          </body>\n</html>\n"
     )
 }
@@ -822,7 +821,9 @@ mod tests {
             light: false,
         }];
         let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
-        assert!(html.contains("apps.js"),
-            "apps.js script tag must be present when a slide contains a cb-app div");
+        assert!(
+            html.contains("apps.js"),
+            "apps.js script tag must be present when a slide contains a cb-app div"
+        );
     }
 }

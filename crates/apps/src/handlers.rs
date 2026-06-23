@@ -4,9 +4,9 @@ use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::{Error, Result};
 use crate::AppsCtx;
 use crate::emit_status;
+use crate::error::{Error, Result};
 use courses_core::{CpuBurstConfig, Intensity, is_public_collection};
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,9 @@ use courses_core::{CpuBurstConfig, Intensity, is_public_collection};
 pub async fn cpu_burst(ctx: &AppsCtx, payload: &str) -> Result<()> {
     let cfg = CpuBurstConfig::parse(payload)?;
 
-    let available = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let available = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(1);
     let workers = match cfg.intensity {
         Intensity::Low => 1,
         Intensity::Medium => (available / 2).max(1),
@@ -144,11 +146,7 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
 ///   BOOL -> JSON bool
 ///   NULL -> JSON null
 ///   Everything else is omitted from the output object.
-pub async fn read_item(
-    ctx: &AppsCtx,
-    collection: &str,
-    key: &str,
-) -> Result<Option<Value>> {
+pub async fn read_item(ctx: &AppsCtx, collection: &str, key: &str) -> Result<Option<Value>> {
     if !is_public_collection(&ctx.public_collections, collection) {
         return Ok(None);
     }
@@ -163,9 +161,8 @@ pub async fn read_item(
         .await
         .map_err(|e| Error::Dynamo(e.to_string()))?;
 
-    let item = match resp.item() {
-        None => return Ok(None),
-        Some(m) => m,
+    let Some(item) = resp.item() else {
+        return Ok(None);
     };
 
     let mut obj = serde_json::Map::new();

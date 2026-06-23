@@ -12,8 +12,10 @@ pub const SLIDES_CSS_PATH: &str = "/static/slides.css";
 pub const MERMAID_JS_PATH: &str = "/static/mermaid.min.js";
 /// URL path of the mermaid initializer, injected after the bundle on guide pages.
 pub const MERMAID_INIT_JS_PATH: &str = "/static/mermaid-init.js";
-/// URL path of the live-toast client (SSE notifications), loaded on all pages.
-pub const NOTIFICATIONS_JS_PATH: &str = "/static/notifications.js";
+/// URL path of the shared structural styles for app widgets and the unlock panel.
+/// Loaded on every page so that widgets render correctly even on non-app pages that
+/// receive a toast notification.
+pub const CB_WIDGETS_CSS_PATH: &str = "/static/cb-widgets.css";
 /// URL path of the interactive-app widgets bundle, injected when a page uses `:::app` blocks.
 pub const APPS_JS_PATH: &str = "/static/apps.js";
 
@@ -26,10 +28,10 @@ pub struct PageAssets {
 }
 
 impl PageAssets {
-    /// The platform baseline: the guide stylesheet, no scripts.
+    /// The platform baseline: the guide stylesheet, shared widget styles, no scripts.
     pub fn base() -> Self {
         Self {
-            styles: vec![GUIDE_CSS_PATH.to_owned()],
+            styles: vec![GUIDE_CSS_PATH.to_owned(), CB_WIDGETS_CSS_PATH.to_owned()],
             scripts: Vec::new(),
         }
     }
@@ -57,17 +59,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn base_holds_only_guide_css_and_no_scripts() {
+    fn base_holds_guide_css_and_widgets_css_and_no_scripts() {
         let assets = PageAssets::base();
-        assert_eq!(assets.styles, vec![GUIDE_CSS_PATH]);
+        assert_eq!(assets.styles, vec![GUIDE_CSS_PATH, CB_WIDGETS_CSS_PATH]);
         assert!(assets.scripts.is_empty());
     }
 
     #[test]
-    fn pushing_duplicate_style_leaves_one_entry() {
+    fn pushing_duplicate_style_does_not_grow_the_list() {
         let mut assets = PageAssets::base();
+        let before = assets.styles.len();
         assets.push_style(GUIDE_CSS_PATH);
-        assert_eq!(assets.styles.len(), 1);
+        assert_eq!(assets.styles.len(), before);
     }
 
     #[test]

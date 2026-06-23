@@ -451,3 +451,51 @@
 .cb-toast-info {
   border-left-color: var(--cb-teal);
 }
+
+/* ---------------------------------------------------------------------------
+   App widget theme overrides for slides (dark theme).
+   Structural rules are in cb-widgets.css (loaded before this file).
+   --------------------------------------------------------------------------- */
+
+/* Slides are rendered in the reveal.js context; tighten spacing slightly. */
+.cb-app {
+  margin: 0.75rem 0;
+}
+
+.cb-app-btn {
+  font-size: 0.9rem;
+  padding: 0.4em 1em;
+}
+
+.cb-app-status,
+.cb-app-value {
+  margin-left: 0.6em;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Unlock toggle: dark-surface style */
+#cb-unlock-toggle {
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* Unlock form: dark panel */
+#cb-unlock-form {
+  background: #1e1e1e;
+  border-color: rgba(255,255,255,0.15);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+#cb-unlock-form label {
+  color: #fff;
+}
+#cb-unlock-input {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+#cb-unlock-status {
+  color: rgba(255,255,255,0.6);
+}

@@ -10,15 +10,15 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use courses_apps::{AppsCtx, Outcome};
 use courses_core::{
-    Event, EventId, Notification, RecentIds, RenderedSite, Seen, SnsMessage,
-    parse_event, parse_gate, parse_sns_message, token_matches,
+    Event, EventId, Notification, RecentIds, RenderedSite, Seen, SnsMessage, parse_event,
+    parse_gate, parse_sns_message, token_matches,
 };
 use serde::Deserialize;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 
-const NOTIFICATIONS_JS: &str = include_str!("../static/notifications.js");
+const APPS_JS: &str = include_str!("../static/apps.js");
 
 /// Buffer of in-flight events per subscriber before a slow client lags.
 const NOTIFICATION_CHANNEL_CAPACITY: usize = 256;
@@ -104,9 +104,7 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
     // --- Apps gate config ---
     let apps_secret = std::env::var(APPS_SECRET_ENV).ok();
     if apps_secret.is_none() {
-        tracing::warn!(
-            "{APPS_SECRET_ENV} is unset: /events endpoint is open (no secret required)"
-        );
+        tracing::warn!("{APPS_SECRET_ENV} is unset: /events endpoint is open (no secret required)");
     }
     let apps_gated = std::env::var(APPS_GATED_ENV).ok();
     let gate_config = parse_gate(apps_secret.as_deref(), apps_gated.as_deref());
@@ -223,7 +221,11 @@ fn emit_notification(bus: &broadcast::Sender<Event>, notification: &Notification
     };
     match serde_json::to_string(notification) {
         Ok(payload) => {
-            let event = Event { id, kind: "notification".into(), payload };
+            let event = Event {
+                id,
+                kind: "notification".into(),
+                payload,
+            };
             // A send error only means no SSE clients are connected; ignore.
             let _ = bus.send(event);
         }
@@ -359,6 +361,7 @@ fn lookup_page(site: &RenderedSite, key: &str) -> Response {
 async fn static_file(State(site): State<Arc<RenderedSite>>, Path(file): Path<String>) -> Response {
     match file.as_str() {
         "toggle.js" => asset("application/javascript; charset=utf-8", TOGGLE_JS),
+        "cb-widgets.css" => asset("text/css; charset=utf-8", CB_WIDGETS_CSS),
         "guide.css" => asset("text/css; charset=utf-8", GUIDE_CSS),
         "reveal.min.js" => asset("application/javascript; charset=utf-8", REVEAL_JS),
         "reveal.min.css" => asset("text/css; charset=utf-8", REVEAL_CSS),
@@ -367,7 +370,7 @@ async fn static_file(State(site): State<Arc<RenderedSite>>, Path(file): Path<Str
         "favicon.ico" => bytes("image/x-icon", FAVICON_ICO),
         "mermaid.min.js" => asset("application/javascript; charset=utf-8", MERMAID_JS),
         "mermaid-init.js" => asset("application/javascript; charset=utf-8", MERMAID_INIT_JS),
-        "notifications.js" => asset("application/javascript; charset=utf-8", NOTIFICATIONS_JS),
+        "apps.js" => asset("application/javascript; charset=utf-8", APPS_JS),
         "montserrat.ttf" => bytes("font/ttf", MONTSERRAT_TTF),
         "cloudbridge.png" => bytes("image/png", CLOUDBRIDGE_PNG),
         "cloudbridge-white.png" => bytes("image/png", CLOUDBRIDGE_WHITE_PNG),
@@ -388,6 +391,7 @@ fn not_found(site: &RenderedSite) -> Response {
 }
 
 const TOGGLE_JS: &str = include_str!("../static/toggle.js");
+const CB_WIDGETS_CSS: &str = include_str!("../static/cb-widgets.css");
 const GUIDE_CSS: &str = include_str!("../static/guide.css");
 const REVEAL_JS: &str = include_str!("../static/reveal.min.js");
 const REVEAL_CSS: &str = include_str!("../static/reveal.min.css");

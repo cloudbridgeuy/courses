@@ -672,3 +672,23 @@ pre.mermaid:hover .cb-diagram-zoom,
 .cb-toast-info {
   border-left-color: var(--cb-teal, #5fc8be);
 }
+
+/* ---------------------------------------------------------------------------
+   App widget theme overrides for the guide (light theme).
+   Structural rules are in cb-widgets.css (loaded before this file).
+   --------------------------------------------------------------------------- */
+
+/* The guide's reading surface is slightly larger than slides; keep spacing
+   comfortable at document scale. */
+.cb-app {
+  margin: 1.25rem 0;
+}
+
+.cb-app-btn {
+  font-size: 0.95rem;
+}
+
+.cb-app-status,
+.cb-app-value {
+  color: var(--cb-grey, #75787b);
+}

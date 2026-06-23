@@ -1,0 +1,116 @@
+/* ---------------------------------------------------------------------------
+   Shared structural styles for app widgets and the unlock control panel.
+   Loaded by both the guide and slides pages (see assets.rs: CB_WIDGETS_CSS_PATH).
+   Theme-specific overrides (colors, backgrounds) live in guide.css / slides.css.
+   --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   App widgets (.cb-app, cb-cpu-burst, cb-counter)
+   --------------------------------------------------------------------------- */
+
+.cb-app {
+  margin: 1rem 0;
+}
+
+.cb-app-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.45em 1.1em;
+  background: var(--cb-teal, #5fc8be);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.cb-app-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cb-app-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.cb-app-status,
+.cb-app-value {
+  display: inline-block;
+  margin-left: 0.75em;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+/* ---------------------------------------------------------------------------
+   Unlock panel — fixed bottom-right, minimal footprint
+   --------------------------------------------------------------------------- */
+
+#cb-unlock-panel {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 900;
+  font-family: inherit;
+}
+#cb-unlock-toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--cb-border, #e2e6e8);
+  background: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+#cb-unlock-toggle:hover {
+  background: var(--cb-teal, #5fc8be);
+  color: #fff;
+}
+#cb-unlock-form {
+  background: #fff;
+  border: 1px solid var(--cb-border, #e2e6e8);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.4rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 220px;
+}
+#cb-unlock-form label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cb-ink, #2d2926);
+}
+#cb-unlock-input {
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--cb-border, #e2e6e8);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+#cb-unlock-form button {
+  padding: 0.3em 0.8em;
+  border: none;
+  border-radius: 4px;
+  background: var(--cb-teal, #5fc8be);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#cb-unlock-form button:hover {
+  opacity: 0.85;
+}
+#cb-unlock-status {
+  font-size: 0.8rem;
+  color: var(--cb-grey, #75787b);
+}

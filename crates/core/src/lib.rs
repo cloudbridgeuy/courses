@@ -19,8 +19,8 @@ mod slides;
 mod solutions;
 
 pub use assets::{
-    APPS_JS_PATH, GUIDE_CSS_PATH, PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH,
-    TOGGLE_JS_PATH,
+    APPS_JS_PATH, CB_WIDGETS_CSS_PATH, GUIDE_CSS_PATH, PageAssets, REVEAL_CSS_PATH, REVEAL_JS_PATH,
+    SLIDES_CSS_PATH, TOGGLE_JS_PATH,
 };
 pub use catalog::{CourseInput, LoadedCourse, parse_course};
 pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
