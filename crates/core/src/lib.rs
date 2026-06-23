@@ -9,6 +9,7 @@ mod assets;
 mod catalog;
 mod course;
 mod error;
+mod events;
 mod manifest;
 mod markdown;
 mod notifications;
@@ -23,6 +24,10 @@ pub use assets::{
 pub use catalog::{CourseInput, LoadedCourse, parse_course};
 pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 pub use error::{Error, Result};
+pub use events::{
+    CpuBurstConfig, Decision, Event, EventId, Gate, HandlerKind, Intensity, RecentIds, Seen,
+    gate, is_public_collection, parse_event, select,
+};
 pub use manifest::{Manifest, parse_manifest};
 pub use markdown::render_markdown;
 pub use notifications::{Notification, SnsMessage, parse_sns_message, token_matches};

@@ -71,6 +71,9 @@ pub enum Error {
 
     #[error("malformed SNS payload: {0}")]
     MalformedNotification(String),
+
+    #[error("malformed event: {0}")]
+    MalformedEvent(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
