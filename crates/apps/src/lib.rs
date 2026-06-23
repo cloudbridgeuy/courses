@@ -84,14 +84,17 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
         return Outcome::Denied;
     }
 
-    let result = match kind {
-        courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(ctx, &event.payload).await,
-        courses_core::HandlerKind::Counter => handlers::counter(ctx, &event.payload).await,
-    };
-
-    if let Err(e) = result {
-        tracing::error!("handler {:?} failed: {e}", kind);
-    }
+    let ctx = ctx.clone();
+    let payload = event.payload;
+    tokio::spawn(async move {
+        let result = match kind {
+            courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(&ctx, &payload).await,
+            courses_core::HandlerKind::Counter => handlers::counter(&ctx, &payload).await,
+        };
+        if let Err(e) = result {
+            tracing::error!("handler {:?} failed: {e}", kind);
+        }
+    });
 
     Outcome::Accepted
 }
