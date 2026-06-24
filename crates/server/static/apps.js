@@ -638,4 +638,60 @@
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Custom element: <cb-toast-demo>
+  // Attributes: label
+  // Fire-and-forget: the server broadcasts a random demo notification, so the
+  // feedback is the toast itself appearing — no app-status listener needed.
+  // ---------------------------------------------------------------------------
+
+  customElements.define(
+    "cb-toast-demo",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (!this._rendered) {
+          this._rendered = true;
+
+          var label = this.getAttribute("label") || "Mostrar un aviso de ejemplo";
+
+          this._btn = makeAppBtn(label);
+          this._status = document.createElement("span");
+          this._status.className = "cb-app-status";
+
+          this.appendChild(this._btn);
+          this.appendChild(this._status);
+
+          this._btn.addEventListener("click", () => {
+            var id = uuid();
+            this._btn.disabled = true;
+            this._status.textContent = "Enviando…";
+            cbEvents
+              .emit(id, "toast-demo", "{}")
+              .then((code) => {
+                this._btn.disabled = false;
+                if (code === 202) {
+                  this._status.textContent = "Aviso enviado";
+                } else if (code === 403) {
+                  this._status.textContent = "";
+                  handleForbidden();
+                } else {
+                  this._status.textContent = "Error (" + code + ")";
+                }
+              })
+              .catch(() => {
+                this._btn.disabled = false;
+                this._status.textContent = "Error de red";
+              });
+          });
+        }
+
+        registerLockable(this);
+      }
+
+      disconnectedCallback() {
+        unregisterLockable(this);
+      }
+    }
+  );
 })();

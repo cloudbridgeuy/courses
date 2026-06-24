@@ -118,10 +118,13 @@ No I/O. Contains:
 - `CpuBurstConfig` — pure config struct for the CPU-burst handler.
 - `MetricConfig` / `MetricMethod` — pure config for the custom-metric handler.
   `MetricMethod` is `Emf | Api`; `MetricConfig::parse` clamps `value` to `0..=100`.
+- `demo_notification(seed)` (in `courses_core::notifications`) — builds a demo
+  `Notification` from a seed, cycling deterministically across the three pipeline
+  events (`SUCCEEDED` / `FAILED` / pending approval). Backs the `toast-demo` handler.
 - `is_public_collection(collection, whitelist)` — collection allowlist check.
 
-`select` maps `"cpu-burst" | "counter" | "metric"` to the matching `HandlerKind`
-(`CpuBurst | Counter | Metric`); any other string is Unknown.
+`select` maps `"cpu-burst" | "counter" | "metric" | "toast-demo"` to the matching
+`HandlerKind` (`CpuBurst | Counter | Metric | ToastDemo`); any other string is Unknown.
 
 All of these are unit-tested inline.
 
@@ -138,6 +141,9 @@ SDK, pulled in for the metric handler's API path). Contains:
   extracts the metric from the log group) or a direct `PutMetricData` API call
   (needs `cloudwatch:PutMetricData` on the ECS task role). Both target namespace
   `Taller/Custom`, metric `CustomValue`, dimension `method` (`emf` | `api`).
+- `toast_demo(ctx, seed)` — broadcasts a demo `Notification` (built by the pure
+  `demo_notification`) on the bus as a `type: "notification"` event, so a guide
+  preview toast renders through the exact path real SNS events use. No AWS call.
 - `read_item(collection, key, ctx)` — DynamoDB `GetItem` for the query side.
 - `AppsCtx` — shared context struct (DynamoDB client, CloudWatch client, table
   name, broadcast sender, gate, public collections).
@@ -157,7 +163,10 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
 
 `crates/server/static/apps.js` provides:
 
-- Custom elements `<cb-cpu-burst>`, `<cb-counter>`, and `<cb-metric>`.
+- Custom elements `<cb-cpu-burst>`, `<cb-counter>`, `<cb-metric>`, and
+  `<cb-toast-demo>` (a fire-and-forget button that emits a `toast-demo` event;
+  feedback is the broadcast toast itself, so it carries no app-status listener;
+  locks like `cb-cpu-burst` when gated).
   `<cb-counter>` takes a `mode` attribute — `increment` (button only), `view`
   (value only), or `both` (default); elements sharing a `key` stay in sync via the
   SSE bus, so an incrementer and a separate viewer can sit in different parts of the
@@ -178,7 +187,7 @@ custom-element tags in `<div class="cb-app">` and sets `uses_apps`.
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `CB_APPS_SECRET` | unset | Gate unlock secret |
-| `CB_APPS_GATED` | unset | `"all"` or comma kind list (`cpu-burst,counter,metric`) |
+| `CB_APPS_GATED` | unset | `"all"` or comma kind list (`cpu-burst,counter,metric,toast-demo`) |
 | `CB_APPS_TABLE` | `"courses-apps"` | DynamoDB table name |
 | `CB_APPS_PUBLIC_COLLECTIONS` | `"counters"` | Comma-separated readable collections |
 

@@ -32,7 +32,9 @@ pub use events::{
 };
 pub use manifest::{Manifest, parse_manifest};
 pub use markdown::render_markdown;
-pub use notifications::{Notification, SnsMessage, parse_sns_message, token_matches};
+pub use notifications::{
+    Notification, SnsMessage, demo_notification, parse_sns_message, token_matches,
+};
 pub use render::{
     RenderedSite, SessionPage, escape_html, render_index_page, render_landing_page,
     render_not_found_page, render_session_page, render_site, render_slideshow_page, render_tree,

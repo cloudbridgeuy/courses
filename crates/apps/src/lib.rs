@@ -69,6 +69,31 @@ fn emit_status(ctx: &AppsCtx, key: &str, payload: String) {
     }
 }
 
+/// Builds a `notification` Event from a domain `Notification` and sends it on
+/// the bus, so it renders through the same toast path real SNS events use.
+///
+/// The payload is double-encoded (a JSON string whose value is the serialized
+/// `Notification`), matching what the server's SNS ingress emits.
+fn emit_notification(ctx: &AppsCtx, raw_id: &str, notification: &courses_core::Notification) {
+    let payload = match serde_json::to_string(notification) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::error!("failed to serialize demo notification: {e}");
+            return;
+        }
+    };
+    match EventId::parse(raw_id) {
+        Ok(id) => {
+            let _ = ctx.bus.send(Event {
+                id,
+                kind: "notification".into(),
+                payload,
+            });
+        }
+        Err(e) => tracing::error!("bad notification id: {e}"),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch entry point
 // ---------------------------------------------------------------------------
@@ -107,6 +132,7 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
             courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(&ctx, &payload).await,
             courses_core::HandlerKind::Counter => handlers::counter(&ctx, &payload).await,
             courses_core::HandlerKind::Metric => handlers::metric(&ctx, &payload).await,
+            courses_core::HandlerKind::ToastDemo => handlers::toast_demo(&ctx, &event_id).await,
         };
         match result {
             Ok(()) => {

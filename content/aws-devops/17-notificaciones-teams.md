@@ -76,6 +76,23 @@ SNS, y la lógica de "qué eventos importan" son idénticos; solo difiere el úl
 Mismo evento, misma regla, mismo SNS. Cambia solo el último salto.
 :::
 
+### Ver cómo se ve un aviso
+
+Antes de disparar el pipeline de verdad, conviene reconocer el formato del aviso. El
+botón siguiente pide a la aplicación del instructor que emita un *toast* de ejemplo: el
+servidor arma una notificación de prueba —atribuida al *pod* `demo`— y la difunde por el
+mismo canal que usan los eventos reales. Cada pulsación produce uno de los tres estados
+que la regla selecciona, con su color: ejecución **exitosa** (verde), **fallida** (rojo),
+y **aprobación pendiente** (azul).
+
+:::app
+<cb-toast-demo label="Mostrar un aviso de ejemplo"></cb-toast-demo>
+:::
+
+El aviso aparece arriba a la derecha y se descarta solo a los pocos segundos. Es el mismo
+componente que muestra los eventos del pipeline; solo cambia el origen del dato. En
+producción, ese aviso llegaría a un canal de Teams.
+
 ## Práctica guiada: crear la regla de notificación
 
 ### Definir la regla sobre el pipeline

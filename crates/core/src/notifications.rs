@@ -140,6 +140,47 @@ fn first_str<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
         .find_map(|k| value.get(*k).and_then(Value::as_str))
 }
 
+// ── Demo notification builder (pure) ───────────────────────────────────────
+
+/// Pod label used for guide-driven demo toasts, so they read as a sample rather
+/// than a real participant.
+const DEMO_POD: &str = "demo";
+
+/// Builds a demo [`Notification`] from an opaque seed, cycling deterministically
+/// across the three pipeline events the real notification rule selects:
+/// `SUCCEEDED` (green), `FAILED` (red), and a pending manual approval (info).
+///
+/// The seed is the emitting event's id; equal seeds yield equal notifications.
+/// This is the pure core of the `toast-demo` app: the shell only broadcasts the
+/// result on the SSE bus, so demo toasts render through the same path real SNS
+/// events do.
+pub fn demo_notification(seed: &str) -> Notification {
+    let pick = seed
+        .bytes()
+        .fold(0u32, |acc, b| acc.wrapping_add(u32::from(b)))
+        % 3;
+    match pick {
+        0 => Notification {
+            pod: DEMO_POD.to_owned(),
+            source: "aws.codepipeline".to_owned(),
+            state: "SUCCEEDED".to_owned(),
+            detail: "taller-pipeline".to_owned(),
+        },
+        1 => Notification {
+            pod: DEMO_POD.to_owned(),
+            source: "aws.codebuild".to_owned(),
+            state: "FAILED".to_owned(),
+            detail: "taller-build".to_owned(),
+        },
+        _ => Notification {
+            pod: DEMO_POD.to_owned(),
+            source: "aws.codepipeline".to_owned(),
+            state: "IN_PROGRESS".to_owned(),
+            detail: "Aprobación pendiente".to_owned(),
+        },
+    }
+}
+
 // ── Shared-secret webhook auth ─────────────────────────────────────────────
 
 /// Compares a provided webhook token against the expected one without an
@@ -245,6 +286,40 @@ mod tests {
             parse_sns_message("not json"),
             Err(Error::MalformedNotification(_))
         ));
+    }
+
+    #[test]
+    fn demo_notification_is_deterministic() {
+        assert_eq!(demo_notification("abc-123"), demo_notification("abc-123"));
+    }
+
+    #[test]
+    fn demo_notification_cycles_three_states() {
+        // Seeds "0", "1", "2" (bytes 48, 49, 50) hit picks 0, 1, 2.
+        assert_eq!(demo_notification("0").state, "SUCCEEDED");
+        assert_eq!(demo_notification("1").state, "FAILED");
+        assert_eq!(demo_notification("2").state, "IN_PROGRESS");
+    }
+
+    #[test]
+    fn demo_notification_succeeded_variant() {
+        let n = demo_notification("0");
+        assert_eq!(n.source, "aws.codepipeline");
+        assert_eq!(n.detail, "taller-pipeline");
+    }
+
+    #[test]
+    fn demo_notification_failed_variant() {
+        let n = demo_notification("1");
+        assert_eq!(n.source, "aws.codebuild");
+        assert_eq!(n.detail, "taller-build");
+    }
+
+    #[test]
+    fn demo_notification_always_uses_demo_pod() {
+        for seed in ["0", "1", "2", "anything"] {
+            assert_eq!(demo_notification(seed).pod, "demo");
+        }
     }
 
     #[test]

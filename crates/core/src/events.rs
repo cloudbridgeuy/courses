@@ -118,6 +118,7 @@ pub enum HandlerKind {
     CpuBurst,
     Counter,
     Metric,
+    ToastDemo,
 }
 
 /// Selects a handler for an event type. Unknown types return `None` (200 no-op).
@@ -126,6 +127,7 @@ pub fn select(kind: &str) -> Option<HandlerKind> {
         "cpu-burst" => Some(HandlerKind::CpuBurst),
         "counter" => Some(HandlerKind::Counter),
         "metric" => Some(HandlerKind::Metric),
+        "toast-demo" => Some(HandlerKind::ToastDemo),
         _ => None,
     }
 }
@@ -334,6 +336,7 @@ pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
             "cpu-burst" => kinds.push(HandlerKind::CpuBurst),
             "counter" => kinds.push(HandlerKind::Counter),
             "metric" => kinds.push(HandlerKind::Metric),
+            "toast-demo" => kinds.push(HandlerKind::ToastDemo),
             other => unknown_kinds.push(other.to_string()),
         }
     }
@@ -527,6 +530,11 @@ mod tests {
         assert_eq!(select("metric"), Some(HandlerKind::Metric));
     }
 
+    #[test]
+    fn select_toast_demo() {
+        assert_eq!(select("toast-demo"), Some(HandlerKind::ToastDemo));
+    }
+
     // A5 — gate
     #[test]
     fn gate_open_always_allow() {
@@ -709,6 +717,19 @@ mod tests {
                     HandlerKind::Counter,
                     HandlerKind::Metric
                 ],
+            }
+        );
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_kind_list_with_toast_demo() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("toast-demo"));
+        assert_eq!(
+            cfg.gate,
+            Gate::Some {
+                secret: "s3cr3t".into(),
+                kinds: vec![HandlerKind::ToastDemo],
             }
         );
         assert!(cfg.unknown_kinds.is_empty());

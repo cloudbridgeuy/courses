@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::AppsCtx;
-use crate::emit_status;
 use crate::error::{Error, Result};
+use crate::{emit_notification, emit_status};
 use courses_core::{CpuBurstConfig, Intensity, MetricConfig, MetricMethod, is_public_collection};
 
 // ---------------------------------------------------------------------------
@@ -253,6 +253,22 @@ async fn put_metric(ctx: &AppsCtx, value: i64) -> Result<()> {
         })?;
 
     tracing::info!(value, "custom metric submitted via PutMetricData");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// toast_demo
+// ---------------------------------------------------------------------------
+
+/// Broadcasts a demo notification on the SSE bus so participants preview how a
+/// pipeline toast looks, without a real pipeline run.
+///
+/// The pure core picks one of the three pipeline-event variants from the seed
+/// (the emitting event's id); the shell only fans it out on the bus.
+pub async fn toast_demo(ctx: &AppsCtx, seed: &str) -> Result<()> {
+    let notification = courses_core::demo_notification(seed);
+    emit_notification(ctx, &format!("notif-demo-{seed}"), &notification);
+    tracing::info!(state = %notification.state, "demo notification broadcast");
     Ok(())
 }
 
