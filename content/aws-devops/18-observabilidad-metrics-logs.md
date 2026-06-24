@@ -69,6 +69,17 @@ ejecuta sobre el grupo de logs y devuelve resultados en segundos.
 3. Observe la gráfica. Ajuste el rango temporal (última hora, último día) en la esquina
    superior.
 
+Para que la métrica tenga algo que mostrar, genere carga real en su pod con el botón de
+abajo. El evento viaja a su propio servidor (mismo origen), así que la CPU se quema en su
+task de ECS, y el pico aparece en *su* CloudWatch. El contador, en cambio, guarda estado
+en DynamoDB y se lee de vuelta —un ejemplo del mismo contrato de eventos aplicado a datos
+persistentes.
+
+:::app
+<cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU (60 s)"></cb-cpu-burst>
+<cb-counter key="demo" label="Incrementar contador"></cb-counter>
+:::
+
 ### Consultar los logs
 
 1. Abra **CloudWatch → Logs → Logs Insights**.
