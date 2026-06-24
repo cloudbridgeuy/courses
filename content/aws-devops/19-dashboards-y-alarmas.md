@@ -80,7 +80,7 @@ Vigila sola; avisa por el canal que ya usa el equipo.
 
 ### Crear la alarma de CPU
 
-1. Abra **CloudWatch → Alarms → All alarms** y pulse **Create alarm**.
+1. Abra [**CloudWatch → Alarms → All alarms**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:) y pulse **Create alarm**.
 2. **Select metric**: `ECS → por servicio → CPUUtilization` de su servicio.
 3. En la condición, elija **Greater than** con un umbral de `70` (por ciento), evaluado
    durante un período.
@@ -105,7 +105,7 @@ acción publique en el tema de SNS del taller.
    `taller-<su-nombre>`.
 2. Agregue widgets de línea para `CPUUtilization` (ECS, su servicio),
    `TargetResponseTime` y `HTTPCode_Target_5XX_Count` (ALB). Guarde.
-3. Abra **CloudWatch → Alarms → Create alarm**.
+3. Abra [**CloudWatch → Alarms → Create alarm**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:).
 4. **Select metric**: `CPUUtilization` de su servicio de ECS.
 5. Condición: **Greater than**, umbral **70**.
 6. **Notification**: el tema de SNS del taller.

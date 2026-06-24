@@ -79,14 +79,14 @@ método de troubleshooting operacional que el taller deja como herramienta.
 
 1. Abra [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccione su clúster.
 2. En **Update cluster**, active **Container Insights**. Guarde.
-3. Tras unos minutos, abra **CloudWatch → Insights → Container Insights** y seleccione su
+3. Tras unos minutos, abra [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccione su
    clúster: verá las métricas por servicio y por tarea.
 
 ### Recorrer un hilo
 
 1. En Container Insights, observe la CPU **por tarea** de su servicio.
 2. Anote la ventana de tiempo de cualquier pico (o del período reciente).
-3. Abra **Logs Insights**, seleccione el grupo de logs del contenedor, y consulte las
+3. Abra [**Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccione el grupo de logs del contenedor, y consulte las
    líneas de esa ventana:
 
    ```
@@ -110,11 +110,11 @@ líneas del contenedor en esa ventana.
 ::: solucion
 1. Abra [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home), seleccione su clúster, y en **Update cluster**
    active **Container Insights**. Guarde.
-2. Espere unos minutos; abra **CloudWatch → Insights → Container Insights** y seleccione
+2. Espere unos minutos; abra [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccione
    su clúster.
 3. Observe la métrica de **CPU por tarea** de su servicio y anote una ventana de tiempo
    reciente.
-4. Abra **CloudWatch → Logs → Logs Insights**, seleccione el grupo de logs del
+4. Abra [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccione el grupo de logs del
    contenedor, y ejecute:
 
    ```

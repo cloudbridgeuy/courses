@@ -79,7 +79,7 @@ task de ECS, y el pico aparece en *su* CloudWatch.
 
 ### Consultar los logs
 
-1. Abra **CloudWatch → Logs → Logs Insights**.
+1. Abra [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights).
 2. En el selector de grupos, elija el grupo de logs de su contenedor (el que vio en la
    task definition).
 3. Pegue la consulta de las veinte líneas recientes y pulse **Run query**. Lea la salida
@@ -96,7 +96,7 @@ Logs Insights consulta el pasado. Cuando lo que importa es **ahora** —reproduc
 problema y verlo aparecer— sirve **CloudWatch Logs Live Tail**: una cola en vivo del
 grupo de logs, línea a línea, a medida que la aplicación las emite.
 
-1. Abra **CloudWatch → Logs → Live Tail**.
+1. Abra [**CloudWatch → Logs → Live Tail**](https://console.aws.amazon.com/cloudwatch/home#logsV2:live-tail).
 2. Seleccione el grupo de logs de su contenedor y pulse **Start**.
 3. Deje la cola corriendo en una pestaña.
 
@@ -127,7 +127,7 @@ consulte las líneas de log más recientes del contenedor con Logs Insights.
 1. Abra [**CloudWatch → Metrics → All metrics**](https://console.aws.amazon.com/cloudwatch/home).
 2. Navegue a **ECS → por servicio** y seleccione `CPUUtilization` para su servicio.
    Observe la gráfica y ajuste el rango temporal.
-3. Abra **CloudWatch → Logs → Logs Insights**.
+3. Abra [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights).
 4. Seleccione el grupo de logs de su contenedor (el de la task definition de la Semana
    2).
 5. Ejecute la consulta:

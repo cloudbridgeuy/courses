@@ -121,7 +121,7 @@ CloudWatch Logs que identificó en la Semana 2.
 
 ### Verificar los destinos sanos
 
-1. Abra **EC2 → Target Groups** y seleccione el target group de su aplicación.
+1. Abra [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:) y seleccione el target group de su aplicación.
 2. En la pestaña **Targets**, confirme que sus tareas aparecen como **healthy**. Estos
    son los destinos a los que el ALB reparte el tráfico.
 
@@ -140,7 +140,7 @@ registradas como sanas.
 3. Active el auto scaling; fije **mínimo 1**, **máximo 4**.
 4. Agregue una política **Target tracking** sobre
    **ECSServiceAverageCPUUtilization** con objetivo **50**. Guarde.
-5. Abra **EC2 → Target Groups**, seleccione el target group de su aplicación, y abra la
+5. Abra [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:), seleccione el target group de su aplicación, y abra la
    pestaña **Targets**.
 6. Confirme que las tareas aparecen con estado **healthy** —son los destinos activos
    detrás del balanceador.

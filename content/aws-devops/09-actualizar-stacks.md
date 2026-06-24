@@ -95,9 +95,9 @@ template y aplicando el cambio con un change set.
 
 ### Verificar el resultado
 
-1. Abra **ECS → Clusters → su clúster → su servicio**. La cuenta de tareas deseadas
+1. Abra [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home). La cuenta de tareas deseadas
    ahora es **2**, y verá dos tareas en estado `RUNNING`.
-2. En **EC2 → Target Groups**, el target group del ALB muestra dos destinos sanos
+2. En [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:), el target group del ALB muestra dos destinos sanos
    (*healthy*): el balanceador ya reparte tráfico entre ambas tareas.
 
 ## Cuando una actualización falla: el rollback
@@ -140,7 +140,7 @@ ejecutando el cambio. Confirme que hay dos tareas en ejecución.
 5. En la tabla de cambios, confirme que `ServicioApp` aparece como **Modify** con
    **Replacement: False**.
 6. Pulse **Execute change set** y, en **Events**, espere a **UPDATE_COMPLETE**.
-7. En **ECS → Clusters → su servicio**, confirme **Desired tasks: 2** y dos tareas en
+7. En [**ECS → Clusters → su servicio**](https://console.aws.amazon.com/ecs/home), confirme **Desired tasks: 2** y dos tareas en
    estado `RUNNING`.
 :::
 
