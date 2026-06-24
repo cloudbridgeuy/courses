@@ -27,6 +27,7 @@ use tokio::sync::broadcast;
 pub struct AppsCtx {
     pub bus: broadcast::Sender<Event>,
     pub dynamo: aws_sdk_dynamodb::Client,
+    pub cloudwatch: aws_sdk_cloudwatch::Client,
     pub gate: Gate,
     pub table: String,
     pub public_collections: Arc<Vec<String>>,
@@ -105,6 +106,7 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
         let result = match kind {
             courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(&ctx, &payload).await,
             courses_core::HandlerKind::Counter => handlers::counter(&ctx, &payload).await,
+            courses_core::HandlerKind::Metric => handlers::metric(&ctx, &payload).await,
         };
         match result {
             Ok(()) => {

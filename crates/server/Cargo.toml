@@ -12,6 +12,7 @@ courses_apps = { workspace = true }
 
 aws-config = { workspace = true }
 aws-sdk-dynamodb = { workspace = true }
+aws-sdk-cloudwatch = { workspace = true }
 axum = { workspace = true }
 include_dir = { workspace = true }
 color-eyre = { workspace = true }

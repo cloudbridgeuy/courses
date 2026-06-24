@@ -117,6 +117,7 @@ impl RecentIds {
 pub enum HandlerKind {
     CpuBurst,
     Counter,
+    Metric,
 }
 
 /// Selects a handler for an event type. Unknown types return `None` (200 no-op).
@@ -124,6 +125,7 @@ pub fn select(kind: &str) -> Option<HandlerKind> {
     match kind {
         "cpu-burst" => Some(HandlerKind::CpuBurst),
         "counter" => Some(HandlerKind::Counter),
+        "metric" => Some(HandlerKind::Metric),
         _ => None,
     }
 }
@@ -229,6 +231,55 @@ impl CpuBurstConfig {
     }
 }
 
+const MAX_METRIC_VALUE: i64 = 100;
+const MIN_METRIC_VALUE: i64 = 0;
+
+/// How a custom metric reaches CloudWatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MetricMethod {
+    /// Embedded Metric Format: one log line CloudWatch extracts from the log group.
+    Emf,
+    /// Direct `PutMetricData` API call.
+    Api,
+}
+
+impl MetricMethod {
+    /// Lowercase wire/display label for this method.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Emf => "emf",
+            Self::Api => "api",
+        }
+    }
+}
+
+/// Validated custom-metric submission. `value` is clamped to 0..=100.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MetricConfig {
+    pub value: i64,
+    pub method: MetricMethod,
+}
+
+/// Unvalidated deserialization target for [`MetricConfig::parse`].
+#[derive(Deserialize)]
+struct MetricRaw {
+    value: i64,
+    method: MetricMethod,
+}
+
+impl MetricConfig {
+    /// Parses and clamps a metric payload. `value` is clamped to 0..=100.
+    pub fn parse(payload: &str) -> Result<Self, crate::Error> {
+        let raw: MetricRaw = serde_json::from_str(payload)
+            .map_err(|e| crate::Error::MalformedEvent(e.to_string()))?;
+        Ok(Self {
+            value: raw.value.clamp(MIN_METRIC_VALUE, MAX_METRIC_VALUE),
+            method: raw.method,
+        })
+    }
+}
+
 /// Returns whether a `/state` collection is publicly readable.
 pub fn is_public_collection(whitelist: &[String], collection: &str) -> bool {
     whitelist.iter().any(|c| c == collection)
@@ -282,6 +333,7 @@ pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
         match name {
             "cpu-burst" => kinds.push(HandlerKind::CpuBurst),
             "counter" => kinds.push(HandlerKind::Counter),
+            "metric" => kinds.push(HandlerKind::Metric),
             other => unknown_kinds.push(other.to_string()),
         }
     }
@@ -470,6 +522,11 @@ mod tests {
         assert_eq!(select(""), None);
     }
 
+    #[test]
+    fn select_metric() {
+        assert_eq!(select("metric"), Some(HandlerKind::Metric));
+    }
+
     // A5 — gate
     #[test]
     fn gate_open_always_allow() {
@@ -638,6 +695,77 @@ mod tests {
             }
         );
         assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    #[test]
+    fn parse_gate_secret_kind_list_with_metric() {
+        let cfg = parse_gate(Some("s3cr3t"), Some("cpu-burst,counter,metric"));
+        assert_eq!(
+            cfg.gate,
+            Gate::Some {
+                secret: "s3cr3t".into(),
+                kinds: vec![
+                    HandlerKind::CpuBurst,
+                    HandlerKind::Counter,
+                    HandlerKind::Metric
+                ],
+            }
+        );
+        assert!(cfg.unknown_kinds.is_empty());
+    }
+
+    // A9 — MetricConfig
+    #[test]
+    fn metric_config_parse_valid() {
+        let cfg = MetricConfig::parse(r#"{"value":42,"method":"emf"}"#).unwrap();
+        assert_eq!(cfg.value, 42);
+        assert_eq!(cfg.method, MetricMethod::Emf);
+    }
+
+    #[test]
+    fn metric_config_parse_api() {
+        let cfg = MetricConfig::parse(r#"{"value":7,"method":"api"}"#).unwrap();
+        assert_eq!(cfg.method, MetricMethod::Api);
+    }
+
+    #[test]
+    fn metric_config_clamps_high() {
+        let cfg = MetricConfig::parse(r#"{"value":999,"method":"emf"}"#).unwrap();
+        assert_eq!(cfg.value, 100);
+    }
+
+    #[test]
+    fn metric_config_clamps_negative() {
+        let cfg = MetricConfig::parse(r#"{"value":-5,"method":"api"}"#).unwrap();
+        assert_eq!(cfg.value, 0);
+    }
+
+    #[test]
+    fn metric_config_exact_max() {
+        let cfg = MetricConfig::parse(r#"{"value":100,"method":"emf"}"#).unwrap();
+        assert_eq!(cfg.value, 100);
+    }
+
+    #[test]
+    fn metric_config_bad_method() {
+        assert!(matches!(
+            MetricConfig::parse(r#"{"value":1,"method":"smtp"}"#),
+            Err(crate::Error::MalformedEvent(_))
+        ));
+    }
+
+    #[test]
+    fn metric_config_missing_field() {
+        assert!(matches!(
+            MetricConfig::parse(r#"{"value":1}"#),
+            Err(crate::Error::MalformedEvent(_))
+        ));
+    }
+
+    #[test]
+    fn metric_method_as_str() {
+        assert_eq!(MetricMethod::Emf.as_str(), "emf");
+        assert_eq!(MetricMethod::Api.as_str(), "api");
     }
 
     // A7 — is_public_collection

@@ -4,6 +4,9 @@ pub enum Error {
     #[error("DynamoDB error: {0}")]
     Dynamo(String),
 
+    #[error("CloudWatch error: {0}")]
+    CloudWatch(String),
+
     #[error("AWS config error: {0}")]
     Config(String),
 

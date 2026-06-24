@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::AppsCtx;
 use crate::emit_status;
 use crate::error::{Error, Result};
-use courses_core::{CpuBurstConfig, Intensity, is_public_collection};
+use courses_core::{CpuBurstConfig, Intensity, MetricConfig, MetricMethod, is_public_collection};
 
 // ---------------------------------------------------------------------------
 // cpu_burst
@@ -155,6 +155,103 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
 
     tracing::info!(key = %dto.key, value = %new_value, "counter incremented");
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// metric
+// ---------------------------------------------------------------------------
+
+const METRIC_NAMESPACE: &str = "Taller/Custom";
+const METRIC_NAME: &str = "CustomValue";
+const METRIC_DIMENSION: &str = "method";
+
+/// Publishes a custom metric to CloudWatch by the selected method.
+///
+/// EMF: writes one Embedded Metric Format log line to stdout; CloudWatch extracts
+/// the metric from the container log group (no SDK, no extra IAM).
+/// API: calls `PutMetricData` directly (needs `cloudwatch:PutMetricData`).
+pub async fn metric(ctx: &AppsCtx, payload: &str) -> Result<()> {
+    let cfg = MetricConfig::parse(payload)?;
+
+    match cfg.method {
+        MetricMethod::Emf => emit_emf(cfg.value),
+        MetricMethod::Api => put_metric(ctx, cfg.value).await?,
+    }
+
+    // "emf"/"api" is an intentional English technical identifier (the method the
+    // student selected), embedded in the otherwise-Spanish status text.
+    emit_status(
+        ctx,
+        "metric-submitted",
+        format!(
+            "CustomValue={} enviado ({})",
+            cfg.value,
+            cfg.method.as_str()
+        ),
+    );
+    tracing::info!(
+        value = cfg.value,
+        method = cfg.method.as_str(),
+        "custom metric submitted"
+    );
+    Ok(())
+}
+
+/// Writes one EMF log line. CloudWatch parses `_aws` and extracts `CustomValue`
+/// with the `method=emf` dimension from whichever log group captures stdout.
+fn emit_emf(value: i64) {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .inspect_err(|e| tracing::warn!(error = %e, "system clock before Unix epoch; EMF timestamp will be 0"))
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let line = serde_json::json!({
+        "_aws": {
+            "Timestamp": ts,
+            "CloudWatchMetrics": [{
+                "Namespace": METRIC_NAMESPACE,
+                "Dimensions": [[METRIC_DIMENSION]],
+                "Metrics": [{ "Name": METRIC_NAME }]
+            }]
+        },
+        METRIC_DIMENSION: "emf",
+        METRIC_NAME: value,
+    });
+    // EMF requires a bare single-line JSON object on stdout; deliberately bypasses
+    // the tracing envelope so CloudWatch's EMF parser sees the raw log line.
+    println!("{line}");
+    tracing::info!(value, "custom metric emitted via EMF log line");
+}
+
+/// Calls `PutMetricData` with the `method=api` dimension.
+async fn put_metric(ctx: &AppsCtx, value: i64) -> Result<()> {
+    use aws_sdk_cloudwatch::types::{Dimension, MetricDatum};
+
+    let datum = MetricDatum::builder()
+        .metric_name(METRIC_NAME)
+        // safe: value is clamped to 0..=100 by MetricConfig::parse
+        .value(value as f64)
+        .dimensions(
+            Dimension::builder()
+                .name(METRIC_DIMENSION)
+                .value("api")
+                .build(),
+        )
+        .build();
+
+    ctx.cloudwatch
+        .put_metric_data()
+        .namespace(METRIC_NAMESPACE)
+        .metric_data(datum)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!(value, error = %e, "PutMetricData failed");
+            Error::CloudWatch(e.to_string())
+        })?;
+
+    tracing::info!(value, "custom metric submitted via PutMetricData");
     Ok(())
 }
 

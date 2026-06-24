@@ -42,6 +42,7 @@ courses_apps = { path = "crates/apps" }
 
 aws-config = { version = "1.8", default-features = false, features = ["rustls", "rt-tokio"] }
 aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["rustls"] }
+aws-sdk-cloudwatch = { version = "1.116", default-features = false, features = ["rustls"] }
 
 axum = "0.8"
 clap = { version = "4.5", features = ["derive", "env"] }

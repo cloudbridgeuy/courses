@@ -134,11 +134,15 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
     tracing::info!("resolving AWS configuration...");
     let aws_cfg = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamo = aws_sdk_dynamodb::Client::new(&aws_cfg);
+    let cloudwatch = aws_sdk_cloudwatch::Client::new(&aws_cfg);
     let region = aws_cfg
         .region()
         .map(ToString::to_string)
         .unwrap_or_else(|| "unknown".to_owned());
-    tracing::info!(region, "AWS configuration resolved; DynamoDB client ready");
+    tracing::info!(
+        region,
+        "AWS configuration resolved; DynamoDB and CloudWatch clients ready"
+    );
 
     // --- Broadcast bus ---
     // The initial receiver is dropped immediately; real subscribers attach via
@@ -148,6 +152,7 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
     let apps = AppsCtx {
         bus,
         dynamo,
+        cloudwatch,
         gate,
         table,
         public_collections: Arc::new(public_collections),
