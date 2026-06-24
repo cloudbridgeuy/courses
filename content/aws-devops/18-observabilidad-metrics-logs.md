@@ -88,7 +88,7 @@ persistentes.
 3. Pegue la consulta de las veinte líneas recientes y pulse **Run query**. Lea la salida
    de su aplicación.
 
-Si pulsó los botones de arriba, sus acciones dejaron rastro en los logs. Busque líneas
+Al pulsar los botones de arriba, las acciones dejan rastro en los logs. Busque líneas
 como `cpu-burst started`, `counter incremented`, o `ignoring duplicate event id`: cada
 una nombra el evento, el handler, y el resultado. Así se ve un log *útil* —cuenta qué
 pasó, con qué datos, y cómo terminó— y eso es justo lo que se consulta con Logs Insights.
@@ -123,7 +123,7 @@ consulte las líneas de log más recientes del contenedor con Logs Insights.
 {{ejercicio-13}}
 :::
 
-El contador `demo` que incrementó arriba se refleja aquí en vivo, aunque esté en otra
+El contador `demo` incrementado arriba se refleja aquí en vivo, aunque esté en otra
 parte de la página: ambos widgets comparten el mismo flujo de eventos por SSE.
 
 :::app
