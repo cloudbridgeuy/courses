@@ -25,6 +25,8 @@ Event { id: EventId, kind: String, payload: String }
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | `POST /events` | inbound | optional (`?secret=`) | parse → dedup → gate → dispatch |
+| `GET /events/config` | read-only | none | `{ "gated": bool }` — is a secret configured? |
+| `GET /events/verify` | read-only | `?secret=` | validate a secret: `204` match, `403` mismatch |
 | `GET /events/stream` | outbound SSE | none | unified bus; one `EventSource` per page |
 | `GET /state/{collection}/{key}` | read-only | none | DynamoDB read, CQRS query side |
 
@@ -71,6 +73,20 @@ A gated `POST /events` request must supply `?secret=<value>`. The check reuses
 `token_matches` (constant-time comparison) from `courses_core`. The instructor
 enters the secret once in the guide UI; it is stored in `sessionStorage` under
 the key `cb-apps-secret` and attached automatically to gated emits as `?secret=`.
+
+Two pure helpers on `Gate` back the client UX: `requires_secret()` (false only
+for `Gate::Open`, drives whether the lock UI shows) and `accepts(provided)`
+(constant-time validation, always true for `Gate::Open`, backs `/events/verify`).
+
+### Lock UI (client)
+
+When `/events/config` reports `gated`, interactive widgets render dimmed with a
+🔒 overlay (`.cb-app-locked`). Clicking a locked widget opens a centered unlock
+modal. Saving validates the secret against `/events/verify` before storing it —
+a wrong value never unlocks. On load, any secret already in `sessionStorage` is
+re-validated; a rejected or unverifiable secret is cleared (fail closed). Only
+emitting widgets lock (`cb-cpu-burst` always, `cb-counter` in `increment`/`both`
+mode); a view-only counter reads the open `/state` endpoint and stays visible.
 
 ## Same-origin topology
 
@@ -133,8 +149,8 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   attribute — `increment` (button only), `view` (value only), or `both` (default);
   elements sharing a `key` stay in sync via the SSE bus, so an incrementer and a
   separate viewer can sit in different parts of the page.
-- Unlock UI: a prompt that stores the instructor secret in `sessionStorage` under
-  `cb-apps-secret`.
+- Lock UI + unlock modal (see "Lock UI" above): dims gated widgets, validates the
+  secret via `/events/verify`, stores it in `sessionStorage` under `cb-apps-secret`.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 
