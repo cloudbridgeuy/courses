@@ -70,3 +70,21 @@ Every heading gets a slug `id` and a self-link (`a.cb-hlink`), generated in
 - Empty result falls back to `titulo`.
 
 Example: `## Práctica guiada: crear el repositorio` → `#practica-guiada-crear-el-repositorio`.
+
+## Console-action links
+
+When an instruction tells the student to **open a specific AWS console screen**
+("Abra **CloudWatch → Logs → Live Tail**"), link the screen name to that window:
+
+```
+Abra [**CloudWatch → Logs → Live Tail**](https://console.aws.amazon.com/cloudwatch/home#logsV2:live-tail).
+```
+
+- Prefer deep-link fragments to the exact window: `#logsV2:logs-insights`,
+  `#logsV2:live-tail`, `#alarmsV2:`, `#container-insights:` (CloudWatch),
+  `#TargetGroups:` (EC2). Use region-less service landings (`ecs/home`,
+  `ec2/home`, `ecr/home`, `codesuite/codebuild/home`) when no stable fragment fits.
+- Link only true "open this window" instructions. Leave **sub-navigation inside an
+  already-open screen** as bold text — e.g. `Entre a **ECS → por servicio**` is the
+  metric picker inside the CloudWatch Metrics window, and form fields like
+  `Environment → Environment image` are not separate windows.
