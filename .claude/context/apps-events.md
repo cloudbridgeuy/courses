@@ -116,19 +116,31 @@ No I/O. Contains:
 - `select(kind)` — maps a kind string to a handler variant (or Unknown).
 - `gate(kind, secret, config)` / `parse_gate(env)` — gating logic.
 - `CpuBurstConfig` — pure config struct for the CPU-burst handler.
+- `MetricConfig` / `MetricMethod` — pure config for the custom-metric handler.
+  `MetricMethod` is `Emf | Api`; `MetricConfig::parse` clamps `value` to `0..=100`.
 - `is_public_collection(collection, whitelist)` — collection allowlist check.
+
+`select` maps `"cpu-burst" | "counter" | "metric"` to the matching `HandlerKind`
+(`CpuBurst | Counter | Metric`); any other string is Unknown.
 
 All of these are unit-tested inline.
 
 ### I/O — `courses_apps`
 
-Depends on the AWS DynamoDB SDK (first AWS SDK in the repo). Contains:
+Depends on the AWS DynamoDB SDK and `aws-sdk-cloudwatch` (the repo's second AWS
+SDK, pulled in for the metric handler's API path). Contains:
 
 - `dispatch(event, ctx)` — executes the selected handler and returns an `Outcome`.
 - `cpu_burst(config)` — spawns a timed CPU load on the Fargate task.
 - `counter(key, table, client)` — atomic counter increment in DynamoDB.
+- `metric(ctx, payload)` — publishes a custom metric to CloudWatch by one of two
+  methods: an EMF log line on stdout (no SDK call, no extra IAM — CloudWatch
+  extracts the metric from the log group) or a direct `PutMetricData` API call
+  (needs `cloudwatch:PutMetricData` on the ECS task role). Both target namespace
+  `Taller/Custom`, metric `CustomValue`, dimension `method` (`emf` | `api`).
 - `read_item(collection, key, ctx)` — DynamoDB `GetItem` for the query side.
-- `AppsCtx` — shared context struct (DynamoDB client, table name, broadcast sender).
+- `AppsCtx` — shared context struct (DynamoDB client, CloudWatch client, table
+  name, broadcast sender, gate, public collections).
 - `Outcome` — result type returned by `dispatch`.
 
 Nothing pure depends on `courses_apps`.
@@ -145,10 +157,13 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
 
 `crates/server/static/apps.js` provides:
 
-- Custom elements `<cb-cpu-burst>` and `<cb-counter>`. `<cb-counter>` takes a `mode`
-  attribute — `increment` (button only), `view` (value only), or `both` (default);
-  elements sharing a `key` stay in sync via the SSE bus, so an incrementer and a
-  separate viewer can sit in different parts of the page.
+- Custom elements `<cb-cpu-burst>`, `<cb-counter>`, and `<cb-metric>`.
+  `<cb-counter>` takes a `mode` attribute — `increment` (button only), `view`
+  (value only), or `both` (default); elements sharing a `key` stay in sync via the
+  SSE bus, so an incrementer and a separate viewer can sit in different parts of the
+  page. `<cb-metric>` takes `mode` (`emf` | `api`) and `label`; it renders a 0–100
+  number input plus submit button and emits a `metric` event
+  `{ value, method }`, locking like `cb-cpu-burst` when gated.
 - Lock UI + unlock modal (see "Lock UI" above): dims gated widgets, validates the
   secret via `/events/verify`, stores it in `sessionStorage` under `cb-apps-secret`.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
@@ -163,7 +178,7 @@ custom-element tags in `<div class="cb-app">` and sets `uses_apps`.
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `CB_APPS_SECRET` | unset | Gate unlock secret |
-| `CB_APPS_GATED` | unset | `"all"` or comma kind list |
+| `CB_APPS_GATED` | unset | `"all"` or comma kind list (`cpu-burst,counter,metric`) |
 | `CB_APPS_TABLE` | `"courses-apps"` | DynamoDB table name |
 | `CB_APPS_PUBLIC_COLLECTIONS` | `"counters"` | Comma-separated readable collections |
 
