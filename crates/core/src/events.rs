@@ -142,6 +142,27 @@ pub enum Gate {
     },
 }
 
+impl Gate {
+    /// Whether any handler is behind the unlock secret. `false` only when no
+    /// secret is configured (`Gate::Open`). The client uses this to decide
+    /// whether to show the instructor unlock form.
+    pub fn requires_secret(&self) -> bool {
+        !matches!(self, Gate::Open)
+    }
+
+    /// Whether a client-provided secret matches the configured one. Always
+    /// `true` when no secret is configured (`Gate::Open`). Used by the unlock
+    /// modal to validate before unlocking the UI.
+    pub fn accepts(&self, provided: Option<&str>) -> bool {
+        let required = match self {
+            Gate::Open => return true,
+            Gate::All(secret) => secret,
+            Gate::Some { secret, .. } => secret,
+        };
+        matches!(provided, Some(p) if crate::token_matches(required, p))
+    }
+}
+
 /// The gate decision for one event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
@@ -303,6 +324,37 @@ mod tests {
             EventId::parse("   "),
             Err(crate::Error::MalformedEvent(_))
         ));
+    }
+
+    #[test]
+    fn gate_requires_secret_reflects_open() {
+        assert!(!Gate::Open.requires_secret());
+        assert!(Gate::All("s".into()).requires_secret());
+        assert!(
+            Gate::Some {
+                secret: "s".into(),
+                kinds: vec![HandlerKind::Counter],
+            }
+            .requires_secret()
+        );
+    }
+
+    #[test]
+    fn gate_accepts_validates_secret() {
+        assert!(Gate::Open.accepts(None));
+        assert!(Gate::Open.accepts(Some("anything")));
+
+        let all = Gate::All("right".into());
+        assert!(all.accepts(Some("right")));
+        assert!(!all.accepts(Some("wrong")));
+        assert!(!all.accepts(None));
+
+        let some = Gate::Some {
+            secret: "right".into(),
+            kinds: vec![HandlerKind::Counter],
+        };
+        assert!(some.accepts(Some("right")));
+        assert!(!some.accepts(Some("wrong")));
     }
 
     #[test]
