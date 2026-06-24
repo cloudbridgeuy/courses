@@ -621,7 +621,7 @@
         this._statusListener = (envelope) => {
           if (
             typeof envelope.id === "string" &&
-            envelope.id.indexOf("status-metric-submitted") === 0
+            envelope.id.indexOf("status-metric-submitted-" + this._method) === 0
           ) {
             this._status.textContent = envelope.payload || "";
             this._btn.disabled = false;

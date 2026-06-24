@@ -181,9 +181,10 @@ pub async fn metric(ctx: &AppsCtx, payload: &str) -> Result<()> {
 
     // "emf"/"api" is an intentional English technical identifier (the method the
     // student selected), embedded in the otherwise-Spanish status text.
+    let status_key = format!("metric-submitted-{}", cfg.method.as_str());
     emit_status(
         ctx,
-        "metric-submitted",
+        &status_key,
         format!(
             "CustomValue={} enviado ({})",
             cfg.value,
