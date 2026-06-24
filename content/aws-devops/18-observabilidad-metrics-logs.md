@@ -71,13 +71,10 @@ ejecuta sobre el grupo de logs y devuelve resultados en segundos.
 
 Para que la métrica tenga algo que mostrar, genere carga real en su pod con el botón de
 abajo. El evento viaja a su propio servidor (mismo origen), así que la CPU se quema en su
-task de ECS, y el pico aparece en *su* CloudWatch. El contador, en cambio, guarda estado
-en DynamoDB y se lee de vuelta —un ejemplo del mismo contrato de eventos aplicado a datos
-persistentes.
+task de ECS, y el pico aparece en *su* CloudWatch.
 
 :::app
 <cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU (60 s)"></cb-cpu-burst>
-<cb-counter key="demo" mode="increment" label="Incrementar contador"></cb-counter>
 :::
 
 ### Consultar los logs
@@ -92,6 +89,31 @@ Al pulsar los botones de arriba, las acciones dejan rastro en los logs. Busque l
 como `cpu-burst started`, `counter incremented`, o `ignoring duplicate event id`: cada
 una nombra el evento, el handler, y el resultado. Así se ve un log *útil* —cuenta qué
 pasó, con qué datos, y cómo terminó— y eso es justo lo que se consulta con Logs Insights.
+
+### Seguir los logs en vivo (Live Tail)
+
+Logs Insights consulta el pasado. Cuando lo que importa es **ahora** —reproducir un
+problema y verlo aparecer— sirve **CloudWatch Logs Live Tail**: una cola en vivo del
+grupo de logs, línea a línea, a medida que la aplicación las emite.
+
+1. Abra **CloudWatch → Logs → Live Tail**.
+2. Seleccione el grupo de logs de su contenedor y pulse **Start**.
+3. Deje la cola corriendo en una pestaña.
+
+Para tener algo que ver, fabrique líneas de log a demanda con el contador de abajo. Cada
+incremento dispara un evento `counter` en su pod, que escribe en DynamoDB y emite la
+línea `counter incremented` —que aparece en la cola casi al instante. El valor a la
+derecha se actualiza en vivo por SSE, aunque viva en otra parte de la página: misma
+acción, dos vistas del mismo flujo de eventos.
+
+:::app
+<cb-counter key="demo" mode="increment" label="Incrementar contador"></cb-counter>
+<cb-counter key="demo" mode="view" label="Contador demo"></cb-counter>
+:::
+
+Pulse el botón unas cuantas veces y observe las líneas `counter incremented` llegar en
+orden a la Live Tail. Eso es tailing de logs: el mismo grupo que consulta con Insights,
+visto en tiempo real mientras genera la actividad.
 
 ---
 
@@ -121,13 +143,6 @@ consulte las líneas de log más recientes del contenedor con Logs Insights.
 
 :::slide light
 {{ejercicio-13}}
-:::
-
-El contador `demo` incrementado arriba se refleja aquí en vivo, aunque esté en otra
-parte de la página: ambos widgets comparten el mismo flujo de eventos por SSE.
-
-:::app
-<cb-counter key="demo" mode="view" label="Contador demo"></cb-counter>
 :::
 
 ---
