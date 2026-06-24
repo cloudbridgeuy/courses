@@ -35,6 +35,14 @@ pub async fn cpu_burst(ctx: &AppsCtx, payload: &str) -> Result<()> {
         Intensity::High => available,
     };
 
+    tracing::info!(
+        intensity = ?cfg.intensity,
+        seconds = cfg.seconds,
+        workers,
+        available_cores = available,
+        "cpu-burst started: generating CPU load (watch CloudWatch CPUUtilization)"
+    );
+
     // Status payload: plain string describing what we're about to do.
     emit_status(
         ctx,
@@ -55,9 +63,15 @@ pub async fn cpu_burst(ctx: &AppsCtx, payload: &str) -> Result<()> {
 
     for handle in handles {
         if let Err(e) = handle.await {
-            tracing::error!("cpu_burst worker panicked: {e}");
+            tracing::error!(error = %e, "cpu-burst worker panicked");
         }
     }
+
+    tracing::info!(
+        seconds = cfg.seconds,
+        workers,
+        "cpu-burst finished: CPU load released"
+    );
 
     // Status payload: plain string signalling completion.
     emit_status(
@@ -95,6 +109,12 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
     let dto: CounterPayload = serde_json::from_str(payload)
         .map_err(|e| courses_core::Error::MalformedEvent(e.to_string()))?;
 
+    tracing::info!(
+        key = %dto.key,
+        table = %ctx.table,
+        "counter increment requested: UpdateItem ADD on collection=counters"
+    );
+
     let resp = ctx
         .dynamo
         .update_item()
@@ -107,7 +127,10 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
         .return_values(aws_sdk_dynamodb::types::ReturnValue::UpdatedNew)
         .send()
         .await
-        .map_err(|e| Error::Dynamo(e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!(key = %dto.key, table = %ctx.table, error = %e, "counter UpdateItem failed");
+            Error::Dynamo(e.to_string())
+        })?;
 
     let new_value = resp
         .attributes()
@@ -130,6 +153,8 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
     .map_err(|e| courses_core::Error::MalformedEvent(e.to_string()))?;
     emit_status(ctx, "counter-updated", status_payload);
 
+    tracing::info!(key = %dto.key, value = %new_value, "counter incremented");
+
     Ok(())
 }
 
@@ -148,8 +173,15 @@ pub async fn counter(ctx: &AppsCtx, payload: &str) -> Result<()> {
 ///   Everything else is omitted from the output object.
 pub async fn read_item(ctx: &AppsCtx, collection: &str, key: &str) -> Result<Option<Value>> {
     if !is_public_collection(&ctx.public_collections, collection) {
+        tracing::warn!(
+            collection,
+            key,
+            "rejected /state read: collection is not in the public allowlist"
+        );
         return Ok(None);
     }
+
+    tracing::debug!(collection, key, table = %ctx.table, "reading state item");
 
     let resp = ctx
         .dynamo
@@ -159,9 +191,13 @@ pub async fn read_item(ctx: &AppsCtx, collection: &str, key: &str) -> Result<Opt
         .key("key", AttributeValue::S(key.into()))
         .send()
         .await
-        .map_err(|e| Error::Dynamo(e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!(collection, key, error = %e, "state GetItem failed");
+            Error::Dynamo(e.to_string())
+        })?;
 
     let Some(item) = resp.item() else {
+        tracing::debug!(collection, key, "state item not found");
         return Ok(None);
     };
 

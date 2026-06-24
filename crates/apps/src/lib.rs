@@ -77,14 +77,27 @@ fn emit_status(ctx: &AppsCtx, key: &str, payload: String) {
 /// Handler failures are logged but never propagate as errors — the caller
 /// always receives `Outcome::Accepted` when the gate passes.
 pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Outcome {
+    let event_id = event.id.as_str().to_owned();
+
     let Some(kind) = courses_core::select(&event.kind) else {
-        tracing::debug!("no handler for type {}", event.kind);
+        tracing::info!(
+            event_id = %event_id,
+            event_type = %event.kind,
+            "ignoring event: no handler is registered for this type"
+        );
         return Outcome::Unknown;
     };
 
     if courses_core::gate(kind, &ctx.gate, provided) == courses_core::Decision::Deny {
+        tracing::warn!(
+            event_id = %event_id,
+            handler = ?kind,
+            "denying event: the unlock secret is missing or does not match"
+        );
         return Outcome::Denied;
     }
+
+    tracing::info!(event_id = %event_id, handler = ?kind, "accepted event; dispatching to handler");
 
     let ctx = ctx.clone();
     let payload = event.payload;
@@ -93,8 +106,13 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
             courses_core::HandlerKind::CpuBurst => handlers::cpu_burst(&ctx, &payload).await,
             courses_core::HandlerKind::Counter => handlers::counter(&ctx, &payload).await,
         };
-        if let Err(e) = result {
-            tracing::error!("handler {:?} failed: {e}", kind);
+        match result {
+            Ok(()) => {
+                tracing::info!(event_id = %event_id, handler = ?kind, "handler finished successfully");
+            }
+            Err(e) => {
+                tracing::error!(event_id = %event_id, handler = ?kind, error = %e, "handler failed");
+            }
         }
     });
 

@@ -88,6 +88,11 @@ persistentes.
 3. Pegue la consulta de las veinte líneas recientes y pulse **Run query**. Lea la salida
    de su aplicación.
 
+Si pulsó los botones de arriba, sus acciones dejaron rastro en los logs. Busque líneas
+como `cpu-burst started`, `counter incremented`, o `ignoring duplicate event id`: cada
+una nombra el evento, el handler, y el resultado. Así se ve un log *útil* —cuenta qué
+pasó, con qué datos, y cómo terminó— y eso es justo lo que se consulta con Logs Insights.
+
 ---
 
 {#ejercicio-13}

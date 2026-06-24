@@ -277,6 +277,11 @@ async fn events_hook(
     };
 
     if seen == Seen::Duplicate {
+        tracing::info!(
+            event_id = %event.id.as_str(),
+            event_type = %event.kind,
+            "ignoring duplicate event id (idempotency); already seen in the recent window"
+        );
         return StatusCode::ACCEPTED.into_response();
     }
 
