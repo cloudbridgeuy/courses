@@ -355,18 +355,27 @@
           this._rendered = true;
 
           this._key = this.getAttribute("key") || "";
+          // mode: "increment" (button only) | "view" (value only) | "both" (default).
+          // Multiple elements sharing a key stay in sync via the SSE bus, so an
+          // incrementer and a viewer can live in different parts of the page.
+          this._mode = this.getAttribute("mode") || "both";
+          var showButton = this._mode !== "view";
+          var showValue = this._mode !== "increment";
           var label = this.getAttribute("label") || "Incrementar contador";
 
-          this._btn = makeAppBtn(label);
-          this._valueDisplay = document.createElement("span");
-          this._valueDisplay.className = "cb-app-value";
-          this._valueDisplay.textContent = "0";
+          if (showButton) {
+            this._btn = makeAppBtn(label);
+            this.appendChild(this._btn);
+          }
+          if (showValue) {
+            this._valueDisplay = document.createElement("span");
+            this._valueDisplay.className = "cb-app-value";
+            this._valueDisplay.textContent = "0";
+            this.appendChild(this._valueDisplay);
+          }
 
-          this.appendChild(this._btn);
-          this.appendChild(this._valueDisplay);
-
-          // Load initial value from state
-          if (this._key) {
+          // Load initial value from state for any value-showing element.
+          if (this._key && this._valueDisplay) {
             cbState.read("counters", this._key).then((item) => {
               if (item && item.value !== undefined) {
                 this._valueDisplay.textContent = item.value;
@@ -374,35 +383,49 @@
             });
           }
 
-          this._btn.addEventListener("click", () => {
-            var id = uuid();
-            cbEvents
-              .emit(id, "counter", JSON.stringify({ key: this._key }))
-              .then((code) => {
-                if (code === 403) {
-                  this._valueDisplay.textContent = "🔒 Bloqueado: ingresa el secreto";
-                }
-              })
-              .catch(function () {});
-          });
+          if (this._btn) {
+            this._btn.addEventListener("click", () => {
+              var id = uuid();
+              cbEvents
+                .emit(id, "counter", JSON.stringify({ key: this._key }))
+                .then((code) => {
+                  if (code !== 403) return;
+                  // No local value display in increment-only mode: flash the button.
+                  if (this._valueDisplay) {
+                    this._valueDisplay.textContent = "🔒 Bloqueado: ingresa el secreto";
+                  } else {
+                    var prev = this._btn.textContent;
+                    this._btn.textContent = "🔒 Bloqueado";
+                    setTimeout(() => {
+                      this._btn.textContent = prev;
+                    }, 2000);
+                  }
+                })
+                .catch(function () {});
+            });
+          }
         }
 
-        this._statusListener = (envelope) => {
-          if (envelope.id !== "status-counter-updated") return;
-          var parsed;
-          try {
-            parsed = JSON.parse(envelope.payload);
-          } catch (_) {
-            return;
-          }
-          if (parsed && parsed.key === this._key) {
-            this._valueDisplay.textContent = parsed.value;
-          }
-        };
-        appStatusListeners.push(this._statusListener);
+        // Only value-showing elements need to track updates.
+        if (this._valueDisplay) {
+          this._statusListener = (envelope) => {
+            if (envelope.id !== "status-counter-updated") return;
+            var parsed;
+            try {
+              parsed = JSON.parse(envelope.payload);
+            } catch (_) {
+              return;
+            }
+            if (parsed && parsed.key === this._key) {
+              this._valueDisplay.textContent = parsed.value;
+            }
+          };
+          appStatusListeners.push(this._statusListener);
+        }
       }
 
       disconnectedCallback() {
+        if (!this._statusListener) return;
         var idx = appStatusListeners.indexOf(this._statusListener);
         if (idx !== -1) appStatusListeners.splice(idx, 1);
         this._statusListener = null;

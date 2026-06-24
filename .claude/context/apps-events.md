@@ -129,7 +129,10 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
 
 `crates/server/static/apps.js` provides:
 
-- Custom elements `<cb-cpu-burst>` and `<cb-counter>`.
+- Custom elements `<cb-cpu-burst>` and `<cb-counter>`. `<cb-counter>` takes a `mode`
+  attribute — `increment` (button only), `view` (value only), or `both` (default);
+  elements sharing a `key` stay in sync via the SSE bus, so an incrementer and a
+  separate viewer can sit in different parts of the page.
 - Unlock UI: a prompt that stores the instructor secret in `sessionStorage` under
   `cb-apps-secret`.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.

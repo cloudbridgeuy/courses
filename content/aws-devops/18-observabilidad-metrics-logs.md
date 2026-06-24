@@ -77,7 +77,7 @@ persistentes.
 
 :::app
 <cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU (60 s)"></cb-cpu-burst>
-<cb-counter key="demo" label="Incrementar contador"></cb-counter>
+<cb-counter key="demo" mode="increment" label="Incrementar contador"></cb-counter>
 :::
 
 ### Consultar los logs
@@ -116,6 +116,13 @@ consulte las líneas de log más recientes del contenedor con Logs Insights.
 
 :::slide light
 {{ejercicio-13}}
+:::
+
+El contador `demo` que incrementó arriba se refleja aquí en vivo, aunque esté en otra
+parte de la página: ambos widgets comparten el mismo flujo de eventos por SSE.
+
+:::app
+<cb-counter key="demo" mode="view" label="Contador demo"></cb-counter>
 :::
 
 ---
