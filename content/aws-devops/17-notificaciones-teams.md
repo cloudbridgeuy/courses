@@ -47,7 +47,7 @@ equipo) no toca el pipeline: solo cambia la suscripción.
 
 ::: extra Una aclaración de nombres: CodeStar
 El servicio **AWS CodeStar** —el de proyectos y dashboards unificados— fue
-**discontinuado en 2024**. Las **reglas de notificación** que usamos aquí son otra cosa:
+**discontinuado en 2024**. Las **reglas de notificación** que se usan aquí son otra cosa:
 forman parte de los *Developer Tools* (su prefijo técnico es `codestar-notifications`),
 siguen plenamente vigentes, y no tienen relación con el servicio discontinuado. Cuando la
 documentación habla de "CodeStar Notifications", se refiere a estas reglas, no al servicio
@@ -59,11 +59,11 @@ de proyectos.
 Conectar Teams de verdad requiere una suscripción de AWS Chatbot al espacio de Teams de
 la organización —algo que cada participante no puede montar en su cuenta del taller. Para
 no perder el aprendizaje, el laboratorio usa un **espejo** del mismo flujo: los eventos
-de su cuenta llegan a la **aplicación del instructor**, que los muestra como avisos
+de la cuenta llegan a la **aplicación del instructor**, que los muestra como avisos
 (*toasts*) sobre esta misma guía.
 
 El mecanismo cambia, la idea no: lo que en el lab aparece como un *toast* en la guía, en
-su organización aparecería en un canal de Teams. La regla de notificación, el tema de
+la organización aparecería en un canal de Teams. La regla de notificación, el tema de
 SNS, y la lógica de "qué eventos importan" son idénticos; solo difiere el último salto.
 
 :::slide
@@ -80,22 +80,22 @@ Mismo evento, misma regla, mismo SNS. Cambia solo el último salto.
 
 ### Definir la regla sobre el pipeline
 
-1. Abra [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home) y entre a su pipeline.
-2. Pulse **Notify → Create notification rule**.
-3. En **Detail type**, elija **Full**. En **Events**, marque al menos:
+1. Abrir [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home) y entrar al pipeline.
+2. Pulsar **Notify → Create notification rule**.
+3. En **Detail type**, elegir **Full**. En **Events**, marcar al menos:
    - **Pipeline execution: Succeeded**
    - **Pipeline execution: Failed**
    - **Manual approval: Needed**
-4. En **Targets**, seleccione el **tema de SNS** que le indique el instructor (el que
-   alimenta la aplicación del taller). Pulse **Submit**.
+4. En **Targets**, seleccionar el **tema de SNS** que indique el instructor (el que
+   alimenta la aplicación del taller). Pulsar **Submit**.
 
-### Dispararla y observar el aviso
+### Disparar la regla y observar el aviso
 
-1. Suba un commit a `main` para iniciar una ejecución del pipeline.
+1. Subir un commit a `main` para iniciar una ejecución del pipeline.
 2. A medida que el pipeline avanza, los eventos seleccionados llegan a la aplicación del
-   instructor y aparecen como *toasts* en la guía, identificados con su *pod*.
-3. Cuando el pipeline se detenga en la aprobación, verá el aviso **Manual approval:
-   Needed**; al aprobar y completarse, verá **Succeeded**.
+   instructor y aparecen como *toasts* en la guía, identificados con el *pod*.
+3. Cuando el pipeline se detenga en la aprobación, se verá el aviso **Manual approval:
+   Needed**; al aprobar y completarse, se verá **Succeeded**.
 
 > **Nota:** la recepción de los *toasts* depende de que el instructor haya configurado el
 > tema de SNS y la aplicación del taller. Si aún no está disponible, esta sección se sigue
@@ -105,20 +105,20 @@ Mismo evento, misma regla, mismo SNS. Cambia solo el último salto.
 ---
 
 {#ejercicio-12}
-### Ejercicio 12 — Notifique los eventos del pipeline
+### Ejercicio 12 — Notificar los eventos del pipeline
 
-Cree una regla de notificación sobre su pipeline que publique, en el tema de SNS del
-taller, los eventos de ejecución exitosa, fallida, y de aprobación pendiente. Dispare una
-ejecución y observe los avisos.
+Crear una regla de notificación sobre el pipeline que publique, en el tema de SNS del
+taller, los eventos de ejecución exitosa, fallida, y de aprobación pendiente. Disparar una
+ejecución y observar los avisos.
 
 ::: solucion
-1. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), abra su pipeline y pulse
+1. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), abrir el pipeline y pulsar
    **Notify → Create notification rule**.
-2. **Detail type: Full**. Marque los eventos **Pipeline execution: Succeeded**,
+2. **Detail type: Full**. Marcar los eventos **Pipeline execution: Succeeded**,
    **Pipeline execution: Failed**, y **Manual approval: Needed**.
-3. En **Targets**, seleccione el tema de SNS indicado por el instructor. **Submit**.
-4. Suba un commit a `main` para disparar el pipeline.
-5. Observe los avisos a medida que el pipeline avanza: el evento de aprobación pendiente,
+3. En **Targets**, seleccionar el tema de SNS indicado por el instructor. **Submit**.
+4. Subir un commit a `main` para disparar el pipeline.
+5. Observar los avisos a medida que el pipeline avanza: el evento de aprobación pendiente,
    y luego el de ejecución exitosa tras aprobar. En el laboratorio aparecen como *toasts*
    en la guía; en producción llegarían a un canal de Teams.
 :::

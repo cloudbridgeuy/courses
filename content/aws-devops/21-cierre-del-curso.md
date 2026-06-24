@@ -4,7 +4,7 @@ title = "Cierre del curso"
 
 ## El flujo completo, de una pieza
 
-Empezó el taller con código en una máquina. Termina con un sistema que se construye, se
+El taller comenzó con código en una máquina. Termina con un sistema que se construye, se
 despliega, se opera, y se reporta solo, sobre infraestructura de AWS. Vale la pena verlo
 entero, porque cada semana fue un eslabón de la misma cadena:
 
@@ -44,8 +44,8 @@ flowchart LR
   Insights (Semanas 3–4).
 - **Teams** recibe las notificaciones del pipeline y de las alarmas (Semanas 3–4).
 
-Ninguna pieza es un ejemplo aislado: es el sistema que ha venido construyendo, y desde el
-cual lee esta misma guía.
+Ninguna pieza es un ejemplo aislado: es el sistema que se ha venido construyendo, y desde el
+cual se lee esta misma guía.
 
 ## La caja de herramientas de diagnóstico
 
@@ -85,35 +85,35 @@ Lo construido es una base sólida, no el final del camino. Hacia dónde seguir:
 - **Pruebas en el pipeline**: agregar una etapa de pruebas automáticas entre Build y
   Deploy, para que solo avance lo que pasa las verificaciones.
 
-Cada uno de estos pasos reutiliza lo que ya sabe: son extensiones del mismo flujo, no
+Cada uno de estos pasos reutiliza lo ya aprendido: son extensiones del mismo flujo, no
 temas nuevos desde cero.
 
 ## Ejercicio final (opcional): el ciclo completo
 
-Si quiere cerrar el taller con todo en movimiento a la vez, este ejercicio integrador
+Para cerrar el taller con todo en movimiento a la vez, este ejercicio integrador
 recorre el sistema entero de punta a punta.
 
 {#ejercicio-16}
 ### Ejercicio 16 — Del error a la corrección, por el pipeline
 
-Provoque una falla en la aplicación, detéctela por la observabilidad que montó,
-diagnostíquela con el método de la caja de herramientas, y corríjala con un commit que
+Provocar una falla en la aplicación, detectarla por la observabilidad montada,
+diagnosticarla con el método de la caja de herramientas, y corregirla con un commit que
 fluya por el pipeline hasta el despliegue.
 
 ::: solucion
-1. **Provocar**: introduzca un cambio que rompa la aplicación (por ejemplo, una variable
-   de entorno faltante o un error de arranque), haga commit, y súbalo a `main`.
+1. **Provocar**: introducir un cambio que rompa la aplicación (por ejemplo, una variable
+   de entorno faltante o un error de arranque), hacer commit, y subirlo a `main`.
 2. **Avanzar por el pipeline**: el pipeline construye y, tras la aprobación, despliega.
    El servicio intenta levantar la nueva tarea.
-3. **Detectar**: observe la señal —la tarea entra en estado detenido, el target group
+3. **Detectar**: observar la señal —la tarea entra en estado detenido, el target group
    pierde destinos sanos, y la alarma o el aviso de Teams (o el *toast*) lo reporta.
-4. **Diagnosticar**: aplique el método. Mire el `stoppedReason` de la tarea detenida; si
-   apunta a la aplicación, abra el grupo de logs en Logs Insights y lea el error de
+4. **Diagnosticar**: aplicar el método. Mirar el `stoppedReason` de la tarea detenida; si
+   apunta a la aplicación, abrir el grupo de logs en Logs Insights y leer el error de
    arranque.
-5. **Corregir**: revierta o arregle el cambio, haga commit, y súbalo. El pipeline
-   reconstruye, usted aprueba, y el Deploy restaura el servicio.
+5. **Corregir**: revertir o arreglar el cambio, hacer commit, y subirlo. El pipeline
+   reconstruye, se aprueba, y el Deploy restaura el servicio.
 6. **Confirmar**: las tareas vuelven a `healthy`, el ALB responde, y el aviso de
-   recuperación llega por el mismo canal. Cerró el ciclo completo: del error a la
+   recuperación llega por el mismo canal. Se cerró el ciclo completo: del error a la
    corrección, todo por el flujo automatizado.
 :::
 
@@ -124,7 +124,7 @@ fluya por el pipeline hasta el despliegue.
 :::slide
 ## Del código a la operación
 
-Construyó, desplegó, automatizó, y observó un sistema real en AWS.
+Se construyó, desplegó, automatizó, y observó un sistema real en AWS.
 
 **Gracias por participar en el taller.**
 :::

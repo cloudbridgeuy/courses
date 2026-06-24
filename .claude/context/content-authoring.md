@@ -4,6 +4,28 @@ Course content lives under `content/<course-slug>/`, one Markdown file per sessi
 ordered by filename prefix (`01-`, `02-`, …). Session URLs use slugs from the
 session title (e.g. `del-codigo-a-la-imagen`), NOT filenames. All content is Spanish.
 
+## Register (impersonal manual)
+
+All content uses an impersonal, timeless manual register. No personal subjects, no
+`usted`.
+
+- **Instructions** (guided-practice steps, exercise tasks, solution steps) use the
+  **infinitive** as the main verb: "Abrir CloudFormation", "Pulsar **Create stack**",
+  "Seleccionar **Upload a template file**", "Guardar el archivo". Not "Abra", "Pulse",
+  "Seleccione", "Guarde".
+- **Explanatory prose** uses the impersonal present or the passive with `se`: "se
+  describe en un archivo YAML", "el stack se lanza con dos parámetros y se obtiene un
+  ambiente", "en la sección anterior se construyó la imagen". Not "usted describe".
+- **Possessives that point at the student** drop to the article: "el stack", "el
+  servicio", "el clúster", "la imagen", "el ambiente" — not "su stack", "su imagen".
+- **Exercise titles** take the infinitive: "Ejercicio 5 — Desplegar la aplicación",
+  not "Despliegue la aplicación".
+
+Leave untouched: placeholder tokens (`<su-nombre>`, `taller-<su-nombre>`,
+`cpu-alta-<su-nombre>`), English AWS console labels in bold (**Create stack**,
+**Next**, **CREATE_COMPLETE**), code blocks, resource and file names, and all
+directive fences and anchors.
+
 ## File format
 
 - TOML frontmatter between `+++` fences: `title = "…"`.

@@ -4,40 +4,40 @@ title = "El despliegue — CloudFormation como caja negra"
 
 ## El salto de la imagen a la aplicación
 
-En la sección anterior construyó y publicó la imagen Docker en ECR. Pero una imagen
+En la sección anterior se construyó y publicó la imagen Docker en ECR. Pero una imagen
 en un registro no es una aplicación en línea: alguien tiene que lanzar el contenedor,
 colocarlo detrás de un balanceador de carga, conectarlo a una base de datos, y
 configurar la red. Hacer eso paso a paso desde la consola tomaría más de una hora y
 sería difícil de reproducir exactamente.
 
-**AWS CloudFormation** resuelve este problema con un enfoque declarativo: usted describe
-en un archivo YAML o JSON qué recursos quiere —un clúster ECS, un servicio Fargate,
+**AWS CloudFormation** resuelve este problema con un enfoque declarativo: se describe
+en un archivo YAML o JSON qué recursos se quieren —un clúster ECS, un servicio Fargate,
 un ALB, una tabla DynamoDB, grupos de seguridad, roles de IAM— y CloudFormation los
 crea todos en el orden correcto, manejando las dependencias automáticamente.
 
 ## El template de esta semana
 
-El instructor le proveyó el archivo `taller-semana1.yaml`. Este template es, por ahora,
-una **caja negra**: usted la lanza con dos parámetros y obtiene un ambiente funcional
-en minutos. No necesita entender su contenido esta semana —eso es el tema de la Semana 2.
+El instructor provee el archivo `taller-semana1.yaml`. Este template es, por ahora,
+una **caja negra**: se lanza con dos parámetros y se obtiene un ambiente funcional
+en minutos. No es necesario entender su contenido esta semana —eso es el tema de la Semana 2.
 
 Lo que despliega el template:
 
 - Una **tabla de DynamoDB** para la aplicación.
-- Un **clúster ECS** y un **servicio Fargate** que ejecuta su imagen Docker.
+- Un **clúster ECS** y un **servicio Fargate** que ejecuta la imagen Docker.
 - Un **Application Load Balancer** (ALB) que recibe el tráfico HTTP y lo dirige al
   contenedor.
 - Los roles de IAM, grupos de seguridad, y configuración de red necesarios para que
   todo funcione junto.
 
-Los únicos parámetros que usted controla son el **nombre del stack** y el **URI de la
+Los únicos parámetros configurables son el **nombre del stack** y el **URI de la
 imagen en ECR**. El resto lo gestiona el template.
 
 ## Un detalle que vale la pena notar
 
-Cuando abra la URL del ALB en el navegador, verá cargarse esta misma guía: la
-plataforma del taller servida desde su propio despliegue en ECS. La aplicación que
-usted construyó, desplegó, y opera es exactamente el entorno desde el que lee estas
+Al abrir la URL del ALB en el navegador, se ve cargarse esta misma guía: la
+plataforma del taller servida desde el despliegue en ECS. La aplicación que
+se construyó, desplegó, y opera es exactamente el entorno desde el que se leen estas
 instrucciones. No es un ejemplo genérico —es el sistema real.
 
 :::slide
@@ -48,98 +48,97 @@ Un template, dos parámetros, un ambiente completo:
 - DynamoDB · ECS + Fargate · Application Load Balancer
 - Roles de IAM, grupos de seguridad, red
 
-Usted controla el **nombre del stack** y el **URI de la imagen**.
+Los parámetros configurables son el **nombre del stack** y el **URI de la imagen**.
 :::
 
 ## Práctica guiada: lanzar el stack de CloudFormation
 
 ### Abrir CloudFormation
 
-1. Abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. Confirme que la región seleccionada (esquina superior derecha) es la misma que ha
+1. Abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
+2. Confirmar que la región seleccionada (esquina superior derecha) es la misma que se ha
    usado para todos los recursos del taller.
 
 ### Crear el stack
 
-1. Pulse **Create stack** y seleccione **With new resources (standard)**.
-2. En la sección **Specify template**, seleccione **Upload a template file**.
-3. Pulse **Choose file** y seleccione el archivo `taller-semana1.yaml` provisto por
+1. Pulsar **Create stack** y seleccionar **With new resources (standard)**.
+2. En la sección **Specify template**, seleccionar **Upload a template file**.
+3. Pulsar **Choose file** y seleccionar el archivo `taller-semana1.yaml` provisto por
    el instructor.
-4. Pulse **Next**.
+4. Pulsar **Next**.
 
 ### Completar los parámetros
 
-1. En **Stack name**, escriba `taller-<su-nombre>` (por ejemplo: `taller-maria`). El
-   nombre del stack identifica su ambiente en la consola y debe ser único en la región.
-2. En los parámetros del template, localice el campo correspondiente al **URI de
-   la imagen**. Pegue el URI completo que copió de ECR al final de la sección anterior.
+1. En **Stack name**, escribir `taller-<su-nombre>` (por ejemplo: `taller-maria`). El
+   nombre del stack identifica el ambiente en la consola y debe ser único en la región.
+2. En los parámetros del template, localizar el campo correspondiente al **URI de
+   la imagen**. Pegar el URI completo copiado de ECR al final de la sección anterior.
    El formato es:
    ```
    123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-<su-nombre>:latest
    ```
-1. Revise los demás parámetros. Déjelos con sus valores predeterminados a menos que el
+1. Revisar los demás parámetros. Dejarlos con sus valores predeterminados a menos que el
    instructor indique lo contrario.
-2. Pulse **Next**.
+2. Pulsar **Next**.
 
 ### Configurar opciones del stack
 
-1. En la pantalla de opciones, no es necesario cambiar nada. Pulse **Next**.
+1. En la pantalla de opciones, no es necesario cambiar nada. Pulsar **Next**.
 
 ### Confirmar y lanzar
 
-1. En la pantalla de revisión, desplácese hasta la sección **Capabilities** al pie
-    de la página. Verá un aviso sobre que el template puede crear recursos de IAM.
-    Marque la casilla **I acknowledge that AWS CloudFormation might create IAM
+1. En la pantalla de revisión, desplazarse hasta la sección **Capabilities** al pie
+    de la página. Se verá un aviso sobre que el template puede crear recursos de IAM.
+    Marcar la casilla **I acknowledge that AWS CloudFormation might create IAM
     resources with custom names**.
-2. Pulse **Submit** (o **Create stack**, según la versión de la consola).
+2. Pulsar **Submit** (o **Create stack**, según la versión de la consola).
 
 ### Seguir la creación del stack
 
-1. CloudFormation lo lleva automáticamente a la vista del stack recién iniciado.
-    Seleccione la pestaña **Events**. Verá cómo se van creando los recursos en tiempo
+1. CloudFormation lleva automáticamente a la vista del stack recién iniciado.
+    Seleccionar la pestaña **Events**. Se ve cómo se van creando los recursos en tiempo
     real, uno por uno, con su estado.
-2. Espere hasta que el estado del stack (en la parte superior) cambie a
+2. Esperar hasta que el estado del stack (en la parte superior) cambie a
     **CREATE_COMPLETE**. El proceso toma entre 3 y 8 minutos, dependiendo de la región.
     Si algún recurso falla, el estado cambia a **ROLLBACK_IN_PROGRESS** y CloudFormation
-    deshará los cambios automáticamente —revise el evento fallido para entender el motivo.
+    deshará los cambios automáticamente —revisar el evento fallido para entender el motivo.
 
 ### Obtener la URL de la aplicación
 
-1. Una vez en **CREATE_COMPLETE**, seleccione la pestaña **Outputs**.
-2. Verá una salida llamada `ALBUrl` (o similar, según el template). Copie el valor
+1. Una vez en **CREATE_COMPLETE**, seleccionar la pestaña **Outputs**.
+2. Se verá una salida llamada `ALBUrl` (o similar, según el template). Copiar el valor
     —es la URL pública del Application Load Balancer.
-3. Abra esa URL en una nueva pestaña del navegador. En unos segundos verá cargarse
-    esta guía del taller, servida desde el contenedor que acaba de desplegar en su
-    propio ECS.
+3. Abrir esa URL en una nueva pestaña del navegador. En unos segundos se ve cargarse
+    esta guía del taller, servida desde el contenedor recién desplegado en ECS.
 
 ---
 
 {#ejercicio-5}
-### Ejercicio 5 — Despliegue la aplicación
+### Ejercicio 5 — Desplegar la aplicación
 
-Lance el stack de CloudFormation con el template `taller-semana1.yaml` provisto por
-el instructor. Use como URI de la imagen el valor que copió de ECR al terminar el
-Ejercicio 4. Al terminar, abra la URL del ALB en el navegador y confirme que la
+Lanzar el stack de CloudFormation con el template `taller-semana1.yaml` provisto por
+el instructor. Usar como URI de la imagen el valor copiado de ECR al terminar el
+Ejercicio 4. Al terminar, abrir la URL del ALB en el navegador y confirmar que la
 aplicación está en línea.
 
 ::: solucion
-1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. Pulse **Create stack → With new resources (standard)**.
-3. Seleccione **Upload a template file**, pulse **Choose file**, y suba
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
+2. Pulsar **Create stack → With new resources (standard)**.
+3. Seleccionar **Upload a template file**, pulsar **Choose file**, y subir
    `taller-semana1.yaml`.
-4. Pulse **Next**.
-5. En **Stack name**, escriba `taller-<su-nombre>`.
-6. En el campo del URI de la imagen, pegue el URI completo de ECR con la etiqueta
+4. Pulsar **Next**.
+5. En **Stack name**, escribir `taller-<su-nombre>`.
+6. En el campo del URI de la imagen, pegar el URI completo de ECR con la etiqueta
    `latest` (por ejemplo:
    `123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest`).
-7. Pulse **Next** dos veces para llegar a la pantalla de revisión.
-8. En la sección **Capabilities**, marque la casilla de aceptación de recursos de IAM.
-9. Pulse **Submit**.
-10. En la pestaña **Events**, espere a que el estado del stack llegue a
+7. Pulsar **Next** dos veces para llegar a la pantalla de revisión.
+8. En la sección **Capabilities**, marcar la casilla de aceptación de recursos de IAM.
+9. Pulsar **Submit**.
+10. En la pestaña **Events**, esperar a que el estado del stack llegue a
     **CREATE_COMPLETE**.
-11. En la pestaña **Outputs**, copie el valor de **ALBUrl**.
-12. Abra esa URL en el navegador. Verá la plataforma del taller corriendo desde su
-    propio despliegue.
+11. En la pestaña **Outputs**, copiar el valor de **ALBUrl**.
+12. Abrir esa URL en el navegador. Se verá la plataforma del taller corriendo desde el
+    despliegue.
 :::
 
 :::slide light

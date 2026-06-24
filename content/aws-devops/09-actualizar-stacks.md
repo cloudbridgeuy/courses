@@ -15,7 +15,7 @@ aplicarlo?* Esa pregunta la responde un **change set**.
 
 ## Change sets: ver antes de aplicar
 
-Un *change set* es una vista previa. Usted sube el template modificado, y CloudFormation
+Un *change set* es una vista previa. Se sube el template modificado, y CloudFormation
 calcula la diferencia contra el estado actual sin tocar nada todavía. El resultado es una
 lista de acciones: qué recursos se **modifican**, cuáles se **agregan**, cuáles se
 **eliminan**, y —lo más importante— cuáles requieren **reemplazo**.
@@ -49,19 +49,19 @@ general, en toda la infraestructura declarativa.
 
 El reemplazo es el que hay que vigilar: cambiar ciertas propiedades (por ejemplo, el
 nombre físico de una tabla) obliga a CloudFormation a crear un recurso nuevo y borrar el
-anterior. El change set lo marca explícitamente con `Replacement: True`, dándole la
+anterior. El change set lo marca explícitamente con `Replacement: True`, dando la
 oportunidad de detenerse antes de perder datos.
 
 ## Práctica guiada: escalar la aplicación a dos tareas
 
-Va a aumentar el número de contenedores en ejecución de uno a dos, modificando el
+Esta práctica aumenta el número de contenedores en ejecución de uno a dos, modificando el
 template y aplicando el cambio con un change set.
 
 ### Modificar el template
 
-1. Abra `taller-semana1.yaml` en su editor.
-2. Localice el recurso `ServicioApp` (tipo `AWS::ECS::Service`).
-3. Cambie la propiedad `DesiredCount` de `1` a `2`:
+1. Abrir `taller-semana1.yaml` en el editor.
+2. Localizar el recurso `ServicioApp` (tipo `AWS::ECS::Service`).
+3. Cambiar la propiedad `DesiredCount` de `1` a `2`:
 
    ```yaml
    ServicioApp:
@@ -70,33 +70,33 @@ template y aplicando el cambio con un change set.
        DesiredCount: 2        # antes: 1
    ```
 
-4. Guarde el archivo.
+4. Guardar el archivo.
 
 ### Crear el change set
 
-1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccione su stack `taller-<su-nombre>`.
-2. Pulse **Stack actions → Create change set for current stack**.
-3. Seleccione **Replace existing template → Upload a template file**, y suba el
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-<su-nombre>`.
+2. Pulsar **Stack actions → Create change set for current stack**.
+3. Seleccionar **Replace existing template → Upload a template file**, y subir el
    `taller-semana1.yaml` modificado.
-4. Avance por las pantallas (los parámetros siguen igual) hasta llegar a la vista del
-   change set. Pulse **Create change set** y déle un nombre, por ejemplo
+4. Avanzar por las pantallas (los parámetros siguen igual) hasta llegar a la vista del
+   change set. Pulsar **Create change set** y asignarle un nombre, por ejemplo
    `escalar-a-dos`.
 
 ### Revisar y aplicar
 
-1. CloudFormation calcula la diferencia y muestra la tabla de cambios. Busque la fila
+1. CloudFormation calcula la diferencia y muestra la tabla de cambios. Buscar la fila
    correspondiente a `ServicioApp`: la acción debe ser **Modify**, y la columna
    **Replacement** debe decir **False** —el servicio se actualiza en sitio, sin
    recrearse.
-2. Confirme que ningún otro recurso aparece como `True` en **Replacement**.
-3. Pulse **Execute change set**. CloudFormation aplica solo ese cambio.
-4. En la pestaña **Events**, siga la actualización hasta que el stack vuelva a
+2. Confirmar que ningún otro recurso aparece como `True` en **Replacement**.
+3. Pulsar **Execute change set**. CloudFormation aplica solo ese cambio.
+4. En la pestaña **Events**, seguir la actualización hasta que el stack vuelva a
    **UPDATE_COMPLETE**.
 
 ### Verificar el resultado
 
-1. Abra [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home). La cuenta de tareas deseadas
-   ahora es **2**, y verá dos tareas en estado `RUNNING`.
+1. Abrir [**ECS → Clusters → el clúster → el servicio**](https://console.aws.amazon.com/ecs/home). La cuenta de tareas deseadas
+   ahora es **2**, y se verán dos tareas en estado `RUNNING`.
 2. En [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:), el target group del ALB muestra dos destinos sanos
    (*healthy*): el balanceador ya reparte tráfico entre ambas tareas.
 
@@ -123,24 +123,24 @@ través del stack.
 ---
 
 {#ejercicio-8}
-### Ejercicio 8 — Actualice el stack con un change set
+### Ejercicio 8 — Actualizar el stack con un change set
 
-Aumente el número de tareas de su servicio de una a dos. Hágalo modificando el template,
+Aumentar el número de tareas del servicio de una a dos. Hacerlo modificando el template,
 creando un change set, verificando que el servicio se **modifica** sin reemplazo, y
-ejecutando el cambio. Confirme que hay dos tareas en ejecución.
+ejecutando el cambio. Confirmar que hay dos tareas en ejecución.
 
 ::: solucion
-1. En `taller-semana1.yaml`, cambie `DesiredCount` de `1` a `2` en el recurso
-   `ServicioApp`, y guarde.
-2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), seleccione su stack y pulse
+1. En `taller-semana1.yaml`, cambiar `DesiredCount` de `1` a `2` en el recurso
+   `ServicioApp`, y guardar.
+2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), seleccionar el stack y pulsar
    **Stack actions → Create change set for current stack**.
-3. Seleccione **Replace existing template → Upload a template file** y suba el archivo
+3. Seleccionar **Replace existing template → Upload a template file** y subir el archivo
    modificado.
-4. Avance hasta crear el change set; déle un nombre como `escalar-a-dos`.
-5. En la tabla de cambios, confirme que `ServicioApp` aparece como **Modify** con
+4. Avanzar hasta crear el change set; asignarle un nombre como `escalar-a-dos`.
+5. En la tabla de cambios, confirmar que `ServicioApp` aparece como **Modify** con
    **Replacement: False**.
-6. Pulse **Execute change set** y, en **Events**, espere a **UPDATE_COMPLETE**.
-7. En [**ECS → Clusters → su servicio**](https://console.aws.amazon.com/ecs/home), confirme **Desired tasks: 2** y dos tareas en
+6. Pulsar **Execute change set** y, en **Events**, esperar a **UPDATE_COMPLETE**.
+7. En [**ECS → Clusters → el servicio**](https://console.aws.amazon.com/ecs/home), confirmar **Desired tasks: 2** y dos tareas en
    estado `RUNNING`.
 :::
 

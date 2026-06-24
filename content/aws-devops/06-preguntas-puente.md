@@ -2,25 +2,25 @@
 title = "Preguntas puente"
 +++
 
-Estas preguntas abren la sesión del viernes. Piénselas después de la sesión del
-miércoles, cuando el ambiente todavía está fresco. No busque las respuestas de
-inmediato: intente razonarlas desde lo que construyó. Al comenzar la sesión remota,
-cada participante comparte su respuesta y discutimos juntos antes de continuar.
+Estas preguntas abren la sesión del viernes. Conviene pensarlas después de la sesión del
+miércoles, cuando el ambiente todavía está fresco. No se buscan las respuestas de
+inmediato: se razonan desde lo que se construyó. Al comenzar la sesión remota,
+cada participante comparte su respuesta y se discute en conjunto antes de continuar.
 
 :::slide
 ## Preguntas puente
 
-1. ¿Qué hace CodeBuild con tu `buildspec.yml`, fase por fase, y dónde queda el
+1. ¿Qué hace CodeBuild con el `buildspec.yml`, fase por fase, y dónde queda el
    resultado?
-2. Si borras el stack, ¿qué sobrevive: CodeCommit, ECR, ambos, ninguno?
-3. El template desplegó tras un ALB: ¿qué pasos manuales te ahorró?
+2. Si se borra el stack, ¿qué sobrevive: CodeCommit, ECR, ambos, ninguno?
+3. El template desplegó la aplicación tras un ALB: ¿qué pasos manuales se ahorró?
 :::
 
 ---
 
 ## Pregunta 1
 
-¿Qué hace exactamente CodeBuild con su `buildspec.yml`, fase por fase, y dónde queda
+¿Qué hace exactamente CodeBuild con el `buildspec.yml`, fase por fase, y dónde queda
 el resultado?
 
 ::: solucion
@@ -48,19 +48,19 @@ servidores que persistan entre builds.
 
 ## Pregunta 2
 
-Si borra su stack de CloudFormation, ¿qué sobrevive —el repositorio de CodeCommit,
+Si se borra el stack de CloudFormation, ¿qué sobrevive —el repositorio de CodeCommit,
 la imagen en ECR, ambos, o ninguno? ¿Por qué?
 
 ::: solucion
 **Sobreviven ambos**: el repositorio de CodeCommit y la imagen en ECR.
 
-La razón es que CloudFormation solo gestiona los recursos que declaró en el template.
+La razón es que CloudFormation solo gestiona los recursos que se declararon en el template.
 El template `taller-semana1.yaml` describe el clúster ECS, el servicio Fargate, el
 Application Load Balancer, la tabla de DynamoDB, los roles de IAM y la configuración
 de red. Esos recursos los creó CloudFormation y los elimina cuando se borra el stack.
 
 El repositorio de CodeCommit y el repositorio de ECR (junto con la imagen que contiene)
-los creó usted directamente desde la consola, fuera de cualquier stack de CloudFormation.
+se crearon directamente desde la consola, fuera de cualquier stack de CloudFormation.
 CloudFormation no los conoce y no los toca. Por eso al recrear el stack basta con
 proporcionar de nuevo el URI de la imagen: la imagen ya está en ECR, exactamente como
 la dejó el build.
@@ -74,11 +74,11 @@ commit y cada build; el segundo puede destruirse y recrearse cuantas veces sea n
 
 ## Pregunta 3
 
-El template desplegó la aplicación detrás de un ALB. ¿Qué pasos manuales le ahorró,
-y cuáles de esos recursos reconoce en la consola?
+El template desplegó la aplicación detrás de un ALB. ¿Qué pasos manuales se ahorró,
+y cuáles de esos recursos se reconocen en la consola?
 
 ::: solucion
-El template automatizó al menos los siguientes pasos que, de otro modo, tendría que
+El template automatizó al menos los siguientes pasos que, de otro modo, habría que
 ejecutar manualmente desde la consola:
 
 1. Crear la tabla de DynamoDB con el nombre y la configuración de clave correctos.
@@ -96,14 +96,14 @@ ejecutar manualmente desde la consola:
 8. Conectar todo: el ALB al target group, el target group al servicio, el servicio a
    la task definition, la task definition a la imagen en ECR.
 
-En la consola puede verificar cada uno de estos recursos directamente:
+En la consola se puede verificar cada uno de estos recursos directamente:
 
-- **ECS → Clusters**: verá el clúster y, dentro de él, el servicio y las tareas en
+- **ECS → Clusters**: se verá el clúster y, dentro de él, el servicio y las tareas en
   estado `RUNNING`.
-- **EC2 → Load Balancers**: verá el ALB con su DNS público.
-- **DynamoDB → Tables**: verá la tabla creada por el template.
-- **IAM → Roles**: verá el rol de ejecución de ECS cuyo nombre contiene el nombre de
-  su stack.
+- **EC2 → Load Balancers**: se verá el ALB con su DNS público.
+- **DynamoDB → Tables**: se verá la tabla creada por el template.
+- **IAM → Roles**: se verá el rol de ejecución de ECS cuyo nombre contiene el nombre del
+  stack.
 
 El valor de CloudFormation es que todos esos pasos, incluyendo el orden correcto de
 creación y las dependencias entre recursos, quedan codificados en el archivo YAML.
@@ -124,12 +124,12 @@ del taller funcionando de punta a punta:
   template de CloudFormation.
 - El **ciclo de recuperación** practicado: destruir y recrear el ambiente en minutos.
 
-Construyó, desplegó, y operó el sistema. Lo que todavía es una caja negra es **cómo**
+Se construyó, desplegó, y operó el sistema. Lo que todavía es una caja negra es **cómo**
 ese template arma todo por dentro.
 
 ## Qué sigue en la Semana 2
 
-La próxima semana abrimos la caja negra. Vamos a:
+La próxima semana se abre la caja negra. Se va a:
 
 - Leer el template `taller-semana1.yaml` recurso por recurso, y entender la
   **infraestructura como código**: parámetros, recursos, salidas, y funciones
@@ -137,7 +137,7 @@ La próxima semana abrimos la caja negra. Vamos a:
 - **Actualizar** el stack de forma segura con *change sets*, y ver cómo CloudFormation
   maneja cambios, *drift*, y *rollback*.
 - Conocer los **primeros contenedores** por dentro: las *task definitions* y los
-  *services* de ECS/Fargate que el template creó por usted.
+  *services* de ECS/Fargate que el template creó.
 
-Llegará al final de la Semana 2 entendiendo, y pudiendo modificar, el ambiente que
-esta semana solo lanzó.
+Al final de la Semana 2 se comprenderá, y se podrá modificar, el ambiente que
+esta semana solo se lanzó.

@@ -4,10 +4,10 @@ title = "Los primeros contenedores — ECS y Fargate"
 
 ## Del recurso en el template al contenedor en ejecución
 
-En el template leyó tres recursos relacionados: un **clúster**, un **servicio**, y una
+En el template se ven tres recursos relacionados: un **clúster**, un **servicio**, y una
 **task definition**. Esta sección los explica como lo que son cuando el stack ya corre:
-las piezas que mantienen su contenedor vivo y accesible. Al terminar, los reconocerá en
-la consola de ECS y entenderá qué hace cada uno.
+las piezas que mantienen el contenedor vivo y accesible. Al terminar, se los reconoce en
+la consola de ECS y se entiende qué hace cada uno.
 
 ## El modelo de ECS
 
@@ -28,16 +28,15 @@ fallan. Tres conceptos lo estructuran.
 ### El clúster
 
 El **clúster** es la agrupación lógica donde viven las tareas. Con Fargate no contiene
-servidores que usted administre —es solo el contexto bajo el cual ECS organiza lo que
-corre. En la consola, es lo que vio en **ECS → Clusters**.
+servidores que administrar —es solo el contexto bajo el cual ECS organiza lo que
+corre. En la consola, se accede desde **ECS → Clusters**.
 
 ### La task definition
 
 La **task definition** es la plantilla de ejecución de un contenedor: el documento que
 dice *cómo* es una tarea. Sus campos principales:
 
-- **Imagen**: el URI en ECR de la imagen a ejecutar (en su caso, el que llegó vía el
-  parámetro `ImageUri`).
+- **Imagen**: el URI en ECR de la imagen a ejecutar (el que llega vía el parámetro `ImageUri`).
 - **CPU y memoria**: los recursos reservados (en su template, `256` CPU y `512` MB).
 - **Puertos** (*port mappings*): el puerto que el contenedor expone (`8080`).
 - **Rol de ejecución**: el rol de IAM que permite a Fargate descargar la imagen de ECR
@@ -122,10 +121,9 @@ flowchart TD
 ```
 
 ::: extra Fargate vs. EC2: ¿quién pone los servidores?
-ECS puede ejecutar tareas de dos formas. Con el tipo de lanzamiento **EC2**, usted
-administra una flota de servidores donde corren los contenedores. Con **Fargate**, AWS
-pone y administra esa capacidad por usted: especifica CPU y memoria por tarea, y no ve ni
-mantiene servidores. Este taller usa Fargate porque elimina la administración de
+ECS puede ejecutar tareas de dos formas. Con el tipo de lanzamiento **EC2**, se administra una flota de servidores donde corren los contenedores. Con **Fargate**, AWS
+pone y administra esa capacidad: se especifican CPU y memoria por tarea, y no hay
+servidores que mantener. Este taller usa Fargate porque elimina la administración de
 servidores —el foco queda en la aplicación, no en la infraestructura que la ejecuta.
 :::
 
@@ -142,43 +140,43 @@ Una describe; el otro opera.
 
 ### Abrir el clúster
 
-1. Abra [**ECS**](https://console.aws.amazon.com/ecs/home) y seleccione su clúster.
-2. En la pestaña **Services**, verá su servicio con la cuenta de tareas deseadas y en
+1. Abrir [**ECS**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
+2. En la pestaña **Services**, aparece el servicio con la cuenta de tareas deseadas y en
    ejecución (ahora `2`).
 
 ### Inspeccionar el servicio y sus tareas
 
-1. Pulse sobre el nombre del servicio.
-2. En la pestaña **Tasks**, verá las tareas en estado `RUNNING`. Pulse una de ellas.
-3. En el detalle de la tarea, localice la **task definition** que la originó (con su
+1. Pulsar sobre el nombre del servicio.
+2. En la pestaña **Tasks**, aparecen las tareas en estado `RUNNING`. Pulsar una de ellas.
+3. En el detalle de la tarea, localizar la **task definition** que la originó (con su
    número de revisión) y el **grupo de logs** al que escribe.
 
 ### Leer la task definition
 
-1. Pulse sobre el nombre de la task definition para abrir su revisión.
-2. Identifique la **imagen** (el URI de ECR), la **CPU y memoria**, y el **port
-   mapping** —los mismos valores que leyó en el template.
+1. Pulsar sobre el nombre de la task definition para abrir la revisión.
+2. Identificar la **imagen** (el URI de ECR), la **CPU y memoria**, y el **port
+   mapping** —los mismos valores del template.
 
 ---
 
 {#ejercicio-9}
-### Ejercicio 9 — Reconozca lo que está corriendo
+### Ejercicio 9 — Reconocer lo que está corriendo
 
-Desde la consola de ECS, identifique para su aplicación: la tarea en ejecución, la
+Desde la consola de ECS, identificar para la aplicación: la tarea en ejecución, la
 revisión de la task definition que la originó, el URI de la imagen que ejecuta, y el
 grupo de CloudWatch Logs al que escribe.
 
 ::: solucion
-1. Abra [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccione su clúster.
-2. Entre a su servicio y abra la pestaña **Tasks**. Pulse una tarea en estado
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
+2. Entrar al servicio y abrir la pestaña **Tasks**. Pulsar una tarea en estado
    `RUNNING`.
-3. En el detalle de la tarea, anote:
+3. En el detalle de la tarea, anotar:
    - La **task definition** y su número de revisión (por ejemplo, `taller:2`).
    - El **grupo de logs** (*Log group*), bajo la sección de logs del contenedor.
-4. Pulse la task definition para abrir su revisión, y localice en el contenedor:
-   - La **imagen**: el URI de ECR con su etiqueta (el mismo que pasó como `ImageUri`).
+4. Pulsar la task definition para abrir la revisión, y localizar en el contenedor:
+   - La **imagen**: el URI de ECR con su etiqueta (el mismo pasado como `ImageUri`).
    - La **CPU y memoria** reservadas.
-5. Compruebe que estos valores coinciden con los que leyó en el template
+5. Comprobar que estos valores coinciden con los del template
    `taller-semana1.yaml`: el recurso del template y el contenedor en ejecución son la
    misma cosa, vista desde dos lados.
 :::
@@ -204,7 +202,7 @@ Pasó de *lanzar* el ambiente a *entenderlo y modificarlo*.
 
 ## Qué sigue en la Semana 3
 
-La próxima semana operamos y automatizamos lo que ya entiende. Vamos a:
+La próxima semana se opera y automatiza lo que ya se entiende:
 
 - **Operar el workload**: la red que conecta el balanceador con las tareas, el
   **escalado** automático, y el **troubleshooting** cuando una tarea no arranca.

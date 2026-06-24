@@ -10,7 +10,7 @@ cuánto se recuerde de cómo se construyó originalmente, y de si esa memoria es
 
 Cuando el ambiente se define como código —en este caso, un template de CloudFormation—
 la situación cambia radicalmente. Si algo sale mal, la corrección no es reconstruir desde
-la memoria: es borrar y volver a crear. El proceso es el mismo que siguió hace unos
+la memoria: es borrar y volver a crear. El proceso es el mismo que se siguió hace unos
 minutos, tarda lo mismo, y produce exactamente el mismo resultado. El **costo de un
 error se convierte en minutos de espera**, no en horas de diagnóstico.
 
@@ -28,8 +28,8 @@ recursos **se eliminan** cuando se borra el stack.
 
 Lo que **no** forma parte del stack y por lo tanto **sobrevive**:
 
-- Su **repositorio de CodeCommit** con todo el historial de commits.
-- Su **repositorio de ECR** con la imagen Docker publicada.
+- El **repositorio de CodeCommit** con todo el historial de commits.
+- El **repositorio de ECR** con la imagen Docker publicada.
 - El **proyecto de CodeBuild** configurado en la sección anterior.
 
 Esto significa que al recrear el stack basta con volver a proporcionar el URI de la
@@ -50,80 +50,80 @@ de CodeBuild.
 
 ### Iniciar la eliminación
 
-1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. En la lista de stacks, seleccione su stack `taller-<su-nombre>`.
-3. Pulse **Delete**.
-4. En el diálogo de confirmación, pulse **Delete stack**.
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
+2. En la lista de stacks, seleccionar el stack `taller-<su-nombre>`.
+3. Pulsar **Delete**.
+4. En el diálogo de confirmación, pulsar **Delete stack**.
 
 ### Seguir los eventos de borrado
 
 1. CloudFormation comienza a eliminar los recursos en orden inverso al de creación
    (primero los que dependen de otros, luego los recursos base). La pestaña **Events**
    muestra cada eliminación en tiempo real.
-2. Espere hasta que el stack desaparezca de la lista o, si la consola lo muestra,
+2. Esperar hasta que el stack desaparezca de la lista o, si la consola lo muestra,
    hasta que el estado sea **DELETE_COMPLETE**. El proceso toma entre 3 y 6 minutos.
 
 > **Nota:** si algún recurso no puede eliminarse automáticamente (por ejemplo, una
 > tabla de DynamoDB con protección contra eliminación, o un bucket de S3 con objetos),
 > el estado cambiará a **DELETE_FAILED** y el evento fallido indicará el recurso y el
-> motivo. El instructor le indicará cómo proceder en ese caso.
+> motivo. El instructor indicará cómo proceder en ese caso.
 
 ### Confirmar que la aplicación ya no está en línea
 
-1. Intente abrir de nuevo la URL del ALB que usó antes. El navegador debería mostrar
+1. Intentar abrir de nuevo la URL del ALB usada antes. El navegador debe mostrar
    un error de conexión —el balanceador ya no existe.
 
 ## Práctica guiada: recrear el stack
 
 ### Lanzar el stack de nuevo
 
-1. Con el stack eliminado, pulse **Create stack → With new resources (standard)**.
-2. Suba nuevamente el template `taller-semana1.yaml`. (Si la consola le ofrece
-   reutilizar el template anterior porque lo subió recientemente, puede hacerlo.)
-3. En **Stack name**, use exactamente el mismo nombre: `taller-<su-nombre>`.
-4. En el campo del URI de la imagen, pegue el mismo URI de ECR que usó antes.
-    La imagen sigue en ECR — no necesita volver a hacer el build.
-5. Pulse **Next**, acepte las capacidades de IAM, y pulse **Submit**.
-6. En la pestaña **Events**, espere a que el estado vuelva a **CREATE_COMPLETE**.
+1. Con el stack eliminado, pulsar **Create stack → With new resources (standard)**.
+2. Subir nuevamente el template `taller-semana1.yaml`. (Si la consola ofrece
+   reutilizar el template anterior porque se subió recientemente, se puede hacer.)
+3. En **Stack name**, usar exactamente el mismo nombre: `taller-<su-nombre>`.
+4. En el campo del URI de la imagen, pegar el mismo URI de ECR usado antes.
+    La imagen sigue en ECR — no es necesario volver a hacer el build.
+5. Pulsar **Next**, aceptar las capacidades de IAM, y pulsar **Submit**.
+6. En la pestaña **Events**, esperar a que el estado vuelva a **CREATE_COMPLETE**.
 
 ### Verificar que la aplicación está de nuevo en línea
 
 1. En la pestaña **Outputs**, la URL del ALB puede ser diferente a la anterior —los
-    balanceadores de carga generan nombres DNS únicos. Copie el nuevo valor.
-2. Abra la URL en el navegador. La aplicación debe responder exactamente igual que
+    balanceadores de carga generan nombres DNS únicos. Copiar el nuevo valor.
+2. Abrir la URL en el navegador. La aplicación debe responder exactamente igual que
     antes. El ciclo completo está cerrado.
 
 ---
 
 {#ejercicio-6}
-### Ejercicio 6 — Destruya, y recree, su ambiente
+### Ejercicio 6 — Destruir, y recrear, el ambiente
 
-Elimine su stack de CloudFormation por completo. Confirme que la aplicación ya no
-responde. Luego recree el stack con los mismos parámetros y confirme que la aplicación
+Eliminar el stack de CloudFormation por completo. Confirmar que la aplicación ya no
+responde. Luego recrear el stack con los mismos parámetros y confirmar que la aplicación
 vuelve a estar en línea.
 
 ::: solucion
 **Destrucción:**
 
-1. En la consola de AWS, abra [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. Seleccione su stack `taller-<su-nombre>`.
-3. Pulse **Delete → Delete stack**.
-4. En la pestaña **Events**, siga los eventos hasta que el stack desaparezca de la
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
+2. Seleccionar el stack `taller-<su-nombre>`.
+3. Pulsar **Delete → Delete stack**.
+4. En la pestaña **Events**, seguir los eventos hasta que el stack desaparezca de la
    lista.
-5. Intente abrir la URL del ALB anterior. El navegador debe mostrar un error de
+5. Intentar abrir la URL del ALB anterior. El navegador debe mostrar un error de
    conexión, confirmando que el balanceador ya no existe.
 
 **Recreación:**
 
-1. Pulse **Create stack → With new resources (standard)**.
-2. Suba el template `taller-semana1.yaml` (o reutilice el cargado anteriormente).
-3. En **Stack name**, escriba `taller-<su-nombre>`.
-4. En el campo del URI de la imagen, pegue el URI de ECR con la etiqueta `latest`.
+1. Pulsar **Create stack → With new resources (standard)**.
+2. Subir el template `taller-semana1.yaml` (o reutilizar el cargado anteriormente).
+3. En **Stack name**, escribir `taller-<su-nombre>`.
+4. En el campo del URI de la imagen, pegar el URI de ECR con la etiqueta `latest`.
    La imagen sigue disponible en ECR sin necesidad de un nuevo build.
-5. Avance por las pantallas, acepte las capacidades de IAM, y pulse **Submit**.
-6. En la pestaña **Events**, espere a **CREATE_COMPLETE**.
-7. En la pestaña **Outputs**, copie la nueva URL del ALB.
-8. Ábrala en el navegador. La guía del taller debe cargarse de nuevo —el ambiente
+5. Avanzar por las pantallas, aceptar las capacidades de IAM, y pulsar **Submit**.
+6. En la pestaña **Events**, esperar a **CREATE_COMPLETE**.
+7. En la pestaña **Outputs**, copiar la nueva URL del ALB.
+8. Abrirla en el navegador. La guía del taller debe cargarse de nuevo —el ambiente
     está completamente restaurado.
 :::
 

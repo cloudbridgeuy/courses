@@ -2,10 +2,10 @@
 title = "Preguntas puente"
 +++
 
-Estas preguntas cierran la sesión presencial y abren la remota. Piénselas mientras lo
-visto hoy está fresco: leyó el template y actualizó el stack con un change set. No busque
-las respuestas de inmediato; intente razonarlas desde lo que hizo. Al comenzar la
-sesión remota, las discutimos antes de seguir con buenas prácticas y contenedores.
+Estas preguntas cierran la sesión presencial y abren la remota. Conviene pensarlas mientras
+lo visto hoy está fresco: se leyó el template y se actualizó el stack con un change set. No
+buscar las respuestas de inmediato; intentar razonarlas desde lo que se hizo. Al comenzar la
+sesión remota, se discuten antes de seguir con buenas prácticas y contenedores.
 
 :::slide
 ## Preguntas puente
@@ -20,18 +20,18 @@ sesión remota, las discutimos antes de seguir con buenas prácticas y contenedo
 
 ## Pregunta 1
 
-Cambió el `DesiredCount` de su servicio con un change set. ¿Qué pasaría si, en cambio,
-lo cambiara a mano desde la consola de ECS? ¿Qué pensaría CloudFormation del estado de
-su stack?
+Se cambió el `DesiredCount` del servicio con un change set. ¿Qué pasaría si, en cambio,
+se lo cambiara a mano desde la consola de ECS? ¿Qué pensaría CloudFormation del estado del
+stack?
 
 ::: solucion
-El cambio surtiría efecto —ECS pondría a correr el número de tareas que indique— pero el
+El cambio surtiría efecto —ECS pondría a correr el número de tareas indicado— pero el
 **template y la realidad dejarían de coincidir**. Eso es *drift*. CloudFormation seguiría
 creyendo que `DesiredCount` es el valor de la última actualización aplicada por el stack,
 porque no se entera de los cambios hechos por fuera.
 
 El problema aparece en la siguiente actualización del stack: CloudFormation podría
-revertir su cambio manual sin avisar, al aplicar el valor del template. La herramienta
+revertir el cambio manual sin avisar, al aplicar el valor del template. La herramienta
 **Detect drift** existe justamente para detectar estas diferencias. La regla práctica:
 si un recurso lo gestiona un stack, cámbielo solo a través del stack.
 :::
@@ -40,7 +40,7 @@ si un recurso lo gestiona un stack, cámbielo solo a través del stack.
 
 ## Pregunta 2
 
-Su servicio mantiene dos tareas en ejecución. Si una de ellas se cae, ¿quién arranca una
+El servicio mantiene dos tareas en ejecución. Si una de ellas se cae, ¿quién arranca una
 nueva, y cómo sabe esa tarea nueva qué imagen ejecutar?
 
 ::: solucion
@@ -60,12 +60,12 @@ sección.
 
 ## Pregunta 3
 
-Si borra su stack de CloudFormation, ¿sobreviven los datos guardados en la tabla de
+Si se borra el stack de CloudFormation, ¿sobreviven los datos guardados en la tabla de
 DynamoDB? ¿Por qué?
 
 ::: solucion
 Con el template tal como está, **no**: la tabla la creó y la gestiona el stack, así que
-al borrar el stack se borra la tabla y, con ella, sus datos.
+al borrar el stack se borra la tabla y, con ella, los datos.
 
 Esto se puede cambiar. CloudFormation permite declarar en un recurso una
 `DeletionPolicy: Retain`, que le indica conservar ese recurso aunque se borre el stack.

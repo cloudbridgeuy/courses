@@ -8,7 +8,7 @@ title = "Anatomía de un template — CloudFormation"
 ## De la caja negra al código
 
 La Semana 1 terminó con la aplicación en línea, desplegada a partir de un archivo que
-tratamos como una caja negra: `taller-semana1.yaml`. Esta semana abrimos esa caja.
+tratamos como una caja negra: `taller-semana1.yaml`. Esta semana se abre esa caja.
 
 El objetivo no es memorizar la sintaxis de CloudFormation, sino **saber leer un
 template**: reconocer qué describe, encontrar dónde se define cada recurso, y entender
@@ -53,19 +53,19 @@ aparecen según lo que el template necesite.
 | `Mappings` | Tablas de búsqueda fijas (por ejemplo, una AMI distinta por región). |
 | `Conditions` | Reglas que activan o desactivan recursos según los parámetros. |
 
-En la Semana 1 ya interactuó con tres de ellas sin saberlo: completó un **parámetro**
-(el URI de la imagen), y leyó un **output** (la URL del ALB) que el template expuso al
+En la Semana 1 ya se interactuó con tres de ellas sin saberlo: se completó un **parámetro**
+(el URI de la imagen), y se leyó un **output** (la URL del ALB) que el template expuso al
 llegar a `CREATE_COMPLETE`.
 
 ## Recursos: nombre lógico y nombre físico
 
 Cada recurso dentro de `Resources` tiene un **nombre lógico** (*logical ID*): el
-identificador que usted le da dentro del template. CloudFormation, al crear el recurso,
+identificador que se le da dentro del template. CloudFormation, al crear el recurso,
 le asigna además un **nombre físico**: el identificador real en AWS.
 
 ```yaml
 Resources:
-  TablaApp:                          # nombre lógico (lo elige usted)
+  TablaApp:                          # nombre lógico (se elige en el template)
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: taller-datos        # nombre físico (opcional)
@@ -73,7 +73,7 @@ Resources:
 ```
 
 El nombre lógico (`TablaApp`) es cómo el resto del template se refiere a este recurso.
-El nombre físico (`taller-datos`) es cómo aparece en la consola de DynamoDB. Si no
+El nombre físico (`taller-datos`) es cómo aparece en la consola de DynamoDB. Si no se
 especifica un nombre físico, CloudFormation genera uno único automáticamente —una
 práctica habitual, porque evita colisiones de nombres al lanzar el mismo template
 varias veces.

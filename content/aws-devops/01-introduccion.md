@@ -31,7 +31,7 @@ Código → Build → Test → Deploy → Monitor
 1. Crear el repositorio, clonarlo desde su origen y subir el código a CodeCommit
 2. Construir la imagen con CodeBuild
 3. Publicar la imagen en ECR
-4. Desplegar el template de CloudFormation para su despliegue inicial
+4. Desplegar el template de CloudFormation para el despliegue inicial
 
 Cada ejercicio incluye su solución oculta — botón **Ver solución** en la guía.
 :::
@@ -46,7 +46,7 @@ Cada ejercicio incluye su solución oculta — botón **Ver solución** en la gu
 
 Durante cuatro semanas se desplegará y operará una aplicación web real de principio a fin,
 sobre infraestructura de AWS. No se trata de ejercicios aislados: cada sesión avanza un paso
-concreto de la misma historia. Al terminar la Semana 4, contaremos con un flujo completo
+concreto de la misma historia. Al terminar la Semana 4, se contará con un flujo completo
 para el despliegue de una aplicación, desde su desarrollo hasta su operación:
 
 **CodeCommit → CodeBuild → ECR → ECS → CloudWatch**
@@ -74,10 +74,10 @@ Una sola historia a lo largo de cuatro semanas:
 ## Semana 1
 
 La primera semana establece los cimientos que el resto del taller supone conocidos. Al
-terminar la sesión del viernes contaremos con:
+terminar la sesión del viernes se contará con:
 
 - Un **repositorio de código** en CodeCommit, con el código de la aplicación ya cargado.
-- Un **pipeline de integración continua** en CodeBuild que, cada vez que lo ejecuta,
+- Un **pipeline de integración continua** en CodeBuild que, cada vez que se ejecuta,
   compila la imagen y la publica en Amazon ECR.
 - La **aplicación en línea**: accesible desde el navegador a través de un Application
   Load Balancer, desplegada con un template de CloudFormation provisto por el instructor,
@@ -91,8 +91,8 @@ la Semana 2.
 ## El seguro del taller
 
 ::: warning
-En caso de que su sistema no funcione, utilizaremos CloudFormation para reiniciar
-el estado de su `pod`, eliminando todos los recursos, para luego volverlos a crear.
+En caso de que el sistema no funcione, se utilizará CloudFormation para reiniciar
+el estado del `pod`, eliminando todos los recursos, para luego volverlos a crear.
 :::
 :::
 
@@ -108,9 +108,9 @@ minutos de espera.
 :::slide
 ## El mecanismo de recuperación
 
-Desde el primer día practicamos **destruir y recrear** el ambiente completo.
+Desde el primer día se practica **destruir y recrear** el ambiente completo.
 
-Si algo sale mal: borre el stack de CloudFormation, espere a que termine, y vuelva a
+Si algo sale mal: borrar el stack de CloudFormation, esperar a que termine, y volver a
 lanzarlo con los mismos parámetros. El costo de un error se reduce a minutos de espera.
 :::
 
@@ -121,22 +121,22 @@ siempre el mismo:
 
 1. **Teoría** (10–15 min): el instructor presenta el problema del día y el servicio de
    AWS que lo resuelve. El instructor utilizará diapositivas directamente conectadas a
-   esta guía, por lo que puede seguir al instructor en cualquiera de las dos vistas.
-2. **Práctica guiada**: siga los pasos numerados en la guía. Intente cada ejercicio por
-   su cuenta antes de revelar la solución.
-3. **Solución oculta**: si se atasca, pulse el botón **Ver solución** bajo cada ejercicio.
-   Aparecerán los clics exactos. Al final de cada sesión todos los participantes quedan
-   en el mismo punto.
+   esta guía, por lo que se puede seguir al instructor en cualquiera de las dos vistas.
+2. **Práctica guiada**: seguir los pasos numerados en la guía. Intentar cada ejercicio
+   antes de revelar la solución.
+3. **Solución oculta**: si se producen bloqueos, pulsar el botón **Ver solución** bajo
+   cada ejercicio. Aparecerán los clics exactos. Al final de cada sesión todos los
+   participantes quedan en el mismo punto.
 4. **Preguntas puente**: al terminar la sesión del miércoles (presencial), aparecen dos
    o tres preguntas que conectan lo construido con lo que viene el viernes (remota).
-   Piénselas antes de la siguiente sesión.
+   Pensarlas antes de la siguiente sesión.
 
 :::slide
 ## ¿Cómo utilizar esta guía?
 
 1. **Teoría** — el problema del día y el servicio de AWS que lo resuelve.
-2. **Práctica guiada** — siga los pasos numerados; intente antes de ver la solución.
-3. **Solución oculta** — pulse **Ver solución** si se atasca.
+2. **Práctica guiada** — seguir los pasos numerados; intentar antes de ver la solución.
+3. **Solución oculta** — pulsar **Ver solución** si se producen bloqueos.
 4. **Preguntas puente** — conectan el miércoles (presencial) con el viernes (remota).
 :::
 
@@ -151,10 +151,10 @@ siempre el mismo:
 
 ## Requisitos previos
 
-Antes de comenzar, confirme que cuenta con lo siguiente:
+Antes de comenzar, confirmar que se cuenta con lo siguiente:
 
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation, ECS y
-  Fargate, y DynamoDB. Si no está seguro, consulte con el instructor.
+  Fargate, y DynamoDB. En caso de duda, consultar con el instructor.
 - **Navegador web** actualizado (Chrome o Firefox recomendados).
 - **Template de CloudFormation** `taller-semana1.yaml`, también provisto por el
-  instructor. La usará en la sección 4.
+  instructor. Se utiliza en la sección 4.

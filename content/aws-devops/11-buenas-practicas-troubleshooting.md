@@ -17,16 +17,16 @@ buen nombre hace legible cada conexión.
 
 ### Dejar que AWS genere los nombres físicos
 
-Salvo que tenga una razón concreta, no fije el nombre físico de un recurso (`TableName`,
-`RoleName`, etc.). Si lo deja sin especificar, CloudFormation genera uno único. Esto
+Salvo que haya una razón concreta, no se fija el nombre físico de un recurso (`TableName`,
+`RoleName`, etc.). Si se deja sin especificar, CloudFormation genera uno único. Esto
 evita un problema común: lanzar el mismo template dos veces y que falle porque el nombre
 físico ya existe.
 
 ### Parámetros con valores por defecto
 
 Un parámetro con `Default` documenta el valor habitual y permite lanzar el stack sin
-tener que completarlo cada vez. Reserve los parámetros sin default para lo que de verdad
-cambia entre lanzamientos —como el `ImageUri` de su template.
+tener que completarlo cada vez. Se reservan los parámetros sin default para lo que de verdad
+cambia entre lanzamientos —como el `ImageUri` del template.
 
 ```yaml
 Parameters:
@@ -39,7 +39,7 @@ Parameters:
 ### `DeletionPolicy` para lo que no debe perderse
 
 Por defecto, borrar un stack borra todos sus recursos. Para los que guardan datos —una
-tabla, un bucket— eso puede ser un desastre. `DeletionPolicy: Retain` le indica a
+tabla, un bucket— eso puede ser un desastre. `DeletionPolicy: Retain` indica a
 CloudFormation conservar el recurso aunque se borre el stack.
 
 ```yaml
@@ -49,18 +49,18 @@ CloudFormation conservar el recurso aunque se borre el stack.
 ```
 
 ::: warning
-Nunca modifique a mano, desde la consola, un recurso que gestiona un stack. El template
+Nunca modificar a mano, desde la consola, un recurso que gestiona un stack. El template
 y la realidad dejan de coincidir —eso es *drift*— y la próxima actualización del stack
-puede revertir su cambio sin avisar. Si un recurso lo gestiona un stack, cámbielo solo a
+puede revertir el cambio sin avisar. Si un recurso lo gestiona un stack, cambiarlo solo a
 través del stack.
 :::
 
 ### Los outputs son un contrato
 
 La sección `Outputs` es la interfaz pública del stack: lo que expone para que otros lo
-usen. La URL del ALB es un output porque alguien —usted, otro stack, un script— necesita
-ese valor sin tener que entrar a buscarlo. Trate los outputs como un contrato: nómbrelos
-con claridad y exponga lo que realmente se consume desde afuera.
+usen. La URL del ALB es un output porque alguien —otro stack, un script, una persona— necesita
+ese valor sin tener que entrar a buscarlo. Los outputs son un contrato: se nombran
+con claridad y se expone lo que realmente se consume desde afuera.
 
 :::inline-slide light
 ## Buenas prácticas, en una línea
@@ -103,9 +103,9 @@ trámite, era CloudFormation pidiendo permiso explícito para crear roles de IAM
 :::slide
 ## Leer un fallo
 
-1. Abra la pestaña **Events**.
-2. Busque el **primer** evento `..._FAILED`.
-3. Lea su *status reason* — esa es la causa.
+1. Abrir la pestaña **Events**.
+2. Buscar el **primer** evento `..._FAILED`.
+3. Leer el *status reason* — esa es la causa.
 
 El resto de los eventos del rollback son consecuencias.
 :::

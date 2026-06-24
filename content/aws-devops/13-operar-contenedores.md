@@ -7,14 +7,14 @@ title = "Operar el workload — red, escalado y fallas"
 
 ## De entender a operar
 
-La Semana 2 terminó con el ambiente entendido: sabe leer el template, actualizar el
-stack, y reconocer el clúster, la task definition, y el servicio. Esta semana lo
+La Semana 2 terminó con el ambiente entendido: se lee el template, se actualiza el
+stack, y se reconocen el clúster, la task definition, y el servicio. Esta semana se
 **opera**. Tres preguntas guían la sesión: ¿cómo llega el tráfico al contenedor?, ¿cómo
-crece el sistema cuando hay más carga?, y ¿qué hace cuando una tarea no arranca?
+crece el sistema cuando hay más carga?, y ¿qué ocurre cuando una tarea no arranca?
 
 ## El camino del tráfico
 
-Cuando alguien abre la URL de su aplicación, la petición atraviesa una cadena de
+Cuando se abre la URL de la aplicación, la petición atraviesa una cadena de
 recursos antes de llegar al contenedor. Conocer esa cadena es lo que permite diagnosticar
 dónde se corta cuando algo falla.
 
@@ -41,7 +41,7 @@ flowchart LR
 
 - El **ALB** recibe el tráfico HTTP en el puerto 80, en subredes públicas.
 - El **listener** define en qué puerto escucha el ALB y a qué *target group* reenvía.
-- El **target group** agrupa los destinos —sus tareas— y verifica su salud.
+- El **target group** agrupa los destinos —las tareas— y verifica su salud.
 - La **tarea** corre en una subred, con un **grupo de seguridad** que permite el tráfico
   del ALB hacia el puerto del contenedor.
 
@@ -63,10 +63,10 @@ En la Semana 2 cambió `DesiredCount` a mano. En producción la carga varía, y 
 manualmente no escala. El **auto scaling** del servicio ajusta el número de tareas según
 una métrica.
 
-La forma más común es **target tracking**: usted fija un objetivo —por ejemplo, "mantén
+La forma más común es **target tracking**: se fija un objetivo —por ejemplo, "mantener
 el uso de CPU promedio en 50%"— y ECS agrega o quita tareas para sostenerlo. Si la CPU
-sube por encima del objetivo, lanza más tareas; si baja, las reduce, sin bajar de un
-mínimo que usted define.
+sube por encima del objetivo, lanza más tareas; si baja, las reduce, sin bajar del
+mínimo definido.
 
 :::slide
 ## Auto scaling por seguimiento de objetivo
@@ -94,8 +94,8 @@ Cuando una tarea termina inesperadamente, aparece en la lista de tareas **deteni
 | `Task failed ELB health checks` | La tarea corre pero no pasa el health check; el ALB la da de baja. |
 
 La regla de diagnóstico: una tarea detenida siempre tiene un `stoppedReason`, y cuando
-ese motivo apunta a la aplicación, la respuesta está en sus **logs** —el grupo de
-CloudWatch Logs que identificó en la Semana 2.
+ese motivo apunta a la aplicación, la respuesta está en los **logs** —el grupo de
+CloudWatch Logs identificado en la Semana 2.
 
 :::slide
 ## Por qué falla una tarea
@@ -110,39 +110,39 @@ CloudWatch Logs que identificó en la Semana 2.
 
 ### Definir la política
 
-1. Abra [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
-2. En la pestaña **Configuration and tasks**, busque **Service auto scaling** y pulse
+1. Abrir [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
+2. En la pestaña **Configuration and tasks**, buscar **Service auto scaling** y pulsar
    **Update**.
-3. Active **Service auto scaling**, y fije el número **mínimo** de tareas en `1` y el
+3. Activar **Service auto scaling**, y fijar el número **mínimo** de tareas en `1` y el
    **máximo** en `4`.
-4. Agregue una política de tipo **Target tracking**, métrica
+4. Agregar una política de tipo **Target tracking**, métrica
    **ECSServiceAverageCPUUtilization**, con un valor objetivo de `50`.
-5. Guarde los cambios.
+5. Guardar los cambios.
 
 ### Verificar los destinos sanos
 
-1. Abra [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:) y seleccione el target group de su aplicación.
-2. En la pestaña **Targets**, confirme que sus tareas aparecen como **healthy**. Estos
+1. Abrir [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:) y seleccionar el target group de la aplicación.
+2. En la pestaña **Targets**, confirmar que las tareas aparecen como **healthy**. Esos
    son los destinos a los que el ALB reparte el tráfico.
 
 ---
 
 {#ejercicio-10}
-### Ejercicio 10 — Configure el escalado y verifique la salud
+### Ejercicio 10 — Configurar el escalado y verificar la salud
 
-Configure auto scaling para su servicio con seguimiento de CPU (objetivo 50%, mínimo 1,
-máximo 4 tareas). Luego, en el target group del ALB, confirme que sus tareas están
+Configurar auto scaling para el servicio con seguimiento de CPU (objetivo 50%, mínimo 1,
+máximo 4 tareas). Luego, en el target group del ALB, confirmar que las tareas están
 registradas como sanas.
 
 ::: solucion
-1. Abra [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
-2. En **Configuration and tasks → Service auto scaling**, pulse **Update**.
-3. Active el auto scaling; fije **mínimo 1**, **máximo 4**.
-4. Agregue una política **Target tracking** sobre
-   **ECSServiceAverageCPUUtilization** con objetivo **50**. Guarde.
-5. Abra [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:), seleccione el target group de su aplicación, y abra la
+1. Abrir [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
+2. En **Configuration and tasks → Service auto scaling**, pulsar **Update**.
+3. Activar el auto scaling; fijar **mínimo 1**, **máximo 4**.
+4. Agregar una política **Target tracking** sobre
+   **ECSServiceAverageCPUUtilization** con objetivo **50**. Guardar.
+5. Abrir [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:), seleccionar el target group de la aplicación, y abrir la
    pestaña **Targets**.
-6. Confirme que las tareas aparecen con estado **healthy** —son los destinos activos
+6. Confirmar que las tareas aparecen con estado **healthy** —son los destinos activos
    detrás del balanceador.
 :::
 

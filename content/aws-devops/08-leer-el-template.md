@@ -4,12 +4,12 @@ title = "Leer el template paso a paso"
 
 ## El template de la Semana 1, por dentro
 
-Ya conoce las secciones de un template. Ahora va a recorrer el archivo real que desplegó
-su aplicación, `taller-semana1.yaml`, recurso por recurso, y conectar cada bloque con lo
-que vio en la consola la semana pasada.
+Ya se conocen las secciones de un template. Ahora se recorre el archivo real que desplegó
+la aplicación, `taller-semana1.yaml`, recurso por recurso, conectando cada bloque con lo
+que se vio en la consola la semana pasada.
 
-Abra el archivo `taller-semana1.yaml` en su editor de texto —es el mismo que subió a
-CloudFormation. Lo leeremos de arriba hacia abajo.
+Abrir el archivo `taller-semana1.yaml` en el editor de texto —es el mismo que se subió a
+CloudFormation. Se leerá de arriba hacia abajo.
 
 ## El encabezado y los parámetros
 
@@ -25,8 +25,8 @@ Parameters:
     Description: URI de la imagen en ECR, con etiqueta.
 ```
 
-Aquí está el parámetro que usted completó al crear el stack: `ImageUri`. Es el único
-valor que el template no puede conocer por sí solo —depende de la imagen que su build
+Aquí está el parámetro que se completó al crear el stack: `ImageUri`. Es el único
+valor que el template no puede conocer por sí solo —depende de la imagen que el build
 publicó en ECR— y por eso se pide al lanzarlo.
 
 ## La tabla de DynamoDB
@@ -45,7 +45,7 @@ Resources:
           KeyType: HASH
 ```
 
-Este es el recurso que vio en **DynamoDB → Tables**. Note que no tiene `TableName`:
+Este es el recurso que se vio en **DynamoDB → Tables**. Note que no tiene `TableName`:
 CloudFormation le asignó un nombre físico generado, lo que permite lanzar el template
 varias veces sin colisiones.
 
@@ -66,7 +66,7 @@ varias veces sin colisiones.
 
 Aquí aparece la primera función intrínseca importante: `Cluster: !Ref ClusterApp`
 conecta el servicio con el clúster creado más arriba, sin escribir su nombre a mano.
-Lo mismo `TaskDefinition: !Ref TareaApp`. Estos son los recursos que vio en
+Lo mismo `TaskDefinition: !Ref TareaApp`. Estos son los recursos que se vieron en
 **ECS → Clusters**: el clúster, y dentro de él el servicio con su tarea en estado
 `RUNNING`.
 
@@ -86,7 +86,7 @@ Lo mismo `TaskDefinition: !Ref TareaApp`. Estos son los recursos que vio en
             - ContainerPort: 8080
 ```
 
-Esta es la pieza clave: `Image: !Ref ImageUri` es donde el URI que usted pegó al lanzar
+Esta es la pieza clave: `Image: !Ref ImageUri` es donde el URI pegado al lanzar
 el stack se convierte en la imagen que ejecuta el contenedor. El parámetro del
 encabezado llega hasta aquí a través de una sola función intrínseca.
 
@@ -104,7 +104,7 @@ Outputs:
     Value: !Sub "http://${BalanceadorApp.DNSName}"
 ```
 
-El output `ALBUrl` es el valor que copió de la pestaña **Outputs**. La función `!Sub`
+El output `ALBUrl` es el valor que se copió de la pestaña **Outputs**. La función `!Sub`
 construye la URL completa insertando el atributo `DNSName` del balanceador —un valor que
 solo existe una vez que AWS crea el ALB.
 
@@ -112,30 +112,30 @@ solo existe una vez que AWS crea el ALB.
 Por claridad, los bloques anteriores omiten los grupos de seguridad, los roles de IAM,
 el *listener* del ALB, el *target group*, y la configuración de red (subredes, VPC). El
 archivo real los incluye: cada uno aparece como un recurso más en `Resources`, conectado
-a los demás con `!Ref` y `!GetAtt`. En la sección de buenas prácticas verá cómo navegar
+a los demás con `!Ref` y `!GetAtt`. En la sección de buenas prácticas se verá cómo navegar
 un template largo sin perderse.
 :::
 
 ---
 
 {#ejercicio-7}
-### Ejercicio 7 — Siga el rastro de la imagen
+### Ejercicio 7 — Seguir el rastro de la imagen
 
-Abra `taller-semana1.yaml` y siga el recorrido del URI de la imagen: desde el parámetro
+Abrir `taller-semana1.yaml` y seguir el recorrido del URI de la imagen: desde el parámetro
 que lo recibe, hasta el recurso que finalmente lo usa para ejecutar el contenedor.
-Identifique el nombre del parámetro, la función intrínseca que lo transporta, y el
+Identificar el nombre del parámetro, la función intrínseca que lo transporta, y el
 recurso de destino.
 
 ::: solucion
 1. En la sección `Parameters`, el parámetro se llama **`ImageUri`** (tipo `String`).
-   Es el valor que pegó al crear el stack.
-2. En la sección `Resources`, busque el recurso de tipo
+   Es el valor que se pegó al crear el stack.
+2. En la sección `Resources`, buscar el recurso de tipo
    `AWS::ECS::TaskDefinition` (llamado `TareaApp`).
 3. Dentro de `ContainerDefinitions`, la propiedad **`Image: !Ref ImageUri`** es donde
    el parámetro se usa. La función **`!Ref`** devuelve el valor del parámetro y lo
    asigna como imagen del contenedor.
 4. El recorrido completo es: `Parameters.ImageUri` → `!Ref ImageUri` →
-   `TareaApp.ContainerDefinitions[0].Image`. Un único `!Ref` conecta lo que usted
+   `TareaApp.ContainerDefinitions[0].Image`. Un único `!Ref` conecta lo que se
    escribió al lanzar el stack con la imagen que ejecuta Fargate.
 :::
 

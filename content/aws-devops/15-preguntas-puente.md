@@ -2,15 +2,15 @@
 title = "Preguntas puente"
 +++
 
-Estas preguntas cierran la sesión presencial y abren la remota. Hoy operó el workload
-—red, escalado, fallas— y vio qué es un pipeline. Piénselas antes de la sesión remota,
-donde construirá el pipeline, lo conectará a las notificaciones, y abrirá la
+Estas preguntas cierran la sesión presencial y abren la remota. En la sesión de hoy se operó el workload
+—red, escalado, fallas— y se vio qué es un pipeline. Conviene reflexionarlas antes de la sesión remota,
+donde se construye el pipeline, se conecta a las notificaciones, y se abre la
 observabilidad.
 
 :::slide
 ## Preguntas puente
 
-1. ¿Qué etapas necesitaría el pipeline de tu aplicación, y en qué orden?
+1. ¿Qué etapas necesitaría el pipeline de la aplicación, y en qué orden?
 2. ¿Dónde agrega valor una aprobación manual, y dónde solo estorba?
 3. Cuando el build termina, ¿quién debería enterarse y por qué medio?
 :::
@@ -19,7 +19,7 @@ observabilidad.
 
 ## Pregunta 1
 
-Para automatizar el flujo que hoy hace a mano, ¿qué etapas necesitaría un pipeline de su
+Para automatizar el flujo que hoy se hace a mano, ¿qué etapas necesitaría un pipeline de la
 aplicación, y en qué orden?
 
 ::: solucion
@@ -27,8 +27,8 @@ Tres etapas, en este orden:
 
 1. **Source** — obtener el código desde CodeCommit. Es lo que dispara el pipeline: un
    commit nuevo en la rama vigilada.
-2. **Build** — ejecutar su proyecto de CodeBuild, que construye la imagen Docker y la
-   publica en ECR (el `buildspec.yml` que ya conoce).
+2. **Build** — ejecutar el proyecto de CodeBuild, que construye la imagen Docker y la
+   publica en ECR (el `buildspec.yml` correspondiente).
 3. **Deploy** — actualizar el servicio de ECS para que tome la nueva imagen.
 
 El orden no es arbitrario: cada etapa consume el artefacto de la anterior. No se puede
@@ -40,7 +40,7 @@ hoy manualmente, ahora descrita una vez.
 
 ## Pregunta 2
 
-¿Dónde, en ese flujo, agregaría valor una aprobación manual? ¿Y dónde solo lo haría más
+¿Dónde, en ese flujo, agrega valor una aprobación manual? ¿Y dónde solo lo haría más
 lento sin aportar nada?
 
 ::: solucion
@@ -62,9 +62,9 @@ delante de los pasos internos y repetibles.
 Cuando el build termina —en éxito o en error— ¿quién debería enterarse, y por qué medio?
 
 ::: solucion
-Debería enterarse **el equipo**, por el canal donde ya conversa —en esta organización,
+Debe enterarse **el equipo**, por el canal donde ya conversa —en esta organización,
 **Microsoft Teams**— sin tener que mirar la consola. Un build exitoso confirma que el
-cambio avanzó; uno fallido necesita atención rápida, y cuanto antes se vea, antes se
+cambio avanzó; uno fallido necesita atención rápida, y cuanto antes se detecte, antes se
 corrige.
 
 El mecanismo que lo hace posible es el que adelantamos en la Semana 1: el evento del

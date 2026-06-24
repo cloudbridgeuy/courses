@@ -5,7 +5,7 @@ title = "Container Insights y trazabilidad"
 ## Más detalle, y cómo conectarlo
 
 Las métricas básicas dicen cómo está el servicio en conjunto. Pero cuando algo falla, la
-pregunta suele ser más fina: ¿qué tarea consume de más?, ¿desde cuándo?, ¿qué decía su
+pregunta suele ser más fina: ¿qué tarea consume de más?, ¿desde cuándo?, ¿qué decía el
 log en ese momento? Esta sección agrega el detalle (**Container Insights**) y la
 disciplina para conectarlo (**trazabilidad**): seguir un síntoma desde la métrica hasta
 la línea de log que lo explica.
@@ -77,16 +77,16 @@ método de troubleshooting operacional que el taller deja como herramienta.
 
 ### Activar Container Insights
 
-1. Abra [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccione su clúster.
-2. En **Update cluster**, active **Container Insights**. Guarde.
-3. Tras unos minutos, abra [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccione su
-   clúster: verá las métricas por servicio y por tarea.
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
+2. En **Update cluster**, activar **Container Insights**. Guardar.
+3. Tras unos minutos, abrir [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccionar el
+   clúster: se verán las métricas por servicio y por tarea.
 
 ### Recorrer un hilo
 
-1. En Container Insights, observe la CPU **por tarea** de su servicio.
-2. Anote la ventana de tiempo de cualquier pico (o del período reciente).
-3. Abra [**Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccione el grupo de logs del contenedor, y consulte las
+1. En Container Insights, observar la CPU **por tarea** del servicio.
+2. Anotar la ventana de tiempo de cualquier pico (o del período reciente).
+3. Abrir [**Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccionar el grupo de logs del contenedor, y consultar las
    líneas de esa ventana:
 
    ```
@@ -95,27 +95,27 @@ método de troubleshooting operacional que el taller deja como herramienta.
    | limit 50
    ```
 
-4. Lea qué hacía la aplicación en ese intervalo. Acaba de recorrer el hilo de la métrica
+4. Leer qué hacía la aplicación en ese intervalo. Con esto se recorre el hilo de la métrica
    al log.
 
 ---
 
 {#ejercicio-15}
-### Ejercicio 15 — Active Insights y siga un hilo
+### Ejercicio 15 — Activar Insights y seguir un hilo
 
-Active Container Insights en su clúster. Luego recorra el camino completo: observe la CPU
-por tarea de su servicio, identifique una ventana de tiempo, y lea en Logs Insights las
+Activar Container Insights en el clúster. Luego recorrer el camino completo: observar la CPU
+por tarea del servicio, identificar una ventana de tiempo, y leer en Logs Insights las
 líneas del contenedor en esa ventana.
 
 ::: solucion
-1. Abra [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home), seleccione su clúster, y en **Update cluster**
-   active **Container Insights**. Guarde.
-2. Espere unos minutos; abra [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccione
-   su clúster.
-3. Observe la métrica de **CPU por tarea** de su servicio y anote una ventana de tiempo
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home), seleccionar el clúster, y en **Update cluster**
+   activar **Container Insights**. Guardar.
+2. Esperar unos minutos; abrir [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccionar
+   el clúster.
+3. Observar la métrica de **CPU por tarea** del servicio y anotar una ventana de tiempo
    reciente.
-4. Abra [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccione el grupo de logs del
-   contenedor, y ejecute:
+4. Abrir [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccionar el grupo de logs del
+   contenedor, y ejecutar:
 
    ```
    fields @timestamp, @message
@@ -123,7 +123,7 @@ líneas del contenedor en esa ventana.
    | limit 50
    ```
 
-5. Lea las líneas del intervalo: recorrió el camino de la métrica (qué tarea, cuándo) al
+5. Leer las líneas del intervalo: se recorrió el camino de la métrica (qué tarea, cuándo) al
    log (qué hacía). Ese es el método de diagnóstico operacional.
 :::
 

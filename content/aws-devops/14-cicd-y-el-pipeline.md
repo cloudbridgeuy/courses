@@ -4,8 +4,8 @@ title = "CI/CD y el rol de un pipeline"
 
 ## Lo que ya hace a mano
 
-A lo largo del taller construyó, sin nombrarlo, un flujo de entrega completo. Cada vez
-que cambia el código, hoy ejecuta a mano una secuencia: subir el commit a CodeCommit,
+A lo largo del taller se construyó, sin nombrarlo, un flujo de entrega completo. Cada vez
+que cambia el código, hoy se ejecuta a mano una secuencia: subir el commit a CodeCommit,
 lanzar el build en CodeBuild, esperar la imagen en ECR, y actualizar el servicio de ECS
 para que tome la nueva imagen.
 
@@ -70,6 +70,6 @@ falla cuando falla?
 4. ¿En qué **etapa** falla?
 :::
 
-En la próxima sesión construirá un pipeline que automatiza el flujo que hoy hace a mano:
-Source desde CodeCommit, Build con su proyecto de CodeBuild, y Deploy hacia ECS, con una
+En la próxima sesión se construye un pipeline que automatiza el flujo que hoy se hace a mano:
+Source desde CodeCommit, Build con el proyecto de CodeBuild, y Deploy hacia ECS, con una
 aprobación manual antes de desplegar.
