@@ -11,6 +11,9 @@ scenario console, for hands-on AWS workshops. Multiple courses live as content u
 | Lint everything (fmt, check, clippy, test, builtin checks) | `cargo xtask lint` |
 | Apply fixes | `cargo xtask lint --fix` |
 | Run the server | `cargo run -p courses_server` |
+| Run the local dev stack (requires Docker or Podman) | `cargo xtask dev` |
+
+`cargo xtask dev` reads `.env` (copy from `.env.example`) and needs Docker or Podman.
 
 `cargo xtask` requires the globally installed `cargo-xtask` wrapper (from the
 forgeguard repo). Fallback: `cargo run -p xtask -- lint`.

@@ -4,6 +4,7 @@
 //! globally installed `cargo-xtask` wrapper, or directly with
 //! `cargo run -p xtask -- <command>`.
 
+mod dev;
 mod lint;
 
 use clap::{Parser, Subcommand};
@@ -20,11 +21,15 @@ struct App {
 enum Commands {
     /// Run the lint pipeline: fmt, check, clippy, test, builtin checks.
     Lint(lint::LintArgs),
+    /// Start the full local dev stack (DynamoDB Local + server).
+    Dev(dev::DevArgs),
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     color_eyre::install()?;
     match App::parse().command {
         Commands::Lint(args) => lint::run(&args),
+        Commands::Dev(args) => dev::run(args).await,
     }
 }

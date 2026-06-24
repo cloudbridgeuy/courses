@@ -6,9 +6,11 @@
 //! side-effecting handler logic (DynamoDB reads/writes, CPU burst workers) and
 //! exposes a single `dispatch` entry point for the server.
 
+mod dev;
 mod error;
 mod handlers;
 
+pub use dev::{dev_dynamo_client, ensure_table};
 pub use error::{Error, Result};
 
 use std::sync::Arc;

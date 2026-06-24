@@ -44,7 +44,7 @@ aws-config = { version = "1.8", default-features = false, features = ["rustls", 
 aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["rustls"] }
 
 axum = "0.8"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 color-eyre = "0.6"
 duct = "0.13"
 serde = { version = "1", features = ["derive"] }
