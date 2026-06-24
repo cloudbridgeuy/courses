@@ -549,4 +549,93 @@
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Custom element: <cb-metric>
+  // Attributes: mode ("emf" | "api"), label
+  // ---------------------------------------------------------------------------
+
+  customElements.define(
+    "cb-metric",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (!this._rendered) {
+          this._rendered = true;
+
+          this._method = this.getAttribute("mode") === "api" ? "api" : "emf";
+          var label = this.getAttribute("label") || "Enviar métrica";
+
+          this._input = document.createElement("input");
+          this._input.type = "number";
+          this._input.min = "0";
+          this._input.max = "100";
+          this._input.step = "1";
+          this._input.value = "42";
+          this._input.className = "cb-app-input";
+
+          this._btn = makeAppBtn(label);
+          this._status = document.createElement("span");
+          this._status.className = "cb-app-status";
+
+          this.appendChild(this._input);
+          this.appendChild(this._btn);
+          this.appendChild(this._status);
+
+          this._btn.addEventListener("click", () => {
+            var n = Math.round(Number(this._input.value));
+            if (!isFinite(n)) {
+              this._status.textContent = "Valor inválido";
+              return;
+            }
+            n = Math.max(0, Math.min(100, n));
+            var id = uuid();
+            this._btn.disabled = true;
+            this._status.textContent = "Enviando…";
+            cbEvents
+              .emit(
+                id,
+                "metric",
+                JSON.stringify({ value: n, method: this._method })
+              )
+              .then((code) => {
+                if (code === 202) {
+                  this._status.textContent = "Enviado";
+                } else if (code === 403) {
+                  this._status.textContent = "";
+                  this._btn.disabled = false;
+                  handleForbidden();
+                } else {
+                  this._status.textContent = "Error (" + code + ")";
+                  this._btn.disabled = false;
+                }
+              })
+              .catch(() => {
+                this._status.textContent = "Error de red";
+                this._btn.disabled = false;
+              });
+          });
+        }
+
+        registerLockable(this);
+
+        this._statusListener = (envelope) => {
+          if (
+            typeof envelope.id === "string" &&
+            envelope.id.indexOf("status-metric-submitted") === 0
+          ) {
+            this._status.textContent = envelope.payload || "";
+            this._btn.disabled = false;
+          }
+        };
+        appStatusListeners.push(this._statusListener);
+      }
+
+      disconnectedCallback() {
+        unregisterLockable(this);
+        var idx = appStatusListeners.indexOf(this._statusListener);
+        if (idx !== -1) appStatusListeners.splice(idx, 1);
+        this._statusListener = null;
+      }
+    }
+  );
 })();

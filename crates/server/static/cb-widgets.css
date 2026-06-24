@@ -35,6 +35,13 @@
   opacity: 0.85;
 }
 
+.cb-app-input {
+  width: 5rem;
+  margin-right: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  font: inherit;
+}
+
 .cb-app-status,
 .cb-app-value {
   display: inline-block;
