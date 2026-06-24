@@ -170,6 +170,8 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
         .route("/favicon.ico", get(favicon))
         .route("/hooks/notifications", post(notifications_hook))
         .route("/events", post(events_hook))
+        .route("/events/config", get(events_config))
+        .route("/events/verify", get(events_verify))
         .route("/events/stream", get(events_stream))
         .route("/state/{collection}/{key}", get(state_read))
         .route("/health", get(health))
@@ -289,6 +291,23 @@ async fn events_hook(
         Outcome::Accepted => StatusCode::ACCEPTED.into_response(),
         Outcome::Unknown => StatusCode::OK.into_response(),
         Outcome::Denied => StatusCode::FORBIDDEN.into_response(),
+    }
+}
+
+/// Client-facing apps config. Currently only advertises whether handlers are
+/// gated, so the client knows whether to show the instructor unlock form.
+async fn events_config(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "gated": state.apps.gate.requires_secret() }))
+}
+
+/// Validates an instructor secret without dispatching anything. The unlock
+/// modal calls this before storing the secret, so a wrong value never unlocks
+/// the UI. Returns 204 on match, 403 otherwise.
+async fn events_verify(State(state): State<AppState>, Query(auth): Query<AppSecret>) -> StatusCode {
+    if state.apps.gate.accepts(auth.secret.as_deref()) {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::FORBIDDEN
     }
 }
 
