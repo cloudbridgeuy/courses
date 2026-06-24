@@ -197,67 +197,186 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Unlock UI — small fixed panel letting an instructor paste the secret
+  // Lock state — when the server gates handlers and no secret is stored, app
+  // widgets render dimmed with a lock symbol. Clicking a locked widget opens
+  // the unlock modal.
   // ---------------------------------------------------------------------------
 
-  function insertUnlockControl() {
-    if (document.getElementById("cb-unlock-panel")) return;
+  var gated = false;            // server reports CB_APPS_SECRET is set
+  var lockables = [];           // registered app host elements
 
-    var panel = document.createElement("div");
-    panel.id = "cb-unlock-panel";
-    panel.setAttribute("aria-label", "Panel de acceso instructor");
-    panel.innerHTML =
-      '<button id="cb-unlock-toggle" type="button" aria-label="Configurar secreto de instructor">🔑</button>' +
-      '<div id="cb-unlock-form" hidden>' +
+  function isLocked() {
+    return gated && !getSecret();
+  }
+
+  function applyLockTo(el) {
+    el.classList.toggle("cb-app-locked", isLocked());
+  }
+
+  function applyLockState() {
+    lockables.forEach(applyLockTo);
+  }
+
+  function registerLockable(el) {
+    if (lockables.indexOf(el) === -1) lockables.push(el);
+    applyLockTo(el);
+  }
+
+  function unregisterLockable(el) {
+    var idx = lockables.indexOf(el);
+    if (idx !== -1) lockables.splice(idx, 1);
+  }
+
+  // Delegated, capture-phase: a click anywhere inside a locked widget opens the
+  // modal instead of reaching the widget's own handlers.
+  document.addEventListener(
+    "click",
+    function (e) {
+      if (!isLocked()) return;
+      var locked = e.target.closest && e.target.closest(".cb-app-locked");
+      if (locked) {
+        e.preventDefault();
+        e.stopPropagation();
+        openUnlockModal();
+      }
+    },
+    true
+  );
+
+  // ---------------------------------------------------------------------------
+  // Unlock modal — centered overlay letting an instructor paste the secret
+  // ---------------------------------------------------------------------------
+
+  function buildUnlockModal() {
+    if (document.getElementById("cb-unlock-overlay")) return;
+
+    var overlay = document.createElement("div");
+    overlay.id = "cb-unlock-overlay";
+    overlay.hidden = true;
+    overlay.innerHTML =
+      '<div id="cb-unlock-modal" role="dialog" aria-modal="true" aria-label="Acceso instructor">' +
+        '<button type="button" id="cb-unlock-close" aria-label="Cerrar">×</button>' +
+        '<h3 id="cb-unlock-title">🔒 Contenido bloqueado</h3>' +
+        '<p id="cb-unlock-desc">Ingresa el secreto de instructor para habilitar las apps.</p>' +
         '<label for="cb-unlock-input">Secreto:</label>' +
         '<input id="cb-unlock-input" type="password" placeholder="Ingresa el secreto" autocomplete="off">' +
-        '<button type="button" id="cb-unlock-save">Guardar</button>' +
-        '<button type="button" id="cb-unlock-clear">Limpiar</button>' +
+        '<div id="cb-unlock-actions">' +
+          '<button type="button" id="cb-unlock-save">Guardar</button>' +
+          '<button type="button" id="cb-unlock-clear">Limpiar</button>' +
+        '</div>' +
         '<span id="cb-unlock-status"></span>' +
       '</div>';
-    document.body.appendChild(panel);
+    document.body.appendChild(overlay);
 
-    var toggleBtn = document.getElementById("cb-unlock-toggle");
-    var form      = document.getElementById("cb-unlock-form");
-    var input     = document.getElementById("cb-unlock-input");
-    var saveBtn   = document.getElementById("cb-unlock-save");
-    var clearBtn  = document.getElementById("cb-unlock-clear");
-    var status    = document.getElementById("cb-unlock-status");
-
-    input.value = getSecret();
-    status.textContent = getSecret() ? "✓ Secreto activo" : "";
-
-    toggleBtn.addEventListener("click", function () {
-      form.hidden = !form.hidden;
-      if (!form.hidden) input.focus();
-    });
+    var modal    = document.getElementById("cb-unlock-modal");
+    var closeBtn = document.getElementById("cb-unlock-close");
+    var input    = document.getElementById("cb-unlock-input");
+    var saveBtn  = document.getElementById("cb-unlock-save");
+    var clearBtn = document.getElementById("cb-unlock-clear");
+    var status   = document.getElementById("cb-unlock-status");
 
     saveBtn.addEventListener("click", function () {
       var v = input.value.trim();
-      setSecret(v);
-      status.textContent = v ? "✓ Secreto activo" : "Secreto borrado";
-      form.hidden = true;
+      if (!v) {
+        setSecret("");
+        applyLockState();
+        status.textContent = "Secreto borrado";
+        return;
+      }
+      // Validate against the server before storing — a wrong value must not unlock.
+      saveBtn.disabled = true;
+      status.textContent = "Verificando…";
+      fetch("/events/verify?secret=" + encodeURIComponent(v))
+        .then(function (r) {
+          saveBtn.disabled = false;
+          if (r.status === 204) {
+            setSecret(v);
+            applyLockState();
+            status.textContent = "✓ Secreto activo";
+            closeUnlockModal();
+          } else {
+            setSecret("");
+            applyLockState();
+            status.textContent = "✗ Secreto incorrecto";
+          }
+        })
+        .catch(function () {
+          saveBtn.disabled = false;
+          status.textContent = "✗ Error de red";
+        });
     });
 
     clearBtn.addEventListener("click", function () {
       input.value = "";
       setSecret("");
+      applyLockState();
       status.textContent = "Secreto borrado";
     });
 
     input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") saveBtn.click();
-      if (e.key === "Escape") {
-        form.hidden = true;
-      }
+      if (e.key === "Escape") closeUnlockModal();
+    });
+
+    closeBtn.addEventListener("click", closeUnlockModal);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) closeUnlockModal();
+    });
+    modal.addEventListener("click", function (e) {
+      e.stopPropagation();
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", insertUnlockControl);
-  } else {
-    insertUnlockControl();
+  function openUnlockModal() {
+    buildUnlockModal();
+    var overlay = document.getElementById("cb-unlock-overlay");
+    var input   = document.getElementById("cb-unlock-input");
+    var status  = document.getElementById("cb-unlock-status");
+    input.value = getSecret();
+    status.textContent = getSecret() ? "✓ Secreto activo" : "";
+    overlay.hidden = false;
+    input.focus();
   }
+
+  function closeUnlockModal() {
+    var overlay = document.getElementById("cb-unlock-overlay");
+    if (overlay) overlay.hidden = true;
+  }
+
+  // Re-lock and prompt when the server rejects a stored secret as wrong.
+  function handleForbidden() {
+    setSecret("");
+    applyLockState();
+    openUnlockModal();
+    var status = document.getElementById("cb-unlock-status");
+    if (status) status.textContent = "✗ Secreto incorrecto";
+  }
+
+  // Validates a stored secret against the server; clears it if rejected.
+  // Resolves once lock state can be applied authoritatively.
+  function validateStoredSecret() {
+    var stored = getSecret();
+    if (!stored) return Promise.resolve();
+    return fetch("/events/verify?secret=" + encodeURIComponent(stored))
+      .then(function (r) {
+        if (r.status !== 204) setSecret("");
+      })
+      .catch(function () {
+        // On a network error, fail closed: drop the unverified secret.
+        setSecret("");
+      });
+  }
+
+  // Learn whether handlers are gated, drop any stale/wrong stored secret, then
+  // reflect lock state on any registered widgets.
+  fetch("/events/config")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (cfg) {
+      gated = !!(cfg && cfg.gated);
+      if (!gated) return applyLockState();
+      return validateStoredSecret().then(applyLockState);
+    })
+    .catch(function () {});
 
   // ---------------------------------------------------------------------------
   // Shared helper: create the standard app button
@@ -308,8 +427,9 @@
                 if (code === 202) {
                   this._status.textContent = "En curso…";
                 } else if (code === 403) {
-                  this._status.textContent = "🔒 Bloqueado: ingresa el secreto";
+                  this._status.textContent = "";
                   this._btn.disabled = false;
+                  handleForbidden();
                 } else {
                   this._status.textContent = "Error (" + code + ")";
                   this._btn.disabled = false;
@@ -321,6 +441,8 @@
               });
           });
         }
+
+        registerLockable(this);
 
         this._statusListener = (envelope) => {
           if (
@@ -335,6 +457,7 @@
       }
 
       disconnectedCallback() {
+        unregisterLockable(this);
         var idx = appStatusListeners.indexOf(this._statusListener);
         if (idx !== -1) appStatusListeners.splice(idx, 1);
         this._statusListener = null;
@@ -384,22 +507,15 @@
           }
 
           if (this._btn) {
+            // Only interactive (emitting) counters get locked; a view-only
+            // counter reads the open /state endpoint and stays visible.
+            registerLockable(this);
             this._btn.addEventListener("click", () => {
               var id = uuid();
               cbEvents
                 .emit(id, "counter", JSON.stringify({ key: this._key }))
                 .then((code) => {
-                  if (code !== 403) return;
-                  // No local value display in increment-only mode: flash the button.
-                  if (this._valueDisplay) {
-                    this._valueDisplay.textContent = "🔒 Bloqueado: ingresa el secreto";
-                  } else {
-                    var prev = this._btn.textContent;
-                    this._btn.textContent = "🔒 Bloqueado";
-                    setTimeout(() => {
-                      this._btn.textContent = prev;
-                    }, 2000);
-                  }
+                  if (code === 403) handleForbidden();
                 })
                 .catch(function () {});
             });
@@ -425,6 +541,7 @@
       }
 
       disconnectedCallback() {
+        unregisterLockable(this);
         if (!this._statusListener) return;
         var idx = appStatusListeners.indexOf(this._statusListener);
         if (idx !== -1) appStatusListeners.splice(idx, 1);
