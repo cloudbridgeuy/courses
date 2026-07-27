@@ -84,6 +84,12 @@ alone — `touch crates/server/src/content.rs` before `cargo build -p courses_se
 ### Conventions
 
 - **CloudFormation term: `template`** (Spanish masc., "el template"), not "plantilla".
+- **Register: impersonal manual** (2026-07). Course prose avoids first person and
+  direct address ("se crea el repositorio", not "vas a crear" / "creamos"). All 21
+  files of `content/aws-devops/` were rewritten to this register; keep new content
+  consistent with it.
+- **Console-action links** point at the window they act on — see
+  `.claude/context/content-authoring.md`.
 - **Bridge questions** (`preguntas-puente`) split each 5 h week into two sessions
   (presencial + remota); they sit mid-week, not as a trailing module. The 3 h week
   (Week 4) is single-session, no bridge.
@@ -143,22 +149,39 @@ Week 3.
 ### Apps event contract
 
 Generic, app-agnostic event bus for in-guide interactive scenarios (**built**
-2026-06-23). Browser custom elements emit typed events to their own pod's server;
+2026-06-23; metric/toast-demo handlers and the validating lock UI added 2026-07).
+Browser custom elements emit typed events to their own pod's server;
 the server runs gated side-effecting handlers and broadcasts feedback on a unified
 SSE bus.
 
 - **Envelope**: `Event { id, type, payload }` — same struct both directions.
 - **Endpoints**:
   - `POST /events` — parse → dedup → gate → dispatch; 202/200/403/400.
+  - `GET /events/config` — reports whether a secret is configured (`{ gated }`).
+  - `GET /events/verify?secret=` — validates a secret; 204 match / 403 mismatch.
   - `GET /events/stream` — unified SSE bus (unauthenticated, read-only).
   - `GET /state/{collection}/{key}` — read-only DynamoDB query side.
 - **Env vars**: `CB_APPS_SECRET` (gate unlock), `CB_APPS_GATED` (`"all"` or kind
-  list), `CB_APPS_TABLE` (DynamoDB table, default `courses-apps`),
-  `CB_APPS_PUBLIC_COLLECTIONS` (default `counters`).
-- **Crates**: pure logic in `courses_core::events`; I/O (DynamoDB, CPU load, handler
-  dispatch) in the new `courses_apps` crate; routes wired in `courses_server`.
-- **Client**: `static/apps.js` — `<cb-cpu-burst>`, `<cb-counter>`, unlock UI,
-  multiplexed `EventSource`. Loaded when `uses_apps` flag is set (via `:::app`).
+  list — `cpu-burst,counter,metric,toast-demo`), `CB_APPS_TABLE` (DynamoDB table,
+  default `courses-apps`), `CB_APPS_PUBLIC_COLLECTIONS` (default `counters`).
+- **Crates**: pure logic in `courses_core::events`; I/O (DynamoDB, CloudWatch, CPU
+  load, handler dispatch) in the `courses_apps` crate; routes wired in
+  `courses_server`.
+- **Handlers**: `cpu-burst`, `counter`, `metric`, `toast-demo`.
+  - `metric` publishes to namespace `Taller/Custom` by one of two methods
+    (dimension `method`): **EMF** — a structured log line on stdout, no SDK call
+    and no extra IAM, works locally; or **API** — a real `PutMetricData` call,
+    needs `cloudwatch:PutMetricData` on the ECS task role and real credentials.
+  - `toast-demo` broadcasts a demo `Notification` on the bus, so a guide preview
+    toast renders through the exact path real SNS events use. No AWS call.
+- **Client**: `static/apps.js` — `<cb-cpu-burst>`, `<cb-counter>`, `<cb-metric>`,
+  `<cb-toast-demo>`, lock UI, multiplexed `EventSource`. Loaded when `uses_apps`
+  flag is set (via `:::app`).
+- **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
+  behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
+  against `/events/verify` before storing it in `sessionStorage`. A stored secret
+  is re-validated on load and cleared if rejected — fails closed. View-only
+  widgets (e.g. a `mode="view"` counter) read open `/state` and stay visible.
 - **Notifications folded in**: notifications arrive on `/events/stream` as
   `Event{type:"notification"}`. The old `/hooks/stream` route is **retired**.
 - Topic guide: `.claude/context/apps-events.md`.
