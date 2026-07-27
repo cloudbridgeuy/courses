@@ -12,6 +12,7 @@ scenario console, for hands-on AWS workshops. Multiple courses live as content u
 | Apply fixes | `cargo xtask lint --fix` |
 | Run the server | `cargo run -p courses_server` |
 | Run the local dev stack (requires Docker or Podman) | `cargo xtask dev` |
+| Prune stale build artifacts from `target/` | `cargo xtask clean` |
 
 `cargo xtask dev` reads `.env` (copy from `.env.example`) and needs Docker or Podman.
 

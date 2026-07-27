@@ -19,6 +19,30 @@
 - `cargo xtask lint` before declaring done; silent unless failing, full log at
   `target/xtask-lint.log`. `cargo xtask lint --fix` applies rustfmt fixes.
 
+## Keeping `target/` small
+
+`target/` grows past 5 GB within weeks. Debug info is *not* the cause: the
+workspace already sets `[profile.dev] debug = 0` (and `[profile.release]
+debug = 0`), which emits no debug info at all, for dependencies as well as
+workspace crates. The widely-shared `debug = "line-tables-only"` /
+`split-debuginfo = "unpacked"` tip would therefore *increase* the size here —
+do not apply it. The real drivers are stale artifacts from old dependency
+versions and the incremental-compilation cache.
+
+`cargo xtask clean` prunes them. It needs `cargo install cargo-sweep`.
+
+| Command | Effect |
+|---------|--------|
+| `cargo xtask clean` | Drops artifacts untouched for 7+ days |
+| `cargo xtask clean --days 3` | Same, with a tighter threshold |
+| `cargo xtask clean --incremental` | Also wipes `target/*/incremental` |
+| `cargo xtask clean --all` | `cargo clean` — nukes `target/` entirely |
+| `cargo xtask clean --dry-run` | Reports what would go, deletes nothing |
+
+Every run prints the target size before and after. `--incremental` costs a full
+recompile of the workspace crates on the next build, so reach for it only when
+the age-based sweep is not enough.
+
 ## Repo hygiene
 
 - Plans and designs (`.claude/plans/`, `.claude/designs/`) stay OUT of git.
