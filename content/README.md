@@ -1,9 +1,12 @@
 # Content authoring guide
 
 Course content lives here. Each course occupies one subdirectory named by its slug
-(lowercase-kebab, e.g. `aws-devops/`). Content is embedded at compile time — run
-`cargo xtask lint` (or rebuild the server) to pick up any changes. Broken content
-fails the embedded-content test and aborts server boot.
+(lowercase-kebab, e.g. `aws-devops/`). Content is embedded at compile time, so an
+ordinary `cargo run -p courses_server` needs a rebuild to pick up an edit; dev mode
+reads it from disk instead, and reloads the open page on save (see "Picking up your
+edits" below). Broken content fails the embedded-content test and aborts server
+boot; in dev mode it turns every page into a 500 naming the file, and the next
+successful save restores it.
 
 ## Directory layout
 
@@ -121,8 +124,9 @@ where N increments from 1 across all sections.
 ## Assets
 
 `/static/guide.css` is always included on every page. `/static/toggle.js` is
-auto-injected when any section in a session uses a solution block (per-session). Both are
-embedded in the binary; no external files are served.
+auto-injected when any section in a session uses a solution block (per-session). Both
+ship inside the binary; no external files are served. Dev mode re-reads both from disk
+on every request, so a styling edit shows up on the next refresh.
 
 ## Minimal example section
 
@@ -147,7 +151,7 @@ Cree un repositorio llamado `taller-aws-<su-nombre>`.
 :::
 ```
 
-## Rebuild reminder
+## Picking up your edits
 
 Content is compiled into the binary. After editing any file here, rebuild with:
 
@@ -160,5 +164,15 @@ or run the full lint gate:
 ```sh
 cargo xtask lint
 ```
+
+To skip the rebuild while authoring, run the server in dev mode instead. It reads
+`content/` from disk and reloads the open page on save:
+
+```sh
+cargo xtask dev                                # + DynamoDB Local, for the apps widgets
+CB_DEV_ROOT=$PWD cargo run -p courses_server   # without Docker
+```
+
+Details in `.claude/context/dev-workflow.md`.
 
 A frontmatter or manifest error prints the file name and reason, then aborts.

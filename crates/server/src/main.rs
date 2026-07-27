@@ -3,22 +3,38 @@
 //! Imperative shell: axum server for the courses platform.
 
 mod content;
+mod dev;
 mod routes;
+mod site;
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 
 use color_eyre::eyre::{Result, WrapErr};
+use tokio::sync::broadcast;
+
+use crate::routes::DevCtx;
+use crate::site::{SiteHandle, SiteState};
 
 const DEFAULT_PORT: u16 = 8080;
 
+/// Environment variable holding the repository root. Its presence turns on dev
+/// mode: content and text assets come from disk, and a watcher hot reloads them.
+const DEV_ROOT_ENV: &str = "CB_DEV_ROOT";
+
+/// Buffer of pending reload signals per browser before a slow client lags.
+const RELOAD_CHANNEL_CAPACITY: usize = 16;
+
 /// Runtime configuration, parsed once at the process boundary.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Config {
     port: u16,
+    /// Repository root when dev mode is on, `None` in production.
+    dev_root: Option<PathBuf>,
 }
 
 impl Config {
-    /// Reads `PORT` from the environment; absent means [`DEFAULT_PORT`].
+    /// Reads `PORT`, and `CB_DEV_ROOT`, from the environment.
     fn from_env() -> Result<Self> {
         let port = match std::env::var("PORT") {
             Ok(raw) => raw
@@ -27,7 +43,15 @@ impl Config {
             Err(std::env::VarError::NotPresent) => DEFAULT_PORT,
             Err(e) => return Err(e).wrap_err("PORT is not valid unicode"),
         };
-        Ok(Self { port })
+        let dev_root = match std::env::var(DEV_ROOT_ENV) {
+            // An empty value means the same as absent, so clearing the variable
+            // in a shell script does not half-enable dev mode.
+            Ok(raw) if raw.trim().is_empty() => None,
+            Ok(raw) => Some(PathBuf::from(raw.trim())),
+            Err(std::env::VarError::NotPresent) => None,
+            Err(e) => return Err(e).wrap_err(format!("{DEV_ROOT_ENV} is not valid unicode")),
+        };
+        Ok(Self { port, dev_root })
     }
 }
 
@@ -41,14 +65,49 @@ async fn main() -> Result<()> {
         .init();
 
     let config = Config::from_env()?;
-    let site = std::sync::Arc::new(content::load_site()?);
+
+    // `_watcher` must outlive the server: dropping the notify watcher ends the
+    // watch, and hot reload stops silently.
+    let (site, dev_ctx, _watcher) = match config.dev_root.as_deref() {
+        Some(root) => {
+            tracing::warn!(
+                root = %root.display(),
+                "{DEV_ROOT_ENV} is set: content and text assets are served from disk with hot \
+                 reload. Never enable this in production."
+            );
+            // Bad content here leaves the server running with `Broken`, so it can
+            // be fixed with the server running; a watcher that fails to start is
+            // a fatal configuration error, handled below.
+            let site = SiteHandle::new(dev::load_from_disk(root));
+            let (reload, _rx) = broadcast::channel::<()>(RELOAD_CHANNEL_CAPACITY);
+            let watcher = dev::spawn_watcher(root.to_path_buf(), site.clone(), reload.clone())
+                .wrap_err_with(|| {
+                    format!(
+                        "failed to watch {DEV_ROOT_ENV}={}: it must point at the repository root",
+                        root.display()
+                    )
+                })?;
+            let ctx = DevCtx {
+                reload,
+                root: root.to_path_buf(),
+            };
+            (site, Some(ctx), Some(watcher))
+        }
+        // Production: bad content aborts startup, same as before dev mode existed.
+        None => (
+            SiteHandle::new(SiteState::Ready(content::load_site()?)),
+            None,
+            None,
+        ),
+    };
+
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .wrap_err_with(|| format!("failed to bind {addr}"))?;
     tracing::info!("listening on http://{addr}");
 
-    axum::serve(listener, routes::router(site).await)
+    axum::serve(listener, routes::router(site, dev_ctx).await)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .wrap_err("server error")?;

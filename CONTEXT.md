@@ -78,8 +78,10 @@ CodePipeline → CloudWatch**.
 authored.**
 
 **Note:** new content files are not served until added to a `[[session]]` in
-`content/<course>/course.toml`, and `include_dir!` does not re-embed on new files
-alone — `touch crates/server/src/content.rs` before `cargo build -p courses_server`.
+`content/<course>/course.toml`, in either mode. On the embedded path, `include_dir!`
+also does not re-embed on new files alone — `touch crates/server/src/content.rs`
+before `cargo build -p courses_server`. Dev mode reads the directory on every
+reload, so it needs neither step.
 
 ### Conventions
 
@@ -209,5 +211,20 @@ SSE bus.
 - Run: `cargo run -p courses_server`; local dev port `8090`.
 - **Content and static assets are embedded at build time** (`include_dir!` for
   `content/`, `include_str!` for CSS/JS). Any content/CSS/JS change requires
-  `cargo build -p courses_server` before it is served.
+  `cargo build -p courses_server` before it is served. This production path is
+  unaffected by dev mode below — unchanged behavior, bad content still aborts
+  startup.
 - Lint gate before done: `cargo xtask lint` (fallback `cargo run -p xtask -- lint`).
+
+### Dev mode / hot reload
+
+- **`CB_DEV_ROOT`** (repo root; trimmed, empty counts as absent) switches the
+  server to read `content/` and six text assets (`guide.css`, `slides.css`,
+  `cb-widgets.css`, `apps.js`, `toggle.js`, `mermaid-init.js`) from disk, with a
+  `notify` watcher that hot reloads on save. `cargo xtask dev` sets it
+  automatically; `CB_DEV_ROOT=$PWD cargo run -p courses_server` is the
+  Docker-free equivalent. Deliberately excluded from `.env.example` (a
+  machine-specific absolute path).
+- **`GET /dev/reload`** — dev-only SSE route the browser client
+  (`static/dev-reload.js`) subscribes to; answers 404 in production.
+- Topic guide: `.claude/context/dev-workflow.md`.

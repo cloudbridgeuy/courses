@@ -8,6 +8,7 @@
 mod assets;
 mod catalog;
 mod course;
+mod dev;
 mod error;
 mod events;
 mod manifest;
@@ -24,6 +25,7 @@ pub use assets::{
 };
 pub use catalog::{CourseInput, LoadedCourse, parse_course};
 pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
+pub use dev::{DEV_RELOAD_SCRIPT_TAG, TextAsset, is_reload_trigger, text_asset, with_dev_script};
 pub use error::{Error, Result};
 pub use events::{
     CpuBurstConfig, Decision, Event, EventId, Gate, GateConfig, HandlerKind, Intensity,

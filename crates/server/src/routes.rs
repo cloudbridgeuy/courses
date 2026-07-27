@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use axum::Json;
@@ -10,13 +11,15 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use courses_apps::{AppsCtx, Outcome};
 use courses_core::{
-    Event, EventId, Notification, RecentIds, RenderedSite, Seen, SnsMessage, parse_event,
-    parse_gate, parse_sns_message, token_matches,
+    Event, EventId, Notification, RecentIds, Seen, SnsMessage, parse_event, parse_gate,
+    parse_sns_message, token_matches,
 };
 use serde::Deserialize;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
+
+use crate::site::{SiteHandle, SiteState};
 
 const APPS_JS: &str = include_str!("../static/apps.js");
 
@@ -49,14 +52,21 @@ const APPS_TABLE_ENV: &str = "CB_APPS_TABLE";
 /// Environment variable holding a comma-separated whitelist of readable collections.
 const APPS_PUBLIC_COLLECTIONS_ENV: &str = "CB_APPS_PUBLIC_COLLECTIONS";
 
+/// Dev-mode context. `AppState::dev` is `None` in production, which is what
+/// makes `GET /dev/reload` answer 404 there.
+#[derive(Clone)]
+pub struct DevCtx {
+    /// Fires once per completed reload, successful or not.
+    pub reload: broadcast::Sender<()>,
+    /// Repository root, used to read text assets from disk.
+    pub root: PathBuf,
+}
+
 /// Shared handler state.
-///
-/// `FromRef` lets page handlers extract `State<Arc<RenderedSite>>` and SSE
-/// handlers extract `State<broadcast::Sender<Event>>` without receiving the
-/// full `AppState`.
 #[derive(Clone)]
 pub struct AppState {
-    site: Arc<RenderedSite>,
+    site: SiteHandle,
+    dev: Option<DevCtx>,
     hook_token: Option<Arc<String>>,
     apps: AppsCtx,
     recent: Arc<Mutex<RecentIds>>,
@@ -74,9 +84,9 @@ struct AppSecret {
     secret: Option<String>,
 }
 
-impl FromRef<AppState> for Arc<RenderedSite> {
+impl FromRef<AppState> for SiteHandle {
     fn from_ref(state: &AppState) -> Self {
-        Arc::clone(&state.site)
+        state.site.clone()
     }
 }
 
@@ -92,7 +102,7 @@ impl FromRef<AppState> for broadcast::Sender<Event> {
 
 /// Builds the application router. Async because it loads AWS SDK config and
 /// reads environment variables.
-pub async fn router(site: Arc<RenderedSite>) -> Router {
+pub async fn router(site: SiteHandle, dev: Option<DevCtx>) -> Router {
     // --- SNS hook token ---
     let hook_token = std::env::var(HOOK_TOKEN_ENV).ok().map(Arc::new);
     if hook_token.is_none() {
@@ -160,6 +170,7 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
 
     let state = AppState {
         site,
+        dev,
         hook_token,
         apps,
         recent: Arc::new(Mutex::new(RecentIds::with_capacity(RECENT_IDS_CAPACITY))),
@@ -178,6 +189,7 @@ pub async fn router(site: Arc<RenderedSite>) -> Router {
         .route("/events/config", get(events_config))
         .route("/events/verify", get(events_verify))
         .route("/events/stream", get(events_stream))
+        .route("/dev/reload", get(dev_reload))
         .route("/state/{collection}/{key}", get(state_read))
         .route("/health", get(health))
         .with_state(state)
@@ -336,6 +348,23 @@ async fn events_stream(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
+/// Dev-mode reload stream. Answers 404 unless the server runs with
+/// `CB_DEV_ROOT` set, so the route is inert in production.
+async fn dev_reload(State(state): State<AppState>) -> Response {
+    let Some(dev) = &state.dev else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let stream = BroadcastStream::new(dev.reload.subscribe()).filter_map(|message| {
+        // A lagged client simply misses a signal; the next save catches it up.
+        message
+            .ok()
+            .map(|()| Ok::<SseEvent, Infallible>(SseEvent::default().data("reload")))
+    });
+    Sse::new(stream)
+        .keep_alive(KeepAlive::default())
+        .into_response()
+}
+
 /// Read-only state endpoint. Gated by the public-collections whitelist.
 async fn state_read(
     State(state): State<AppState>,
@@ -360,39 +389,88 @@ async fn favicon() -> Response {
     bytes("image/x-icon", FAVICON_ICO)
 }
 
-async fn index(State(site): State<Arc<RenderedSite>>) -> Html<String> {
-    Html(site.index_html.clone())
+async fn index(State(site): State<SiteHandle>) -> Response {
+    match &*site.load() {
+        SiteState::Ready(site) => Html(site.index_html.clone()).into_response(),
+        SiteState::Broken(message) => broken(message),
+    }
 }
 
-async fn course_page(State(site): State<Arc<RenderedSite>>, Path(slug): Path<String>) -> Response {
+async fn course_page(State(site): State<SiteHandle>, Path(slug): Path<String>) -> Response {
     // Pages are keyed by parsed slugs, so any invalid slug simply misses.
     lookup_page(&site, &slug)
 }
 
 async fn session_page(
-    State(site): State<Arc<RenderedSite>>,
+    State(site): State<SiteHandle>,
     Path((slug, session)): Path<(String, String)>,
 ) -> Response {
     lookup_page(&site, &format!("{slug}/{session}"))
 }
 
 async fn slides_page(
-    State(site): State<Arc<RenderedSite>>,
+    State(site): State<SiteHandle>,
     Path((slug, session)): Path<(String, String)>,
 ) -> Response {
     lookup_page(&site, &format!("{slug}/{session}/slides"))
 }
 
-fn lookup_page(site: &RenderedSite, key: &str) -> Response {
-    match site.pages.get(key) {
-        Some(html) => Html(html.clone()).into_response(),
-        None => not_found(site),
+fn lookup_page(site: &SiteHandle, key: &str) -> Response {
+    let state = site.load();
+    if let SiteState::Ready(rendered) = &*state
+        && let Some(html) = rendered.pages.get(key)
+    {
+        return Html(html.clone()).into_response();
+    }
+    not_found(&state)
+}
+
+/// Reports a missing page: a 404 carrying the site's not-found page while the
+/// site is `Ready`, and the broken-site error otherwise.
+fn not_found(state: &SiteState) -> Response {
+    match state {
+        SiteState::Ready(site) => {
+            (StatusCode::NOT_FOUND, Html(site.not_found_html.clone())).into_response()
+        }
+        SiteState::Broken(message) => broken(message),
     }
 }
 
+/// Reports a broken site loudly: an error line in the terminal, and the message
+/// in the browser.
+///
+/// In dev mode this is the authoring error screen. In production the `Broken`
+/// variant is unreachable, because only the dev watcher writes the handle, so
+/// reaching this arm there signals a real defect rather than bad content.
+fn broken(message: &str) -> Response {
+    tracing::error!("serving a broken site: {message}");
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        format!("content failed to load:\n\n{message}\n"),
+    )
+        .into_response()
+}
+
 // The {file} param cannot contain a literal slash (the router rejects it at
-// match time), so path traversal via `..` is impossible here.
-async fn static_file(State(site): State<Arc<RenderedSite>>, Path(file): Path<String>) -> Response {
+// match time), and `text_asset` is a whitelist, so no request can steer a read
+// outside the checked-in static directory.
+async fn static_file(State(state): State<AppState>, Path(file): Path<String>) -> Response {
+    if let Some(dev) = &state.dev
+        && let Some(hot) = courses_core::text_asset(&file)
+    {
+        let path = dev.root.join(hot.repo_path);
+        match std::fs::read_to_string(&path) {
+            Ok(body) => {
+                return ([(header::CONTENT_TYPE, hot.content_type)], body).into_response();
+            }
+            Err(e) => tracing::warn!(
+                "could not read {} ({e}); serving the embedded copy",
+                path.display()
+            ),
+        }
+    }
+
     match file.as_str() {
         "toggle.js" => asset("application/javascript; charset=utf-8", TOGGLE_JS),
         "cb-widgets.css" => asset("text/css; charset=utf-8", CB_WIDGETS_CSS),
@@ -405,10 +483,11 @@ async fn static_file(State(site): State<Arc<RenderedSite>>, Path(file): Path<Str
         "mermaid.min.js" => asset("application/javascript; charset=utf-8", MERMAID_JS),
         "mermaid-init.js" => asset("application/javascript; charset=utf-8", MERMAID_INIT_JS),
         "apps.js" => asset("application/javascript; charset=utf-8", APPS_JS),
+        "dev-reload.js" => asset("application/javascript; charset=utf-8", DEV_RELOAD_JS),
         "montserrat.ttf" => bytes("font/ttf", MONTSERRAT_TTF),
         "cloudbridge.png" => bytes("image/png", CLOUDBRIDGE_PNG),
         "cloudbridge-white.png" => bytes("image/png", CLOUDBRIDGE_WHITE_PNG),
-        _ => not_found(&site),
+        _ => not_found(&state.site.load()),
     }
 }
 
@@ -420,10 +499,6 @@ fn asset(content_type: &'static str, body: &'static str) -> Response {
     ([(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
-fn not_found(site: &RenderedSite) -> Response {
-    (StatusCode::NOT_FOUND, Html(site.not_found_html.clone())).into_response()
-}
-
 const TOGGLE_JS: &str = include_str!("../static/toggle.js");
 const CB_WIDGETS_CSS: &str = include_str!("../static/cb-widgets.css");
 const GUIDE_CSS: &str = include_str!("../static/guide.css");
@@ -432,6 +507,7 @@ const REVEAL_CSS: &str = include_str!("../static/reveal.min.css");
 const SLIDES_CSS: &str = include_str!("../static/slides.css");
 const MERMAID_JS: &str = include_str!("../static/mermaid.min.js");
 const MERMAID_INIT_JS: &str = include_str!("../static/mermaid-init.js");
+const DEV_RELOAD_JS: &str = include_str!("../static/dev-reload.js");
 const FAVICON_ICO: &[u8] = include_bytes!("../static/favicon.ico");
 const FAVICON_PNG: &[u8] = include_bytes!("../static/favicon.png");
 const MONTSERRAT_TTF: &[u8] = include_bytes!("../static/montserrat.ttf");

@@ -144,6 +144,7 @@ pub async fn run(args: DevArgs) -> Result<()> {
     println!(
         "\n[dev] starting server → http://127.0.0.1:{server_port}\n\
          [dev] endpoint={endpoint}  table={}\n\
+         [dev] hot reload on: content/ and crates/server/static/ are served from disk\n\
          [dev] press Ctrl-C to stop\n",
         args.table
     );
@@ -155,6 +156,7 @@ pub async fn run(args: DevArgs) -> Result<()> {
         .env("AWS_ACCESS_KEY_ID", "test")
         .env("AWS_SECRET_ACCESS_KEY", "test")
         .env("CB_APPS_TABLE", &args.table)
+        .env("CB_DEV_ROOT", &root)
         .spawn()
         .wrap_err("failed to spawn courses_server")?;
 

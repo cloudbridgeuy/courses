@@ -8,6 +8,37 @@
 - Session URLs use title slugs, not filenames: discover them with
   `curl -s localhost:8090/ | grep -o 'href="/courses/[^"]*"'`.
 
+## Hot reload (dev mode)
+
+`CB_DEV_ROOT=<repo root>` switches the server off its compile-time embedded
+content and onto disk, with a file watcher that reloads on save.
+
+- `cargo xtask dev` sets it automatically, from the workspace root.
+- Escape hatch without Docker: `CB_DEV_ROOT=$PWD cargo run -p courses_server`.
+  The apps widgets on `17-notificaciones-teams.md` and
+  `18-observabilidad-metrics-logs.md` will not work without DynamoDB Local.
+- Watched: every non-hidden `.md`, `.toml`, `.css`, and `.js` file under
+  `content/` and `crates/server/static/` fires the watcher — there is no
+  filename allowlist, so vendored bundles like `reveal.min.js` and the
+  dev-reload client itself also qualify.
+- Hot-served: content (`*.md`, `course.toml`) is always re-read from disk;
+  static assets are re-read only for the six files in `text_asset`
+  (`guide.css`, `slides.css`, `cb-widgets.css`, `apps.js`, `toggle.js`,
+  `mermaid-init.js`). Everything else — binary assets, `reveal.min.js`,
+  `reveal.min.css`, `mermaid.min.js`, `dev-reload.js` — still triggers a
+  reload notification but keeps serving the embedded copy, so the browser
+  reloads without picking up the edit.
+- Broken content does not stop the server: every page answers 500 with the
+  parse error, and returns to normal on the next successful save.
+- A `CB_DEV_ROOT` the watcher cannot watch is fatal: startup fails naming the
+  variable and the offending path, rather than running without hot reload.
+- The browser reloads over `GET /dev/reload` (SSE), preserving guide scroll
+  through the `cb-dev-scroll` sessionStorage key. Slides keep their position
+  through reveal's `hash:true`.
+- `CB_DEV_ROOT` is absent in production, where `/dev/reload` answers 404 and
+  pages carry no reload client. It is deliberately kept out of `.env.example`,
+  since it is a machine-specific absolute path.
+
 ## Verifying in the browser (Playwright MCP)
 
 - Guides use `scroll-behavior: smooth`: poll `scrollY` until ~5 consecutive identical
@@ -69,6 +100,7 @@ the age-based sweep is not enough.
    - `AWS_ACCESS_KEY_ID=test`
    - `AWS_SECRET_ACCESS_KEY=test`
    - `CB_APPS_TABLE=courses-apps`
+   - `CB_DEV_ROOT=<workspace root>` — turns on hot reload; see above.
    No server code changes are required.
 6. On Ctrl-C: kills the server, then the container guard removes the container.
 
