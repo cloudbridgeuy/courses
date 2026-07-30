@@ -555,6 +555,22 @@
   border-color: var(--cb-teal);
 }
 
+/* Mermaid measures HTML labels in helper elements attached to <body>, which
+   inherit the body font. Reveal only styles .reveal, so without this the
+   labels measure in the browser's serif default and render clipped. */
+body {
+  font-family: "Montserrat", system-ui, sans-serif;
+}
+
+/* While mermaid renders, the deck must sit at scale 1: mermaid sizes labels
+   with getBoundingClientRect, and reveal's scale transform shrinks those
+   measurements, clipping the text. The !important guard holds even if
+   something (e.g. an image load) triggers Reveal.layout() mid-render;
+   mermaid-init.js toggles the class and re-runs layout afterwards. */
+.reveal.cb-mermaid-measure .slides {
+  transform: none !important;
+}
+
 /* Mermaid diagrams on slides: centered, no code-block chrome, bounded to the
    slide box. Authored on light slides (`:::slide light`) for contrast. */
 .reveal pre.mermaid {

@@ -25,6 +25,13 @@
       ".mermaid:not([data-processed])",
     );
     if (!nodes.length) return;
+    // Reveal scales the deck with a CSS transform, which shrinks the
+    // getBoundingClientRect measurements mermaid uses to size HTML labels —
+    // foreignObjects come out scale× too narrow and the text clips. Hold the
+    // deck at scale 1 for the whole render (the CSS class survives mid-render
+    // Reveal.layout() calls); afterRender restores the scaled layout.
+    var deck = window.Reveal ? document.querySelector(".reveal") : null;
+    if (deck) deck.classList.add("cb-mermaid-measure");
     try {
       var result = mermaid.run({ nodes: nodes });
       if (result && typeof result.then === "function") {
@@ -34,6 +41,7 @@
       }
     } catch (e) {
       console.error("mermaid render failed", e);
+      afterRender();
     }
   }
 
@@ -42,6 +50,8 @@
   // Re-run the layout so the grown slide is centered on its real height.
   function afterRender() {
     setupZoom();
+    var deck = window.Reveal ? document.querySelector(".reveal") : null;
+    if (deck) deck.classList.remove("cb-mermaid-measure");
     if (window.Reveal && typeof Reveal.layout === "function") Reveal.layout();
   }
 

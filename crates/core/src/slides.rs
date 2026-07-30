@@ -62,7 +62,9 @@ pub(crate) fn extract_anchors(
             }
             Segment::Info(info) => {
                 if let Some(TailAnchor::Info(name)) = tail_anchor.take()
-                    && anchors.insert(name.clone(), Anchor::Info(info.clone())).is_some()
+                    && anchors
+                        .insert(name.clone(), Anchor::Info(info.clone()))
+                        .is_some()
                 {
                     return Err(Error::DuplicateAnchor(name));
                 }
@@ -326,14 +328,21 @@ mod tests {
 
     #[test]
     fn info_anchor_renders_the_admonition_in_guide_and_slide() {
-        let body = "{#info-flujo}\n::: info\n**PR aprobado.**\n:::\n\n:::slide\n{{info-flujo}}\n:::\n";
+        let body =
+            "{#info-flujo}\n::: info\n**PR aprobado.**\n:::\n\n:::slide\n{{info-flujo}}\n:::\n";
         let result = render_section_body("Sección", body).unwrap();
         assert!(result.html.contains("<div class=\"cb-info\">"));
         assert_eq!(result.slide_html.len(), 1);
-        assert!(result.slide_html[0].html.contains("<div class=\"cb-info\">"));
-        assert!(result.slide_html[0]
-            .html
-            .contains("<strong>PR aprobado.</strong>"));
+        assert!(
+            result.slide_html[0]
+                .html
+                .contains("<div class=\"cb-info\">")
+        );
+        assert!(
+            result.slide_html[0]
+                .html
+                .contains("<strong>PR aprobado.</strong>")
+        );
         assert!(!result.slide_html[0].html.contains("{{info-flujo}}"));
     }
 

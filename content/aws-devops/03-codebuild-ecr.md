@@ -67,27 +67,16 @@ forma privada y segura. Cuando ECS necesite lanzar el contenedor en la Semana 3,
 buscar la imagen directamente a ECR.
 :::
 
-### Flujo Completo
-
-```mermaid
-flowchart LR
-    subgraph repo[CodeCommit]
-        direction TB
-        source[Código fuente]
-        spec[buildspec.yml]
-    end
-
-    build[CodeBuild<br/>entorno administrado]
-    image[[Imagen Docker<br/>artefacto desplegable]]
-    ecr[(Amazon ECR<br/>imagen etiquetada)]
-
-    source -->|fuente| build
-    spec -.->|fases y comandos| build
-    build -->|docker build| image
-    image -->|docker push| ecr
-```
-
 ## Artefactos desplegables: construir una vez, promover muchas veces
+
+:::slide light
+## Artefactos desplegables: construir una vez, promover muchas veces
+
+El objetivo es solo producir el artefacto a desplegar **una vez**, para luego **promoverlo**
+entre ambientes.
+
+{{info-realidad}}
+:::
 
 El resultado de CodeBuild no es solo una imagen Docker: es el **artefacto desplegable**
 que conecta el cambio de código con un despliegue. Debe poder responderse con precisión
@@ -100,103 +89,201 @@ tag de release puede construir la imagen candidata. Cuando esa imagen se aprueba
 otro ambiente, se promueve **el mismo artefacto**, sin reconstruirlo. Así, `staging` y
 producción prueban y ejecutan exactamente los mismos bytes.
 
+{#info-realidad}
+::: info
+La realidad es que no siempre se sigue esta práctica, y lo que termina pasando es
+que se termina reconstruyendo el artefacto en cada fase de su ciclo de vida. Algunas
+veces hay alguna razón para hacerlo, pero otras veces es simplemente un error.
+
+Lo ideal, es que promovamos un mismo artefacto a través de distintos ambientes. Si es
+necesario que se comporte distinto en cada ambiente (se conecte a distintos servicios
+de terceros, bases de datos, nivel de logging, etc.) estos cambios de comportamiento
+deben producirse a través de cambios en su configuración, las cuales puede absorber de
+diversas maneras: variables de entorno, argumentos, archivos de configuración, etc.
+:::
+
 Para lograrlo, conviene identificar las imágenes con una referencia inmutable o
 inequívoca: el SHA del commit, un tag de versión como `v1.4.0`, o el *digest* que ECR
 asigna a la imagen. Una etiqueta mutable como `latest` es cómoda para un laboratorio,
 pero no indica qué versión se está desplegando y puede cambiar entre dos operaciones.
 
-:::inline-slide light
-## El artefacto conecta Git y el despliegue
-
-`commit` o `tag` → validaciones → imagen en ECR → promoción del mismo artefacto
-
-**No se vuelve a construir una imagen para cada ambiente.**
-:::
-
-:::slide
+:::slide light
 ## Del código a la imagen publicada
 
 Ahora que tenemos el código en un lugar que controlamos, tenemos que producir
 el artefacto desplegable de este proyecto: una imagen de contenedor.
 
 ```mermaid
+%%{init: {"flowchart": {"defaultRenderer": "elk", "nodeSpacing": 40, "rankSpacing": 55, "padding": 12}, "themeVariables": {"clusterBkg": "#fdf4ff", "clusterBorder": "#c925d1", "surface0": "#fdf4ff", "border0": "#c925d1", "edgeLabelBackground": "#ffffff"}}}%%
 flowchart LR
-    subgraph repo[CodeCommit]
+    subgraph repo["<img src='/static/aws-codecommit.svg' width='40' height='40' /> CodeCommit"]
         direction TB
-        source[Código fuente]
-        spec[buildspec.yml]
+        source["Código fuente"]
+        spec["buildspec.yml"]
     end
 
-    build[CodeBuild]
-    image[[Imagen Docker]]
-    ecr[(Amazon ECR)]
+    subgraph cb["<img src='/static/aws-codebuild.svg' width='40' height='40' /> CodeBuild"]
+        direction LR
+        dbuild["<img src='/static/docker.svg' width='42' /><br/>docker build"]
+        image[["Imagen Docker"]]
+        dpush["<img src='/static/docker.svg' width='42' /><br/>docker push"]
+        dbuild ==> image ==> dpush
+    end
 
-    source --> build
-    spec -.->|fases y comandos| build
-    build -->|docker build| image
-    image -->|docker push| ecr
+    ecr[("<img src='/static/aws-ecr.svg' width='44' height='44' /><br/>Amazon ECR")]
+
+    source --> dbuild
+    spec -.->|"fases y comandos"| dbuild
+    dpush ==> ecr
+
+    classDef repoNode fill:#ffffff,stroke:#c925d1,color:#4a044e
+    classDef dockerNode fill:#eff8ff,stroke:#2396ed,color:#0c4a6e
+    classDef artifactNode fill:#f1f5f9,stroke:#475569,color:#0f172a
+    classDef ecrNode fill:#fff7ed,stroke:#ed7100,stroke-width:2px,color:#7c2d12
+    class source,spec repoNode
+    class dbuild,dpush dockerNode
+    class image artifactNode
+    class ecr ecrNode
 ```
 :::
 
-## El archivo `buildspec.yml`
+## Nuestro archivo `buildspec.yml`
 
-El archivo `buildspec.yml` está incluido en el `.zip` de la aplicación, en la raíz del
-proyecto. Es el contrato entre el código y CodeBuild: describe exactamente qué comandos
-ejecutar en cada fase del build.
-
-El archivo tiene este aspecto:
+El archivo `buildspec.yml` vive en la raíz del repositorio que se clonó y subió a
+CodeCommit en la sección anterior, junto al `Dockerfile`. Es el contrato entre el
+código y CodeBuild, y usa las cuatro fases:
 
 ```yaml
 version: 0.2
 
 phases:
+  install:
+    commands:
+      - echo Verificando las herramientas del entorno de build...
+      - docker --version
+      - aws --version
   pre_build:
     commands:
       - echo Autenticando con Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION |
-          docker login --username AWS --password-stdin
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - GIT_SHA=$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - GIT_SHA_SHORT=$(printf %.12s "$GIT_SHA")
+      - SOURCE_BRANCH=${SOURCE_BRANCH:-${CODEBUILD_SOURCE_VERSION#refs/heads/}}
+      - BRANCH_TAG=branch-$(printf '%s' "$SOURCE_BRANCH" | tr '/_' '--' | tr -cd '[:alnum:].-')
   build:
     commands:
       - echo Construyendo la imagen Docker...
-      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
-      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $IMAGE_URI:$IMAGE_TAG
+      - |
+        docker build \
+          --label org.opencontainers.image.revision="$GIT_SHA" \
+          --label org.opencontainers.image.source="$CODEBUILD_SOURCE_REPO_URL" \
+          --label com.amazonaws.codebuild.build-arn="$CODEBUILD_BUILD_ARN" \
+          --label com.amazonaws.codebuild.project-arn="$CODEBUILD_PROJECT_ARN" \
+          --label com.amazonaws.codebuild.initiator="$CODEBUILD_INITIATOR" \
+          --label com.amazonaws.codecommit.repository-arn="${CODECOMMIT_REPOSITORY_ARN:-}" \
+          -t "$IMAGE_URI:$IMAGE_TAG" \
+          -t "$IMAGE_URI:$BRANCH_TAG" \
+          -t "$IMAGE_URI:$GIT_SHA_SHORT" \
+          -t "$IMAGE_URI:$GIT_SHA" \
+          .
   post_build:
     commands:
       - echo Publicando la imagen en ECR...
-      - docker push $IMAGE_URI:$IMAGE_TAG
+      - docker push --all-tags $IMAGE_URI
       - echo Build completado.
 ```
 
-Las tres fases y su propósito:
+De más está decir que cada `command` puede invocar cualquier herramienta o script dentro
+del ambiente de CodeBuild, o dentro del repositorio. Los `commands` se ejecutan desde
+un directorio con la revisión de código que disparó el proceso de `build`.
+
+Es común utilizar comandos de `bash` directamente, pero no es necesario. Podemos, por
+ejemplo, ejecutar un `script` de `python` almacenado dentro del repositorio:
+
+```yaml
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+  build:
+    commands:
+      - python --version
+      - python -m pip install -r requirements.txt
+      - python scripts/build_image_metadata.py
+```
+
+Por defecto, el archivo `buildspec.yml` es leído por CodeBuild desde la revisión que lanzó
+el `build`. Esto tiene la ventaja de que podemos probar cambios en el `buildspec.yml` sin
+necesidad de desplegar nada.
+
+Por otro lado, podemos fijarlo si seleccionamos una ruta alternativa como fuente, o
+mediante la opción `buildSpecOverride` al momento de iniciar el build. Colocar una fuente
+externa para el `buildspec.yml` puede ser útil si contamos con un repositorio centralizado
+donde gestionamos las especificaciones de ejecución.
+
+En `install` se confirma que las herramientas del entorno están disponibles. Aquí no
+hay nada que instalar porque la imagen administrada de CodeBuild ya trae Docker y la
+CLI de AWS. En `pre_build` se autentica con ECR para poder empujar la imagen construida
+al repositorio correcto, que se especifica según la cuenta y la región.
+
+::: info
+Es _muy_ común que utilicemos una cuenta para centralizar todas las imágenes de la empresa,
+desde la cual luego se consumen en los demás ambientes.
+:::
+
+Las cuatro fases y su propósito:
 
 | Fase | Propósito |
 |------|-----------|
-| `pre_build` | Preparación: autenticar con ECR para tener permiso de publicar imágenes. |
+| `install` | Preparación del entorno: instalar o verificar las herramientas del build. |
+| `pre_build` | Preparación del trabajo: autenticar con ECR para tener permiso de publicar imágenes. |
 | `build` | Construcción: ejecutar `docker build` y etiquetar la imagen con el URI de ECR. |
 | `post_build` | Publicación: subir la imagen etiquetada al repositorio de ECR. |
 
 Las variables de entorno (`$AWS_ACCOUNT_ID`, `$AWS_DEFAULT_REGION`, `$IMAGE_REPO_NAME`,
 `$IMAGE_TAG`) se definen en el proyecto de CodeBuild, no en el archivo. Esto permite
 reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
+`SOURCE_BRANCH` y `CODECOMMIT_REPOSITORY_ARN` son opcionales: un pipeline puede
+proporcionarlos explícitamente para mantener la trazabilidad incluso cuando el origen
+llega como un commit en lugar de una rama.
 
-::: info
-En este laboratorio se configura `IMAGE_TAG=latest` para simplificar los pasos. En un
-pipeline real, usar el SHA del commit o un tag de release como valor de `IMAGE_TAG`, y
-registrar también el *digest* publicado por ECR. Esas referencias permiten promover la
-misma imagen validada entre Desarrollo, QA y producción.
-:::
+### ¿Por qué estos labels?
 
-:::slide
-## Las tres fases del build
+Los *tags* permiten seleccionar una imagen al publicarla; los *labels* guardan dentro
+de la imagen datos de procedencia que ayudan a reconstruir su historia. Docker los
+almacena como metadatos y pueden inspeccionarse sin cambiar el contenido del artefacto.
 
-| Fase | Propósito |
-| --- | --- |
-| `pre_build` | Autenticar con ECR. |
-| `build` | `docker build` y etiquetar la imagen. |
-| `post_build` | `docker push` a ECR. |
-:::
+El prefijo `org.opencontainers.image` es parte de las [annotations de OCI][oci-annotations].
+OCI (*Open Container Initiative*) define especificaciones abiertas para que las
+imágenes de contenedor puedan ser creadas, almacenadas y ejecutadas por herramientas
+distintas. En particular, `org.opencontainers.image.revision` identifica la revisión
+del control de código y `org.opencontainers.image.source` la URL de su fuente. Usamos
+esas claves estándar para asociar la imagen con el SHA exacto y el repositorio desde el
+que se construyó.
+
+Los labels que empiezan por `com.amazonaws` son metadatos propios: usan un namespace
+de AWS para no chocar con las claves OCI ni con las de otras herramientas. Las
+[variables de entorno de CodeBuild][codebuild-env-vars] proporcionan los valores para
+seguir el recorrido de la imagen:
+
+| Label | Valor | Qué permite identificar |
+| --- | --- | --- |
+| `org.opencontainers.image.revision` | `GIT_SHA` | El commit exacto incluido en la imagen. |
+| `org.opencontainers.image.source` | `CODEBUILD_SOURCE_REPO_URL` | El repositorio desde el que se obtuvo el código. |
+| `com.amazonaws.codebuild.build-arn` | `CODEBUILD_BUILD_ARN` | La ejecución concreta que construyó la imagen. |
+| `com.amazonaws.codebuild.project-arn` | `CODEBUILD_PROJECT_ARN` | El proyecto y su configuración de build. |
+| `com.amazonaws.codebuild.initiator` | `CODEBUILD_INITIATOR` | Quién o qué inició la ejecución, por ejemplo un pipeline. |
+| `com.amazonaws.codecommit.repository-arn` | `CODECOMMIT_REPOSITORY_ARN` | El recurso de CodeCommit que originó el flujo. |
+
+`CODECOMMIT_REPOSITORY_ARN` es una variable definida por el proyecto o por el pipeline;
+CodeBuild no la genera automáticamente. Esta combinación permite partir de una imagen
+en ECR y responder qué commit, repositorio y ejecución la produjeron.
+
+[oci-annotations]: https://specs.opencontainers.org/image-spec/annotations/
+[codebuild-env-vars]: https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html
 
 ## Práctica guiada: crear el repositorio ECR
 
@@ -294,8 +381,10 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
 1. En la vista del proyecto recién creado, pulsar **Start build**.
 2. CodeBuild aprovisiona el entorno y comienza a ejecutar los comandos del
     `buildspec.yml`. La pestaña **Build logs** muestra la salida en tiempo real.
-3. Seguir los logs. Se verán las tres fases: autenticación con ECR, `docker build`, y
-    `docker push`. El proceso tarda entre 2 y 5 minutos la primera vez.
+3. Seguir los logs. Se verán las cuatro fases: verificación de herramientas,
+    autenticación con ECR, `docker build`, y `docker push`. La aplicación se compila
+    dentro del `docker build`, por lo que la primera vez el proceso tarda entre 10 y
+    20 minutos — un buen momento para la discusión guiada.
 4. Al terminar, el estado cambia a **Succeeded** (en verde) o **Failed** (en rojo).
     Si falla, el log indica en qué línea ocurrió el error.
 

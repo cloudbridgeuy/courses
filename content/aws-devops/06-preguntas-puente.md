@@ -28,6 +28,9 @@ CodeBuild lee el archivo `buildspec.yml` desde la raíz del repositorio de CodeC
 y ejecuta los comandos de cada fase en secuencia, dentro de un contenedor efímero
 (un entorno limpio que se destruye al terminar el build):
 
+- **`install`**: prepara el entorno de ejecución. En el `buildspec.yml` del taller,
+  esta fase verifica que Docker y la CLI de AWS estén disponibles — la imagen
+  administrada de CodeBuild ya los trae, así que no hay nada que instalar.
 - **`pre_build`**: se ejecuta antes de la construcción principal. En el `buildspec.yml`
   del taller, esta fase autentica con Amazon ECR usando las credenciales del rol de
   IAM del proyecto. Sin este paso, el `docker push` posterior fallaría por falta de

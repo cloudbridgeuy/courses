@@ -1,0 +1,10 @@
+# Keep the build context small: the image build only needs the workspace
+# sources, content/, and the static assets embedded at compile time.
+target/
+.git/
+.claude/
+.local/
+.playwright-mcp/
+.env
+/*.png
+assets/

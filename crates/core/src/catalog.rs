@@ -452,9 +452,11 @@ mod tests {
         };
 
         let loaded = parse_course(&input).unwrap();
-        assert!(loaded.session_assets[0]
-            .scripts
-            .contains(&SHIKI_INIT_JS_PATH.to_owned()));
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&SHIKI_INIT_JS_PATH.to_owned())
+        );
     }
 
     #[test]

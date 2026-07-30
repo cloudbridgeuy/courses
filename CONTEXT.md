@@ -113,8 +113,9 @@ reload, so it needs neither step.
 | `05-teardown` | Tear down + recreate ("el seguro del taller") · ej. 6 | 30–40 min |
 | `06-preguntas-puente` | 3 bridge questions to Week 2 | 15–20 min |
 
-Active content ≈ 3.5 h; reaches ~5 h counting passive waits (build 2–5 min, stack
-3–8 min, teardown 3–6 min) and discussion. Margin to raise density without padding:
+Active content ≈ 3.5 h; reaches ~5 h counting passive waits (first build 10–20 min —
+the Rust release compile runs inside `docker build` — stack 3–8 min, teardown
+3–6 min) and discussion. Margin to raise density without padding:
 connective theory before building, guided discussion during waits, and a **Teams
 notifications teaser** anchored on the CodeBuild build (full treatment in Week 3).
 
@@ -129,6 +130,11 @@ Week 3.
 
 **Lab parameters.**
 - Lab code source repo: `https://github.com/cloudbridgeuy/courses`.
+- The repo root ships the lab build files (added 2026-07-30): a 4-phase
+  `buildspec.yml` (install verifies tools · pre_build ECR login · build
+  `docker build`+tag · post_build `docker push`) and a multi-stage `Dockerfile`
+  that compiles `courses_server` (content embeds at compile time). The GitHub
+  snapshot must be republished so students actually clone them.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
 - Week-1 CloudFormation template (instructor-provided): `taller-semana1.yaml`.

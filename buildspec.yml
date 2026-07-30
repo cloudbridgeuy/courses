@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Verificando las herramientas del entorno de build...
+      - docker --version
+      - aws --version
+  pre_build:
+    commands:
+      - echo Autenticando con Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - GIT_SHA=$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - GIT_SHA_SHORT=$(printf %.12s "$GIT_SHA")
+      - SOURCE_BRANCH=${SOURCE_BRANCH:-${CODEBUILD_SOURCE_VERSION#refs/heads/}}
+      - BRANCH_TAG=branch-$(printf '%s' "$SOURCE_BRANCH" | tr '/_' '--' | tr -cd '[:alnum:].-')
+  build:
+    commands:
+      - echo Construyendo la imagen Docker...
+      - |
+        docker build \
+          --label org.opencontainers.image.revision="$GIT_SHA" \
+          --label org.opencontainers.image.source="$CODEBUILD_SOURCE_REPO_URL" \
+          --label com.amazonaws.codebuild.build-arn="$CODEBUILD_BUILD_ARN" \
+          --label com.amazonaws.codebuild.project-arn="$CODEBUILD_PROJECT_ARN" \
+          --label com.amazonaws.codebuild.initiator="$CODEBUILD_INITIATOR" \
+          --label com.amazonaws.codecommit.repository-arn="${CODECOMMIT_REPOSITORY_ARN:-}" \
+          -t "$IMAGE_URI:$IMAGE_TAG" \
+          -t "$IMAGE_URI:$BRANCH_TAG" \
+          -t "$IMAGE_URI:$GIT_SHA_SHORT" \
+          -t "$IMAGE_URI:$GIT_SHA" \
+          .
+  post_build:
+    commands:
+      - echo Publicando la imagen en ECR...
+      - docker push --all-tags $IMAGE_URI
+      - echo Build completado.
