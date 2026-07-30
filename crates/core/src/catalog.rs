@@ -1,5 +1,6 @@
 use crate::assets::{
-    APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, TOGGLE_JS_PATH,
+    APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, SHIKI_INIT_JS_PATH,
+    TOGGLE_JS_PATH,
 };
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
@@ -69,6 +70,7 @@ fn assemble_session(
     let mut sections = Vec::with_capacity(entry.sections.len());
     let mut uses_solutions = false;
     let mut uses_mermaid = false;
+    let mut uses_syntax_highlighting = false;
     let mut uses_apps = false;
     let mut all_slides = Vec::new();
 
@@ -86,6 +88,7 @@ fn assemble_session(
 
         uses_solutions |= rendered.uses_solutions;
         uses_mermaid |= rendered.uses_mermaid;
+        uses_syntax_highlighting |= rendered.html.contains("<code class=\"language-");
         uses_apps |= rendered.uses_apps;
         all_slides.extend(rendered.slide_html);
 
@@ -107,6 +110,9 @@ fn assemble_session(
     if uses_mermaid {
         assets.push_script(MERMAID_JS_PATH);
         assets.push_script(MERMAID_INIT_JS_PATH);
+    }
+    if uses_syntax_highlighting {
+        assets.push_script(SHIKI_INIT_JS_PATH);
     }
     if uses_apps {
         assets.push_script(APPS_JS_PATH);
@@ -134,7 +140,7 @@ fn in_file(file: &str, error: &Error) -> Error {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::assets::TOGGLE_JS_PATH;
+    use crate::assets::{SHIKI_INIT_JS_PATH, TOGGLE_JS_PATH};
 
     fn make_section(title: &str, body: &str) -> String {
         format!("+++\ntitle = \"{title}\"\n+++\n{body}")
@@ -433,6 +439,22 @@ mod tests {
                 .scripts
                 .contains(&APPS_JS_PATH.to_owned())
         );
+    }
+
+    #[test]
+    fn section_with_a_language_fence_injects_shiki() {
+        let body = "```yaml\nversion: 0.2\n```\n";
+        let files = make_files(&[("01-code.md", make_section("Code", body))]);
+        let input = CourseInput {
+            slug: "course-code",
+            manifest: &make_manifest_one_session("Course Code", &["01-code.md"]),
+            files: &files,
+        };
+
+        let loaded = parse_course(&input).unwrap();
+        assert!(loaded.session_assets[0]
+            .scripts
+            .contains(&SHIKI_INIT_JS_PATH.to_owned()));
     }
 
     #[test]

@@ -108,9 +108,27 @@ h3 {
   margin-top: 2rem;
 }
 
+/* Underline properties are set globally: every chrome anchor turns the underline
+   off, so these only reach prose links and the hover-underlines chrome restores.
+   The hover colour is scoped to section prose, because the chrome anchors keep
+   their own hover treatments. */
+
 a {
   color: var(--cb-link);
-  text-decoration-color: var(--cb-blue);
+  text-decoration-color: rgba(10, 126, 164, 0.4);
+  text-decoration-thickness: 0.07em;
+  text-underline-offset: 0.15em;
+  overflow-wrap: break-word;
+}
+
+main section a:not(.cb-hlink) {
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+main section a:not(.cb-hlink):hover,
+main section a:not(.cb-hlink):focus-visible {
+  color: var(--cb-link-strong);
+  text-decoration-color: var(--cb-link-strong);
 }
 
 /* Perma-linkable titles: heading text links to its own anchor. */
@@ -256,6 +274,33 @@ pre code {
   background: var(--cb-teal);
   border-color: var(--cb-teal);
   opacity: 1;
+}
+
+/* Thematic breaks: the header's gradient strip, shortened and tapered so it
+   separates prose without competing with the section headings. */
+
+hr {
+  width: 100%;
+  max-width: 18rem;
+  height: 2px;
+  margin: 2.75rem auto;
+  border: 0;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cb-teal),
+    var(--cb-blue),
+    transparent
+  );
+}
+
+/* The seam between two section files: the same rule, given more room above so
+   it reads as a chapter break rather than a paragraph one. The following `h2`
+   supplies the space below through its own collapsing margin. */
+
+hr.cb-section-break {
+  margin: 3.5rem auto 0;
 }
 
 /* Tables */
@@ -444,6 +489,36 @@ details.cb-tree-course > summary::-webkit-details-marker {
 }
 
 .cb-warning > :last-child {
+  margin-bottom: 0;
+}
+
+/* Information admonitions */
+
+.cb-info {
+  margin: 1.25rem 0;
+  padding: 0.85rem 1rem 0.85rem 2.75rem;
+  position: relative;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+}
+
+.cb-info::before {
+  content: "ℹ";
+  position: absolute;
+  left: 1rem;
+  top: 0.8rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #2563eb;
+}
+
+.cb-info > :first-child {
+  margin-top: 0;
+}
+
+.cb-info > :last-child {
   margin-bottom: 0;
 }
 

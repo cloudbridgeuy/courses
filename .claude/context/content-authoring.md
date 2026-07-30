@@ -37,7 +37,8 @@ directive fences and anchors.
 | Syntax | Effect |
 |--------|--------|
 | `::: solucion` … `:::` | Collapsible solution card (button toggle) in guide and slides |
-| `::: warning` … `:::` | Always-visible amber admonition (guide only). Takes NO arguments — `::: warning anything` is plain Markdown |
+| `::: warning` … `:::` | Always-visible amber admonition in guides and slides. Takes NO arguments — `::: warning anything` is plain Markdown |
+| `::: info` … `:::` | Always-visible blue information admonition in guides and slides. Takes NO arguments — `::: info anything` is plain Markdown |
 | `::: extra <title>` … `:::` | Collapsible deep-dive `<details>` block, closed by default (guide only). Title optional; empty falls back to "Contenido adicional" |
 | `:::slide` … `:::` | reveal.js slide (dark, default theme); slides only |
 | `:::slide light` … `:::` | Light slide variant (`<section class="cb-light">`) |
@@ -63,7 +64,7 @@ a visible slide), so diagrams off the first slide appear on navigation, not befo
 
 ### Nesting
 
-`::: solucion`, `::: warning`, and `::: extra` nest freely — inside each other and
+`::: solucion`, `::: warning`, `::: info`, and `::: extra` nest freely — inside each other and
 inside `:::slide`/`:::inline-slide` (slides carry matching reveal.js CSS). A bare
 `:::` closes the innermost open block, so balance fences carefully:
 

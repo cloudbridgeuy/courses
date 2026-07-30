@@ -473,6 +473,7 @@ async fn static_file(State(state): State<AppState>, Path(file): Path<String>) ->
 
     match file.as_str() {
         "toggle.js" => asset("application/javascript; charset=utf-8", TOGGLE_JS),
+        "shiki-init.js" => asset("application/javascript; charset=utf-8", SHIKI_INIT_JS),
         "cb-widgets.css" => asset("text/css; charset=utf-8", CB_WIDGETS_CSS),
         "guide.css" => asset("text/css; charset=utf-8", GUIDE_CSS),
         "reveal.min.js" => asset("application/javascript; charset=utf-8", REVEAL_JS),
@@ -500,6 +501,7 @@ fn asset(content_type: &'static str, body: &'static str) -> Response {
 }
 
 const TOGGLE_JS: &str = include_str!("../static/toggle.js");
+const SHIKI_INIT_JS: &str = include_str!("../static/shiki-init.js");
 const CB_WIDGETS_CSS: &str = include_str!("../static/cb-widgets.css");
 const GUIDE_CSS: &str = include_str!("../static/guide.css");
 const REVEAL_JS: &str = include_str!("../static/reveal.min.js");

@@ -51,6 +51,9 @@ pub enum Error {
     #[error("nested `::: warning` block")]
     NestedWarning,
 
+    #[error("unclosed `::: info` block")]
+    UnclosedInfo,
+
     #[error("unclosed `::: extra` block")]
     UnclosedExtra,
 
@@ -201,6 +204,11 @@ mod tests {
             Error::NestedWarning.to_string(),
             "nested `::: warning` block"
         );
+    }
+
+    #[test]
+    fn display_unclosed_info() {
+        assert_eq!(Error::UnclosedInfo.to_string(), "unclosed `::: info` block");
     }
 
     #[test]

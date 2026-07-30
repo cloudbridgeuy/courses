@@ -164,7 +164,7 @@ pub async fn run(args: DevArgs) -> Result<()> {
     tokio::select! {
         status = child.wait() => {
             match status {
-                Ok(s) if s.success() => println!("[dev] server exited cleanly"),
+                Ok(s) if s.success() => println!("[dev] server exited cleanly: {s}"),
                 Ok(s) => println!("[dev] server exited with status: {s}"),
                 Err(e) => println!("[dev] error waiting for server: {e}"),
             }

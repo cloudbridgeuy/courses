@@ -5,7 +5,7 @@ use crate::slides::{extract_anchors, render_slide_content};
 
 /// One top-level segment of a section body: plain Markdown, a hidden solution,
 /// a slides-only block, an inline slide (rendered in both guide and slides), a
-/// title-only slide, an always-visible warning, or a collapsible extra block.
+/// title-only slide, an always-visible admonition, or a collapsible extra block.
 ///
 /// A directive's payload (`md`) is captured verbatim — it may itself contain
 /// nested directives, which the recursive renderers expand.
@@ -17,6 +17,7 @@ pub enum Segment {
     InlineSlide { md: String, light: bool },
     TitleSlide { text: String },
     Warning(String),
+    Info(String),
     Extra { title: String, md: String },
     App(String),
 }
@@ -35,6 +36,7 @@ enum Opener {
     InlineSlide { light: bool },
     TitleSlide { text: String },
     Warning,
+    Info,
     Extra { title: String },
     App,
 }
@@ -42,7 +44,8 @@ enum Opener {
 /// Recognizes a directive opener on its own line. The slide fences
 /// (`:::slide`, `:::inline-slide`, `:::title-slide`) take no space and accept
 /// an optional `light` modifier (except title-slide). `::: warning` takes no
-/// arguments — with trailing text it is plain Markdown. `::: extra` takes an
+/// arguments — with trailing text it is plain Markdown; the same applies to
+/// `::: info`. `::: extra` takes an
 /// optional title after the keyword.
 fn opener(fence: &str) -> Option<Opener> {
     if fence == "::: solucion" {
@@ -61,6 +64,8 @@ fn opener(fence: &str) -> Option<Opener> {
         })
     } else if fence == "::: warning" {
         Some(Opener::Warning)
+    } else if fence == "::: info" {
+        Some(Opener::Info)
     } else if let Some(rest) = fence.strip_prefix("::: extra") {
         (rest.is_empty() || rest.starts_with(' ')).then(|| Opener::Extra {
             title: rest.trim().to_owned(),
@@ -85,6 +90,7 @@ impl Opener {
                 Segment::TitleSlide { text }
             }
             Opener::Warning => Segment::Warning(md),
+            Opener::Info => Segment::Info(md),
             Opener::Extra { title } => Segment::Extra { title, md },
             Opener::App => Segment::App(md),
         })
@@ -97,6 +103,7 @@ impl Opener {
             Opener::InlineSlide { .. } => Error::UnclosedInlineSlide,
             Opener::TitleSlide { .. } => Error::UnclosedTitleSlide,
             Opener::Warning => Error::UnclosedWarning,
+            Opener::Info => Error::UnclosedInfo,
             Opener::Extra { .. } => Error::UnclosedExtra,
             Opener::App => Error::UnclosedApp,
         }
@@ -174,8 +181,8 @@ pub struct RenderedBody {
 
 /// Renders a section's Markdown body.
 ///
-/// `::: solucion`, `::: warning`, and `::: extra` produce their guide markup
-/// and nest freely (a warning inside a solution, an extra inside a warning,
+/// `::: solucion`, `::: warning`, `::: info`, and `::: extra` produce their guide markup
+/// and nest freely (an info block inside a solution, an extra inside a warning,
 /// etc.). `:::slide` blocks are collected separately and omitted from the
 /// guide HTML. `:::inline-slide` renders in BOTH places. `:::title-slide`
 /// produces a slide showing only `title` (the section heading); its body must
@@ -227,6 +234,10 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
                 let inner = render_guide_segments(&md, &mut uses_solutions)?;
                 html.push_str(&render_warning(&inner));
             }
+            Segment::Info(md) => {
+                let inner = render_guide_segments(&md, &mut uses_solutions)?;
+                html.push_str(&render_info(&inner));
+            }
             Segment::Extra { title, md } => {
                 let inner = render_guide_segments(&md, &mut uses_solutions)?;
                 html.push_str(&render_extra(&title, &inner));
@@ -261,7 +272,7 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
 }
 
 /// Renders raw Markdown that may contain nested directives, in GUIDE context:
-/// `::: solucion`, `::: warning`, and `::: extra` produce their guide markup;
+/// `::: solucion`, `::: warning`, `::: info`, and `::: extra` produce their guide markup;
 /// nesting recurses. Slide directives are illegal here (slides live only at
 /// the top level) and produce the matching nested-slide error. `{{name}}`
 /// references are not expanded outside slides.
@@ -278,6 +289,10 @@ fn render_guide_segments(md: &str, uses_solutions: &mut bool) -> Result<String> 
             Segment::Warning(inner) => {
                 let body = render_guide_segments(&inner, uses_solutions)?;
                 html.push_str(&render_warning(&body));
+            }
+            Segment::Info(inner) => {
+                let body = render_guide_segments(&inner, uses_solutions)?;
+                html.push_str(&render_info(&body));
             }
             Segment::Extra { title, md } => {
                 let body = render_guide_segments(&md, uses_solutions)?;
@@ -304,6 +319,12 @@ fn render_title_slide(title: &str) -> String {
 /// (`.cb-warning::before`), keeping markup minimal.
 pub(crate) fn render_warning(inner_html: &str) -> String {
     format!("<div class=\"cb-warning\">\n{inner_html}</div>\n")
+}
+
+/// Renders an always-visible information admonition. The symbol comes from CSS
+/// (`.cb-info::before`), keeping markup minimal.
+pub(crate) fn render_info(inner_html: &str) -> String {
+    format!("<div class=\"cb-info\">\n{inner_html}</div>\n")
 }
 
 /// Renders a collapsible extra block as a native `<details>` element, closed
@@ -460,7 +481,7 @@ mod tests {
         );
     }
 
-    // ── warning / extra fences ────────────────────────────────────────────
+    // ── warning / info / extra fences ─────────────────────────────────────
 
     #[test]
     fn warning_with_arguments_is_plain_markdown() {
@@ -479,6 +500,26 @@ mod tests {
         assert!(matches!(
             split_solutions("::: warning\nX.\n"),
             Err(Error::UnclosedWarning)
+        ));
+    }
+
+    #[test]
+    fn info_with_arguments_is_plain_markdown() {
+        let body = "::: info extra-text\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(
+                "::: info extra-text\nX.\n:::\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn unclosed_info_errors() {
+        assert!(matches!(
+            split_solutions("::: info\nX.\n"),
+            Err(Error::UnclosedInfo)
         ));
     }
 
@@ -839,6 +880,16 @@ mod tests {
     }
 
     #[test]
+    fn info_inside_solution_renders_both() {
+        let body = "::: solucion\nRespuesta.\n::: info\nContexto.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_solutions);
+        assert!(result.html.contains("class=\"solucion\""));
+        assert!(result.html.contains("<div class=\"cb-info\">"));
+        assert!(result.html.contains("Contexto."));
+    }
+
+    #[test]
     fn deeply_nested_solution_inside_extra_inside_warning() {
         let body = "::: warning\nA.\n::: extra T\nB.\n::: solucion\nC.\n:::\n:::\n:::\n";
         let result = render_section_body("Sección", body).unwrap();
@@ -873,6 +924,15 @@ mod tests {
         let result = render_section_body("Sección", body).unwrap();
         assert!(result.html.contains("<div class=\"cb-warning\">"));
         assert!(result.html.contains("<strong>Atención</strong>"));
+        assert!(result.html.contains("target=\"_blank\""));
+    }
+
+    #[test]
+    fn info_renders_admonition_div_with_inner_markdown() {
+        let body = "::: info\n**Nota**: [más información](https://example.com).\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("<div class=\"cb-info\">"));
+        assert!(result.html.contains("<strong>Nota</strong>"));
         assert!(result.html.contains("target=\"_blank\""));
     }
 
@@ -913,8 +973,8 @@ mod tests {
     }
 
     #[test]
-    fn warning_and_extra_omitted_from_slides_and_do_not_set_flags() {
-        let body = "::: warning\nW.\n:::\n::: extra T\nE.\n:::\n";
+    fn admonitions_and_extra_omitted_from_slides_and_do_not_set_flags() {
+        let body = "::: warning\nW.\n:::\n::: info\nI.\n:::\n::: extra T\nE.\n:::\n";
         let result = render_section_body("Sección", body).unwrap();
         assert!(!result.uses_solutions);
         assert!(!result.uses_slides);

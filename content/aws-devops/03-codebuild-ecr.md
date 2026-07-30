@@ -2,54 +2,140 @@
 title = "Integración continua — CodeBuild, y ECR"
 +++
 
-## El problema: construir de forma reproducible
+:::inline-slide
+## Problema: ¿Como construir de forma reproducible?
 
-En el repositorio ya se tiene el código fuente. Pero entre el código fuente y una
-aplicación en ejecución hay un paso crítico: **la construcción** (*build*). Para una
-aplicación empaquetada como contenedor Docker, eso significa ejecutar `docker build`,
-etiquetar la imagen, y dejarla en un lugar donde el sistema de despliegue pueda
-encontrarla.
+El código fuente no se despliega directamente: primero se transforma en un
+**artefacto desplegable**. En este ejemplo, el artefacto es una imagen de contenedor
+construida a partir del `Dockerfile` en la raíz del repositorio.
+:::
 
-Si ese proceso se ejecuta manualmente en la máquina local, depende de lo que haya
-instalado, de la versión del sistema operativo, de si se recuerdan los mismos comandos que la última
-vez. La integración continua resuelve esto ejecutando el build en un entorno
-**estándar, limpio, y reproducible** cada vez —sin intervención manual.
+Construirla en la máquina de cada desarrollador parece sencillo, pero incorpora
+diferencias difíciles de detectar: sistema operativo, arquitectura del procesador,
+versiones de herramientas y dependencias instaladas. Docker reduce esas diferencias,
+pero no las elimina. Por ejemplo, una imagen creada en macOS sobre ARM, sin indicar
+`--platform linux/amd64`, puede no ejecutarse en un servidor x86.
 
-## CodeBuild: build administrado
+La integración continua ejecuta el build en un entorno **estándar, limpio y
+reproducible**. Así, cada commit o tag produce un artefacto cuyo origen y proceso de
+construcción se pueden verificar, sin depender de una máquina local.
 
-**AWS CodeBuild** es un servicio de build totalmente administrado. Se le indica la
-fuente (el repositorio de CodeCommit), la imagen del entorno de construcción (una imagen
-estándar con las herramientas necesarias), y los comandos a ejecutar (descritos en un
-archivo `buildspec.yml`). CodeBuild aprovisiona el entorno, ejecuta los comandos, y
-libera los recursos al terminar. No hay servidores que mantener.
+:::inline-slide light
+## Respuesta en AWS: CodeBuild y Amazon ECR
+:::
 
-## Amazon ECR: el registro de imágenes Docker
+**AWS CodeBuild** es un servicio de `build` totalmente administrado. Se le indica la
+fuente, la imagen del entorno de construcción y los comandos que debe ejecutar.
+CodeBuild aprovisiona un entorno limpio, ejecuta el trabajo y libera los recursos al
+terminar. No hay servidores de build que mantener.
+
+:::inline-slide
+### ¿Qué expresa un `buildspec.yml`?
+
+Un `buildspec.yml` es una especificación YAML que funciona como el pequeño DSL de
+CodeBuild: declara las fases del trabajo y los comandos que se ejecutan en cada una.
+
+```yaml
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - npm ci
+  build:
+    commands:
+      - npm test
+      - docker build -t app:$IMAGE_TAG .
+```
+
+- `version` selecciona la versión del formato de *buildspec*.
+- `phases` organiza el proceso; las fases permitidas son: `install`, `pre_build`, `build` y
+  `post_build`.
+- `commands` contiene la lista de órdenes de shell de cada fase, ejecutadas en orden.
+- También puede declarar `env`, `artifacts`, `cache` y `reports`.
+
+:::
+
+:::inline-slide light
+### ¿Qué es Amazon ECR?
+
+**Amazon Elastic Container Registry (ECR)** es el registro de imágenes de contenedores de AWS. Como [DockerHub](https://hub.docker.com/)
 
 Una vez construida la imagen Docker, hay que guardarla en algún lugar. **Amazon ECR**
 (Elastic Container Registry) es el servicio de AWS para almacenar imágenes Docker de
 forma privada y segura. Cuando ECS necesite lanzar el contenedor en la Semana 3, irá a
 buscar la imagen directamente a ECR.
+:::
 
-El flujo completo de esta sección es:
+### Flujo Completo
 
+```mermaid
+flowchart LR
+    subgraph repo[CodeCommit]
+        direction TB
+        source[Código fuente]
+        spec[buildspec.yml]
+    end
+
+    build[CodeBuild<br/>entorno administrado]
+    image[[Imagen Docker<br/>artefacto desplegable]]
+    ecr[(Amazon ECR<br/>imagen etiquetada)]
+
+    source -->|fuente| build
+    spec -.->|fases y comandos| build
+    build -->|docker build| image
+    image -->|docker push| ecr
 ```
-CodeCommit (código fuente)
-    ↓
-CodeBuild (lee buildspec.yml, construye la imagen)
-    ↓
-ECR (almacena la imagen con una etiqueta)
-```
+
+## Artefactos desplegables: construir una vez, promover muchas veces
+
+El resultado de CodeBuild no es solo una imagen Docker: es el **artefacto desplegable**
+que conecta el cambio de código con un despliegue. Debe poder responderse con precisión
+qué commit, qué PR o qué tag de Git produjo una imagen, qué validaciones superó y en
+qué ambientes se utilizó.
+
+En un pipeline de equipo, un evento de Git inicia el trabajo adecuado: un PR puede
+ejecutar `lint`, pruebas, análisis de seguridad y un ambiente efímero; un *merge* o un
+tag de release puede construir la imagen candidata. Cuando esa imagen se aprueba para
+otro ambiente, se promueve **el mismo artefacto**, sin reconstruirlo. Así, `staging` y
+producción prueban y ejecutan exactamente los mismos bytes.
+
+Para lograrlo, conviene identificar las imágenes con una referencia inmutable o
+inequívoca: el SHA del commit, un tag de versión como `v1.4.0`, o el *digest* que ECR
+asigna a la imagen. Una etiqueta mutable como `latest` es cómoda para un laboratorio,
+pero no indica qué versión se está desplegando y puede cambiar entre dos operaciones.
+
+:::inline-slide light
+## El artefacto conecta Git y el despliegue
+
+`commit` o `tag` → validaciones → imagen en ECR → promoción del mismo artefacto
+
+**No se vuelve a construir una imagen para cada ambiente.**
+:::
 
 :::slide
 ## Del código a la imagen publicada
 
-```
-CodeCommit (código fuente)
-    → CodeBuild (lee buildspec.yml, construye)
-    → ECR (almacena la imagen etiquetada)
-```
+Ahora que tenemos el código en un lugar que controlamos, tenemos que producir
+el artefacto desplegable de este proyecto: una imagen de contenedor.
 
-CodeBuild construye en un entorno limpio; ECR guarda el resultado.
+```mermaid
+flowchart LR
+    subgraph repo[CodeCommit]
+        direction TB
+        source[Código fuente]
+        spec[buildspec.yml]
+    end
+
+    build[CodeBuild]
+    image[[Imagen Docker]]
+    ecr[(Amazon ECR)]
+
+    source --> build
+    spec -.->|fases y comandos| build
+    build -->|docker build| image
+    image -->|docker push| ecr
+```
 :::
 
 ## El archivo `buildspec.yml`
@@ -95,6 +181,13 @@ Las variables de entorno (`$AWS_ACCOUNT_ID`, `$AWS_DEFAULT_REGION`, `$IMAGE_REPO
 `$IMAGE_TAG`) se definen en el proyecto de CodeBuild, no en el archivo. Esto permite
 reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 
+::: info
+En este laboratorio se configura `IMAGE_TAG=latest` para simplificar los pasos. En un
+pipeline real, usar el SHA del commit o un tag de release como valor de `IMAGE_TAG`, y
+registrar también el *digest* publicado por ECR. Esas referencias permiten promover la
+misma imagen validada entre Desarrollo, QA y producción.
+:::
+
 :::slide
 ## Las tres fases del build
 
@@ -118,7 +211,8 @@ reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 2. En **Repository name**, escribir `taller-aws-<su-nombre>` (el mismo nombre usado
    en CodeCommit, por consistencia).
 3. Dejar **Image tag mutability** en **Mutable** — esto permite reutilizar etiquetas
-   como `latest` o `v1` entre builds sucesivos.
+   como `latest` entre builds sucesivos. Es una simplificación para el laboratorio;
+   las etiquetas de release que identifican un artefacto desplegable deben ser únicas.
 4. Dejar las demás opciones con sus valores predeterminados y pulsar **Create repository**.
 
 El repositorio aparece en la lista. Pulsar sobre su nombre y copiar el **URI** completo
@@ -138,6 +232,12 @@ necesitará al configurar CodeBuild.
 2. En la sección **Source**, seleccionar **Source provider: AWS CodeCommit**.
 3. En **Repository**, seleccionar el repositorio `taller-aws-<su-nombre>`.
 4. En **Reference type**, seleccionar **Branch** y elegir `main`.
+
+::: info
+Aquí el build se inicia manualmente y toma `main` para practicar. En un flujo real, un
+evento de CodeCommit o CodePipeline lo iniciaría al abrir un PR, fusionar un cambio o
+crear un tag, según las reglas de promoción acordadas por el equipo.
+:::
 
 ### Configurar el entorno de construcción
 
@@ -185,7 +285,8 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
 1. En la sección **Buildspec**, dejar seleccionado **Use a buildspec file** —CodeBuild
     buscará automáticamente el archivo `buildspec.yml` en la raíz del repositorio.
 2. En la sección **Artifacts**, seleccionar **No artifacts** —el resultado del build
-    es la imagen publicada en ECR, no un artefacto de archivo.
+   es la imagen publicada en ECR, no un artefacto de archivo. Esa imagen es el
+   artefacto desplegable que usarán las etapas posteriores.
 3. Pulsar **Create build project**.
 
 ### Ejecutar el build y seguir los logs
@@ -202,8 +303,9 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
 
 1. Volver a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abrir el repositorio `taller-aws-<su-nombre>`.
 2. En la pestaña **Images**, se verá la imagen recién publicada con la etiqueta `latest`
-    y la fecha y hora del push. Copiar el **Image URI** completo —se necesitará en la
-    siguiente sección para lanzar el stack de CloudFormation.
+   y la fecha y hora del push. Copiar el **Image URI** completo —se necesitará en la
+   siguiente sección para lanzar el stack de CloudFormation. También observar el
+   *digest*: es la identidad inmutable de la imagen aunque `latest` se actualice.
 
 ## Un adelanto: enterarse cuando el build termina
 

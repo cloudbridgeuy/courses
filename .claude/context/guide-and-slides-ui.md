@@ -15,6 +15,13 @@
     so it survives guide → slides → guide navigation. Visibility check runs once on
     load. Button bottom offset adjusts when the footer intersects.
 - Ordered-list step numbering restarts at 1 in each subsection.
+- `hr` (Markdown `---`) is an 18rem centered bar carrying the `.cb-strip` teal→blue
+  gradient, tapered to transparent at both ends. Slides use the same rule sized in
+  `em` so it tracks the scaled deck.
+- `render_session_page` emits `<hr class="cb-section-break">` between consecutive
+  section files (never before the first), so the seams of a stitched session read
+  like the `---` breaks inside one. Its `margin-bottom` is 0 on purpose — the
+  following `h2` supplies the gap below through its own collapsing margin.
 
 ## Slides (`crates/server/static/slides.css`)
 
@@ -24,6 +31,37 @@
   (section background doesn't fill the viewport).
 - Exercise hero cards: `.cb-ejercicio` with kicker, title, body, solution toggle.
   Reveal re-layouts when a solution toggle changes slide height.
+- Anything that grows a slide after reveal has laid it out MUST call
+  `Reveal.layout()`. With `center: true` reveal freezes an inline `top` computed
+  from the height at layout time; mermaid renders later, so without the relayout
+  the diagram is offset by a quarter of the deck and overflows the bottom
+  (`mermaid-init.js` does this in `afterRender`).
+- reveal's core stylesheet does NOT style anchors — link colour ships in the stock
+  themes this file replaces, and the `--r-link-*` vars are inert without them. So
+  `slides.css` styles `a:not(.cb-hlink)` itself: brand blue on dark, `--cb-link`
+  on `section.cb-light` (brand blue is unreadable there). The `:not()` matters —
+  `.reveal section.cb-light a` would otherwise outrank `.reveal .cb-hlink`.
+- `.reveal pre` sets `text-align: left`; slides centre their text, which would
+  otherwise destroy indentation in code blocks. `pre.mermaid` stays centred.
+- Inline `code` is a tinted chip (background, hairline teal border, 5px radius),
+  reset back to bare inside `pre`. The reset needs BOTH `.reveal pre code` and
+  `.reveal section.cb-light pre code`, since `.reveal section.cb-light code`
+  outranks the former.
+- `li::marker` is teal; light slides use `--cb-teal-deep` (`#1f7a70`), because
+  brand teal is ~1.9:1 on the light background.
+- `.reveal` sets `line-height: 1.4` (core reveal sets none, leaving `normal`).
+  Keep chip padding small — the inline-code box must fit inside the line box or
+  it paints over the descenders above. Headings pin `line-height: 1.15`.
+- A dense slide remains at Reveal's fixed canvas height and scrolls vertically inside
+  its top-level `<section>` instead of being clipped or auto-shrunk. The scroll panel
+  has `touch-action: pan-y`, so it also works with a touch gesture.
+- Fenced code blocks that declare a language load Shiki on demand. The client-side
+  initializer uses the local TextMate definition of `tokyonight-storm`; Mermaid and
+  untyped blocks keep their dedicated/plain rendering.
+- Top-level slide headings make the content hierarchy visible: `h1` uses a wide
+  teal→blue divider, `h2` a tapered underline, `h3` a teal marker and rule, and `h4`
+  a compact uppercase label. `.cb-title-slide` and exercise-card headings retain
+  their specialized styles.
 - Heading self-links come from the shared Markdown renderer; on slides they're inert
   (`pointer-events: none`) — hash clicks would fight reveal.js `#/n` navigation.
 - Last viewed slide persists in `sessionStorage` key `'cb-slide:' + location.pathname`.

@@ -139,7 +139,7 @@ async fn shutdown_signal() {
     };
 
     tokio::select! {
-        () = ctrl_c => {}
-        () = terminate => {}
+        () = ctrl_c => tracing::info!(signal = "SIGINT", "graceful shutdown requested"),
+        () = terminate => tracing::info!(signal = "SIGTERM", "graceful shutdown requested"),
     }
 }

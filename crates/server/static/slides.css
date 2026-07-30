@@ -13,6 +13,10 @@
   --cb-ink: #2d2926;
   --cb-blue: #5dc8f0;
   --cb-teal: #5fc8be;
+  --cb-link: #0a7ea4;
+  --cb-link-strong: #075f7d;
+  /* Brand teal darkened enough to carry meaning on the light slide variant. */
+  --cb-teal-deep: #1f7a70;
   --r-background-color: #2d2926;
   --r-main-font: "Montserrat", system-ui, sans-serif;
   --r-main-font-size: 38px;
@@ -33,16 +37,22 @@
 .reveal {
   font-family: "Montserrat", system-ui, sans-serif;
   font-size: 38px;
+  /* reveal's core stylesheet sets no body line-height (the stock themes this
+     file replaces did), leaving `normal` — too tight for wrapped prose, and
+     tight enough that an inline-code chip clips the descenders above it. */
+  line-height: 1.4;
   color: #ffffff;
 }
 
 .reveal h1,
 .reveal h2,
-.reveal h3 {
+.reveal h3,
+.reveal h4 {
   font-family: "Montserrat", system-ui, sans-serif;
   color: #ffffff;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 1.15;
   text-transform: none;
 }
 
@@ -52,13 +62,109 @@
   display: inline-block;
 }
 
+/* The four heading levels are distinct visual tools: h1 carries a concept,
+   h2 starts a major section, h3 introduces a subsection, and h4 works as a
+   compact label. Title-only slides retain their dedicated hero treatment. */
+
+.reveal .slides > section > h1:not(.cb-title-slide) {
+  margin: 0 0 0.55em;
+  padding-bottom: 0.28em;
+  letter-spacing: -0.035em;
+  border-bottom: 0.1em solid var(--cb-teal);
+  border-image: linear-gradient(90deg, var(--cb-teal), var(--cb-blue), transparent) 1;
+}
+
+.reveal .slides > section > h2 {
+  position: relative;
+  padding-bottom: 0.35em;
+  border-bottom: 0;
+}
+
+.reveal .slides > section > h2::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.09em;
+  border-radius: 1em;
+  background: linear-gradient(90deg, var(--cb-teal), var(--cb-blue), transparent);
+}
+
+/* A third-level title introduces a smaller idea within a slide. Give it its
+   own branded treatment, instead of letting it read like a reduced h1: a teal
+   marker and a short gradient rule echo the site's section dividers. */
+
+.reveal .slides > section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0 0 0.85em;
+  letter-spacing: 0;
+}
+
+.reveal .slides > section > h3::before {
+  content: "";
+  width: 0.22em;
+  height: 0.9em;
+  flex: 0 0 auto;
+  border-radius: 0.12em;
+  background: var(--cb-teal);
+}
+
+.reveal .slides > section > h3::after {
+  content: "";
+  width: 2.8em;
+  height: 0.08em;
+  flex: 0 0 auto;
+  border-radius: 1em;
+  background: linear-gradient(90deg, var(--cb-teal), transparent);
+}
+
+.reveal .slides > section > h4 {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.9em;
+  padding: 0.28em 0.55em;
+  color: var(--cb-teal);
+  font-size: 0.45em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  background: rgba(95, 200, 190, 0.12);
+  border-left: 0.32em solid var(--cb-teal);
+  border-radius: 0 0.25em 0.25em 0;
+}
+
+/* Regular slide content starts at the deck's left edge and may consume the
+   available content width. Title slides override this locally below. */
+
+.reveal .slides > section {
+  /* Reveal positions top-level slides absolutely but does not give them a
+     height. Without this, `overflow-y: auto` expands with the content instead
+     of becoming a scroll container. */
+  height: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  /* Keep a dense slide readable when it exceeds the fixed Reveal canvas. The
+     scrollbar appears only when needed; arrow controls still change slides. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+}
+
 .reveal ol,
 .reveal ul {
   display: block;
   text-align: left;
-  margin: 0 auto;
-  width: fit-content;
-  max-width: 80%;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 }
 
 .reveal ol {
@@ -72,6 +178,51 @@
 .reveal li {
   margin: 0.35em 0;
   padding-left: 0.25em;
+}
+
+/* List markers carry the brand accent instead of the body colour. */
+
+.reveal li::marker {
+  color: var(--cb-teal);
+  font-weight: 700;
+}
+
+.reveal section.cb-light li::marker {
+  color: var(--cb-teal-deep);
+}
+
+/* Links. reveal's core stylesheet leaves anchors unstyled — link colour lives in
+   the stock themes this file replaces — so without these they fall back to the
+   browser's default blue. `.cb-hlink` is excluded: heading self-links inherit
+   the heading colour, and the light-slide rules would otherwise outrank them. */
+
+.reveal a:not(.cb-hlink) {
+  color: var(--cb-blue);
+  text-decoration: underline;
+  text-decoration-color: rgba(93, 200, 240, 0.45);
+  text-decoration-thickness: 0.05em;
+  text-underline-offset: 0.18em;
+  overflow-wrap: break-word;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.reveal a:not(.cb-hlink):hover,
+.reveal a:not(.cb-hlink):focus-visible {
+  color: var(--cb-teal);
+  text-decoration-color: var(--cb-teal);
+}
+
+/* Brand blue is unreadable on the light variant's near-white background. */
+
+.reveal section.cb-light a:not(.cb-hlink) {
+  color: var(--cb-link);
+  text-decoration-color: rgba(10, 126, 164, 0.4);
+}
+
+.reveal section.cb-light a:not(.cb-hlink):hover,
+.reveal section.cb-light a:not(.cb-hlink):focus-visible {
+  color: var(--cb-link-strong);
+  text-decoration-color: var(--cb-link-strong);
 }
 
 .reveal pre,
@@ -88,6 +239,9 @@
   font-size: 0.6em;
   line-height: 1.5;
   box-shadow: none;
+  /* Slides centre their text; code must stay flush left to keep indentation
+     and multi-line commands readable. */
+  text-align: left;
 }
 
 /* Code keeps the light pre color even on light slides, where the cb-light
@@ -97,6 +251,35 @@
 .reveal section.cb-light pre,
 .reveal section.cb-light pre code {
   color: #e8e8e8;
+}
+
+/* Inline code reads as a tinted chip, as it does in the guide. */
+
+.reveal code {
+  font-size: 0.9em;
+  /* Vertical padding stays small: the chip must fit inside the line box, or it
+     paints over the descenders of the line above. */
+  padding: 0.04em 0.34em;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(95, 200, 190, 0.35);
+  border-radius: 5px;
+}
+
+.reveal section.cb-light code {
+  background: #e7ebea;
+  border-color: rgba(31, 122, 112, 0.3);
+}
+
+/* …but code inside a block keeps the block's own chrome. The light-slide reset
+   has to be spelled out: `.reveal section.cb-light code` outranks
+   `.reveal pre code`, so a one-selector reset would lose inside a light slide. */
+
+.reveal pre code,
+.reveal section.cb-light pre code {
+  font-size: 1em;
+  padding: 0;
+  background: none;
+  border: 0;
 }
 
 .reveal table {
@@ -127,7 +310,8 @@
 
 .reveal section.cb-light h1,
 .reveal section.cb-light h2,
-.reveal section.cb-light h3 {
+.reveal section.cb-light h3,
+.reveal section.cb-light h4 {
   color: var(--cb-ink);
 }
 
@@ -148,6 +332,24 @@
 
 .reveal section.cb-light td {
   border-bottom-color: #ccc9c6;
+}
+
+/* Thematic breaks: same tapered gradient rule as the guide, sized in `em` so it
+   tracks the scaled deck. Reads on both the dark and the light slide variants. */
+
+.reveal hr {
+  width: 8em;
+  height: 3px;
+  margin: 0.8em auto;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cb-teal),
+    var(--cb-blue),
+    transparent
+  );
 }
 
 /* Exercise hero card: kicker + title + statement + solution toggle. */
@@ -231,12 +433,15 @@
 /* Title-only slide (:::title-slide): the section heading as a centered hero. */
 
 .reveal .cb-title-slide {
-  display: inline-block;
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
   font-size: 2em;
   font-weight: 700;
   line-height: 1.1;
   padding-bottom: 0.3em;
   border-bottom: 4px solid var(--cb-teal);
+  text-align: center;
 }
 
 .reveal section.cb-light .cb-title-slide {
@@ -283,8 +488,7 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* Defensive: the ::: warning directive is rejected inside :::slide, so this
-   only styles a literal <div class="cb-warning"> embedded as raw HTML. */
+/* Admonitions nested in slide content. */
 
 .reveal .cb-warning {
   position: relative;
@@ -303,6 +507,25 @@
   left: 0.7em;
   top: 0.5em;
   color: #d97706;
+}
+
+.reveal .cb-info {
+  position: relative;
+  background: #eff6ff;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  color: var(--cb-ink);
+  padding: 0.5em 0.8em 0.5em 2em;
+  font-size: 0.6em;
+  text-align: left;
+}
+
+.reveal .cb-info::before {
+  content: "ℹ";
+  position: absolute;
+  left: 0.7em;
+  top: 0.5em;
+  color: #2563eb;
 }
 
 /* Code-copy buttons on slides (markup injected by toggle.js) */
@@ -350,7 +573,7 @@
 }
 .reveal pre.mermaid svg {
   max-width: 100%;
-  max-height: 520px;
+  max-height: 600px;
   height: auto;
 }
 

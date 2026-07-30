@@ -28,13 +28,21 @@
     try {
       var result = mermaid.run({ nodes: nodes });
       if (result && typeof result.then === "function") {
-        result.then(setupZoom).catch(setupZoom);
+        result.then(afterRender).catch(afterRender);
       } else {
-        setupZoom();
+        afterRender();
       }
     } catch (e) {
       console.error("mermaid render failed", e);
     }
+  }
+
+  // Diagrams grow the slide long after reveal centered it from the pre-render
+  // height, which strands dead space above the content and overflows below it.
+  // Re-run the layout so the grown slide is centered on its real height.
+  function afterRender() {
+    setupZoom();
+    if (window.Reveal && typeof Reveal.layout === "function") Reveal.layout();
   }
 
   // ── Maximize / lightbox ────────────────────────────────────────────────

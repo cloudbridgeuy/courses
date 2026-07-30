@@ -8,14 +8,21 @@ use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
 use crate::solutions::{
-    Segment, render_app, render_extra, render_solution, render_warning, split_solutions,
+    Segment, render_app, render_extra, render_info, render_solution, render_warning,
+    split_solutions,
 };
 
-/// An anchored block: plain Markdown, or an exercise (a heading-opened
-/// subsection whose `::: solucion` block immediately follows it).
+/// An anchored block: plain Markdown, an info admonition, or an exercise (a
+/// heading-opened subsection whose `::: solucion` block immediately follows it).
 pub(crate) enum Anchor {
     Block(String),
+    Info(String),
     Exercise { md: String, solution_md: String },
+}
+
+enum TailAnchor {
+    Heading(String),
+    Info(String),
 }
 
 /// Collects `{#name}` anchors from Markdown segments, stripping the marker
@@ -28,16 +35,19 @@ pub(crate) fn extract_anchors(
 ) -> Result<(Vec<Segment>, HashMap<String, Anchor>)> {
     let mut anchors = HashMap::new();
     let mut out: Vec<Segment> = Vec::with_capacity(segments.len());
-    let mut tail_anchor: Option<String> = None;
+    let mut tail_anchor: Option<TailAnchor> = None;
     for segment in segments {
         match segment {
             Segment::Markdown(md) => {
+                if let Some(TailAnchor::Info(name)) = tail_anchor.take() {
+                    return Err(Error::EmptyAnchor(name));
+                }
                 let (stripped, tail) = strip_anchors(&md, &mut anchors)?;
                 tail_anchor = tail;
                 out.push(Segment::Markdown(stripped));
             }
             Segment::Solution(solution) => {
-                if let Some(name) = tail_anchor.take()
+                if let Some(TailAnchor::Heading(name)) = tail_anchor.take()
                     && let Some(Anchor::Block(md)) = anchors.remove(&name)
                 {
                     anchors.insert(
@@ -50,11 +60,22 @@ pub(crate) fn extract_anchors(
                 }
                 out.push(Segment::Solution(solution));
             }
+            Segment::Info(info) => {
+                if let Some(TailAnchor::Info(name)) = tail_anchor.take()
+                    && anchors.insert(name.clone(), Anchor::Info(info.clone())).is_some()
+                {
+                    return Err(Error::DuplicateAnchor(name));
+                }
+                out.push(Segment::Info(info));
+            }
             other => {
                 tail_anchor = None;
                 out.push(other);
             }
         }
+    }
+    if let Some(TailAnchor::Info(name)) = tail_anchor {
+        return Err(Error::EmptyAnchor(name));
     }
     Ok((out, anchors))
 }
@@ -65,7 +86,7 @@ pub(crate) fn extract_anchors(
 fn strip_anchors(
     md: &str,
     anchors: &mut HashMap<String, Anchor>,
-) -> Result<(String, Option<String>)> {
+) -> Result<(String, Option<TailAnchor>)> {
     let lines: Vec<&str> = md.lines().collect();
     let mut out = String::new();
     let mut tail_anchor = None;
@@ -78,6 +99,11 @@ fn strip_anchors(
             continue;
         };
         let start = i + 1;
+        if start == lines.len() {
+            tail_anchor = Some(TailAnchor::Info(name.to_owned()));
+            i = start;
+            continue;
+        }
         let end = anchored_block_end(&lines, start);
         if end == start {
             return Err(Error::EmptyAnchor(name.to_owned()));
@@ -91,7 +117,7 @@ fn strip_anchors(
         }
         let is_heading = lines[start].starts_with('#');
         let trailing = lines[end..].iter().all(|l| l.trim().is_empty());
-        tail_anchor = (is_heading && trailing).then(|| name.to_owned());
+        tail_anchor = (is_heading && trailing).then(|| TailAnchor::Heading(name.to_owned()));
         out.push_str(&block);
         i = end;
     }
@@ -142,7 +168,7 @@ fn is_valid_anchor_name(name: &str) -> bool {
 }
 
 /// Renders a slide's raw payload to HTML. Nested directives are expanded with
-/// slide semantics: `::: solucion`, `::: warning`, and `::: extra` produce
+/// slide semantics: `::: solucion`, `::: warning`, `::: info`, and `::: extra` produce
 /// their usual markup (the slide stylesheet has matching rules), and `{{name}}`
 /// references inside them still resolve. Nested slide-family directives are an
 /// error — slides live only at the top level.
@@ -156,6 +182,9 @@ pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) 
             }
             Segment::Warning(inner) => {
                 html.push_str(&render_warning(&render_slide_content(&inner, anchors)?));
+            }
+            Segment::Info(inner) => {
+                html.push_str(&render_info(&render_slide_content(&inner, anchors)?));
             }
             Segment::Extra { title, md } => {
                 html.push_str(&render_extra(&title, &render_slide_content(&md, anchors)?));
@@ -192,11 +221,17 @@ fn render_slide_markdown(md: &str, anchors: &HashMap<String, Anchor>) -> Result<
         match anchors.get(name) {
             None => return Err(Error::UnknownSlideRef(name.to_owned())),
             Some(Anchor::Block(block)) => buf.push_str(block),
+            Some(Anchor::Info(inner)) => {
+                if !buf.is_empty() {
+                    html.push_str(&render_markdown(&std::mem::take(&mut buf)));
+                }
+                html.push_str(&render_info(&render_slide_content(inner, anchors)?));
+            }
             Some(Anchor::Exercise { md, solution_md }) => {
                 if !buf.is_empty() {
                     html.push_str(&render_markdown(&std::mem::take(&mut buf)));
                 }
-                html.push_str(&render_exercise(md, solution_md));
+                html.push_str(&render_exercise(md, solution_md, anchors)?);
             }
         }
     }
@@ -209,7 +244,11 @@ fn render_slide_markdown(md: &str, anchors: &HashMap<String, Anchor>) -> Result<
 /// Renders an exercise hero card: a kicker (the part of the heading before
 /// " — ", e.g. "Ejercicio 1"), the title, the statement, and the standard
 /// solution toggle.
-fn render_exercise(md: &str, solution_md: &str) -> String {
+fn render_exercise(
+    md: &str,
+    solution_md: &str,
+    anchors: &HashMap<String, Anchor>,
+) -> Result<String> {
     let lines: Vec<&str> = md.lines().collect();
     let heading_idx = lines.iter().position(|l| l.starts_with('#'));
     let heading = heading_idx
@@ -230,15 +269,15 @@ fn render_exercise(md: &str, solution_md: &str) -> String {
             escape_html(kicker)
         )
     };
-    format!(
+    Ok(format!(
         "<div class=\"cb-ejercicio\">\n\
          {kicker_html}<h3>{}</h3>\n\
          <div class=\"cb-ejercicio-cuerpo\">\n{}</div>\n\
          {}</div>\n",
         escape_html(title),
         render_markdown(&statement_md),
-        render_solution(&render_markdown(solution_md)),
-    )
+        render_solution(&render_slide_content(solution_md, anchors)?),
+    ))
 }
 
 #[cfg(test)]
@@ -283,6 +322,19 @@ mod tests {
         assert!(result.slide_html[0].html.contains("line 1"));
         assert!(result.slide_html[0].html.contains("line 2"));
         assert!(result.html.contains("line 2"));
+    }
+
+    #[test]
+    fn info_anchor_renders_the_admonition_in_guide_and_slide() {
+        let body = "{#info-flujo}\n::: info\n**PR aprobado.**\n:::\n\n:::slide\n{{info-flujo}}\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("<div class=\"cb-info\">"));
+        assert_eq!(result.slide_html.len(), 1);
+        assert!(result.slide_html[0].html.contains("<div class=\"cb-info\">"));
+        assert!(result.slide_html[0]
+            .html
+            .contains("<strong>PR aprobado.</strong>"));
+        assert!(!result.slide_html[0].html.contains("{{info-flujo}}"));
     }
 
     #[test]
@@ -364,6 +416,16 @@ mod tests {
     }
 
     #[test]
+    fn warning_inside_exercise_solution_renders_in_slide_card() {
+        let body = "{#ej}\n### Ejercicio 1 — Configurar el remoto\n\nEnunciado.\n\n::: solucion\nPaso.\n\n::: warning\nConfigurar `AWS_PROFILE`.\n:::\n:::\n\n:::slide\n{{ej}}\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("<div class=\"cb-warning\">"));
+        assert!(slide.contains("AWS_PROFILE"));
+        assert!(!slide.contains("::: warning"));
+    }
+
+    #[test]
     fn exercise_heading_without_dash_has_no_kicker() {
         let body = "{#ej}\n### Reto final\n\nEnunciado.\n\n::: solucion\nR.\n:::\n\n:::slide\n{{ej}}\n:::\n";
         let result = render_section_body("Sección", body).unwrap();
@@ -390,6 +452,16 @@ mod tests {
         assert!(slide.contains("Cuidado."));
         // the warning is slide-only here, so the guide does not show it
         assert!(!result.html.contains("Cuidado."));
+    }
+
+    #[test]
+    fn info_nested_inside_slide_renders_in_fragment() {
+        let body = ":::slide\n## Título\n::: info\nContexto.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        let slide = &result.slide_html[0].html;
+        assert!(slide.contains("<div class=\"cb-info\">"));
+        assert!(slide.contains("Contexto."));
+        assert!(!result.html.contains("Contexto."));
     }
 
     #[test]

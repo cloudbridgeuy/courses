@@ -41,6 +41,7 @@ pub fn text_asset(file: &str) -> Option<TextAsset> {
         "cb-widgets.css" => asset(CSS, "crates/server/static/cb-widgets.css"),
         "apps.js" => asset(JS, "crates/server/static/apps.js"),
         "toggle.js" => asset(JS, "crates/server/static/toggle.js"),
+        "shiki-init.js" => asset(JS, "crates/server/static/shiki-init.js"),
         "mermaid-init.js" => asset(JS, "crates/server/static/mermaid-init.js"),
         _ => None,
     }
@@ -130,6 +131,7 @@ mod tests {
             ("cb-widgets.css", CSS, "crates/server/static/cb-widgets.css"),
             ("apps.js", JS, "crates/server/static/apps.js"),
             ("toggle.js", JS, "crates/server/static/toggle.js"),
+            ("shiki-init.js", JS, "crates/server/static/shiki-init.js"),
             (
                 "mermaid-init.js",
                 JS,

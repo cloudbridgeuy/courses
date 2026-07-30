@@ -12,6 +12,9 @@ pub const SLIDES_CSS_PATH: &str = "/static/slides.css";
 pub const MERMAID_JS_PATH: &str = "/static/mermaid.min.js";
 /// URL path of the mermaid initializer, injected after the bundle on guide pages.
 pub const MERMAID_INIT_JS_PATH: &str = "/static/mermaid-init.js";
+/// URL path of the Shiki initializer, injected only when a page has a fenced
+/// code block with a language annotation.
+pub const SHIKI_INIT_JS_PATH: &str = "/static/shiki-init.js";
 /// URL path of the shared structural styles for app widgets and the unlock panel.
 /// Loaded on every page so that widgets render correctly even on non-app pages that
 /// receive a toast notification.

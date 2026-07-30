@@ -3,7 +3,7 @@ use std::fmt::Write as FmtWrite;
 
 use crate::assets::{
     APPS_JS_PATH, CB_WIDGETS_CSS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets,
-    REVEAL_CSS_PATH, REVEAL_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
+    REVEAL_CSS_PATH, REVEAL_JS_PATH, SHIKI_INIT_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
 };
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
@@ -174,6 +174,11 @@ pub fn render_session_page(input: &SessionPage<'_>) -> String {
         let n = index + 1;
         let title = escape_html(&section.title);
         nav_items.push_str(&format!("<li><a href=\"#seccion-{n}\">{title}</a></li>\n"));
+        // Mark the seam between two section files the way `---` marks a break
+        // within one, so a stitched-together session still reads as chapters.
+        if index > 0 {
+            sections.push_str("<hr class=\"cb-section-break\">\n");
+        }
         sections.push_str(&format!(
             "<section id=\"seccion-{n}\">\n\
              <h2><a class=\"cb-hlink\" href=\"#seccion-{n}\">{title}</a></h2>\n{}\n</section>\n",
@@ -250,6 +255,14 @@ pub fn render_slideshow_page(
     } else {
         String::new()
     };
+    let uses_syntax_highlighting = slides_html
+        .iter()
+        .any(|slide| slide.html.contains("<code class=\"language-"));
+    let shiki_script = if uses_syntax_highlighting {
+        format!("<script defer src=\"{SHIKI_INIT_JS_PATH}\"></script>\n")
+    } else {
+        String::new()
+    };
 
     format!(
         "<!doctype html>\n<html lang=\"es\">\n<head>\n\
@@ -269,10 +282,11 @@ pub fn render_slideshow_page(
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          {mermaid_script}\
          {apps_script}\
+         {shiki_script}\
          <script>\
 var cbSlideKey='cb-slide:'+location.pathname;\
 if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
-Reveal.initialize({{hash:true,controls:true,progress:true,center:true,transition:'slide'}});\
+Reveal.initialize({{hash:true,controls:true,progress:true,center:false,transition:'slide',width:1280,height:720}});\
 Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);}});\
 document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
 </script>\n\
@@ -522,6 +536,28 @@ mod tests {
     }
 
     #[test]
+    fn render_session_page_separates_sections_with_a_break() {
+        let mut loaded = sample();
+        let extra = GuideSection {
+            title: "Sección 2".to_owned(),
+            body_html: "<p>Adiós</p>".to_owned(),
+        };
+        loaded.course.sessions[0].sections.push(extra);
+        let html = render_session_page(&sample_session_page(&loaded));
+        assert_eq!(html.matches("<hr class=\"cb-section-break\">").count(), 1);
+        let break_at = html.find("cb-section-break").unwrap();
+        assert!(html.find("id=\"seccion-1\"").unwrap() < break_at);
+        assert!(break_at < html.find("id=\"seccion-2\"").unwrap());
+    }
+
+    #[test]
+    fn render_session_page_single_section_has_no_break() {
+        let loaded = sample();
+        let html = render_session_page(&sample_session_page(&loaded));
+        assert!(!html.contains("cb-section-break"));
+    }
+
+    #[test]
     fn render_session_page_has_nav() {
         let loaded = sample();
         let html = render_session_page(&sample_session_page(&loaded));
@@ -740,6 +776,18 @@ mod tests {
     }
 
     #[test]
+    fn slideshow_page_disables_vertical_centering() {
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<p>Contenido</p>\n".to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains("center:false"));
+        assert!(!html.contains("center:true"));
+    }
+
+    #[test]
     fn slideshow_close_button_links_to_session_guide() {
         let loaded = sample();
         let slides = vec![SlideFragment {
@@ -825,5 +873,16 @@ mod tests {
             html.contains("apps.js"),
             "apps.js script tag must be present when a slide contains a cb-app div"
         );
+    }
+
+    #[test]
+    fn slideshow_page_with_a_language_fence_injects_shiki() {
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<pre><code class=\"language-yaml\">version: 0.2\n</code></pre>\n".to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains(SHIKI_INIT_JS_PATH));
     }
 }
