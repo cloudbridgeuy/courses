@@ -1226,7 +1226,8 @@ duraciones en el historial del proyecto.
    activado al crear el proyecto).
 4. Pulsar **Update project**.
 5. Pulsar **Start build** y esperar a que termine.
-6. Sin dejar pasar tiempo, pulsar **Start build** otra vez.
+6. Pulsar **Start build** otra vez, al finalizar el anterior. El resultado debería ser un
+   `build` casi instantaneo.
 7. En la pestaña **Build history**, comparar la columna **Duration** de ambos builds:
    el segundo reutiliza la fuente descargada y las capas de Docker del primero.
 :::
@@ -1250,33 +1251,43 @@ vuelve a descargar `rust` ni `debian` desde Docker Hub.
 
 ::: solucion
 1. Abrir [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home) y,
-   en el panel lateral, seleccionar **Private registry → Pull through cache**.
-2. Pulsar **Add rule**. En **Registry**, seleccionar **Amazon ECR Public** —no
-   requiere credenciales— y pulsar **Next**.
+   en el panel lateral, seleccionar **Features and Settings → Pull through cache**.
+2. Pulsar **Add rule**. En **Registry**, seleccionar **Amazon ECR Public**. No
+   requiere credenciales. Pulsar **Next**.
 3. Dejar el prefijo predeterminado `ecr-public`, pulsar **Next**, y luego **Create**.
    La regla vale para todo el registro privado de la cuenta, una por región: cualquier
    repositorio bajo el prefijo `ecr-public/` pasa a servirse a través del cache.
 4. Darle permiso al rol de CodeBuild para importar imágenes a través de la regla —la
-   política `AmazonEC2ContainerRegistryPowerUser` no lo incluye. En
-   [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles), abrir el rol
-   `codebuild-taller-aws-<su-nombre>-...`, pulsar **Add permissions → Create inline
-   policy**, cambiar a la pestaña **JSON**, y pegar (reemplazando el ID de cuenta):
+   política `AmazonEC2ContainerRegistryPowerUser` no lo incluye. Con la CLI: resolver
+   el ID de cuenta y el nombre del rol, y crear sobre él la inline policy
+   `pull-through-cache`:
 
-   ```json
+   ```bash
+   export TALLER=taller-aws-<su-nombre>
+   AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+   ROLE=$(aws iam list-roles \
+     --query "Roles[?starts_with(RoleName, 'codebuild-$TALLER')].RoleName" \
+     --output text)
+   cat > /tmp/pull-through-cache.json <<EOF
    {
      "Version": "2012-10-17",
      "Statement": [
        {
          "Effect": "Allow",
          "Action": ["ecr:BatchImportUpstreamImage", "ecr:CreateRepository"],
-         "Resource": "arn:aws:ecr:*:<AWS_ACCOUNT_ID>:repository/ecr-public/*"
+         "Resource": "arn:aws:ecr:*:${AWS_ACCOUNT_ID}:repository/ecr-public/*"
        }
      ]
    }
+   EOF
+   aws iam put-role-policy \
+     --role-name "$ROLE" \
+     --policy-name pull-through-cache \
+     --policy-document file:///tmp/pull-through-cache.json
    ```
 
-   Nombrarla `pull-through-cache` y guardarla. `ecr:CreateRepository` solo hace
-   falta la primera vez, mientras el repositorio de cache todavía no existe.
+   `ecr:CreateRepository` solo hace falta la primera vez, mientras el repositorio
+   de cache todavía no existe.
 5. En el clon local del repositorio, editar las dos líneas `FROM` del `Dockerfile`
    para que apunten al registro privado. La galería pública de ECR publica las
    imágenes oficiales de Docker bajo `docker/library/`, con **el mismo digest** que

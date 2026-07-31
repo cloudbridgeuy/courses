@@ -69,12 +69,12 @@ CodePipeline → CloudWatch**.
 
 **Content status.** Written (Week 1): `01`–`06`. Written (Week 2):
 `07-cloudformation-anatomia`, `08-leer-el-template`, `09-actualizar-stacks`,
-`10-preguntas-puente`, `11-buenas-practicas-troubleshooting`,
-`12-primeros-contenedores` (ej. 9–11). Written (Week 3): `13-operar-contenedores`,
-`14-cicd-y-el-pipeline`, `15-preguntas-puente`, `16-codepipeline-en-la-practica`,
-`17-notificaciones-teams`, `18-observabilidad-metrics-logs` (ej. 12–15). Written
-(Week 4): `19-dashboards-y-alarmas`, `20-container-insights-trazabilidad`,
-`21-cierre-del-curso` (ej. 16–17 + optional capstone ej. 18). **All 4 weeks
+`10-preguntas-puente`, `11-buenas-practicas-troubleshooting`, `12-separar-stacks`,
+`13-primeros-contenedores` (ej. 9–12). Written (Week 3): `14-operar-contenedores`,
+`15-cicd-y-el-pipeline`, `16-preguntas-puente`, `17-codepipeline-en-la-practica`,
+`18-notificaciones-teams`, `19-observabilidad-metrics-logs` (ej. 13–16). Written
+(Week 4): `20-dashboards-y-alarmas`, `21-container-insights-trazabilidad`,
+`22-cierre-del-curso` (ej. 17–18 + optional capstone ej. 19). **All 4 weeks
 authored.**
 
 **Note:** new content files are not served until added to a `[[session]]` in
@@ -97,8 +97,8 @@ reload, so it needs neither step.
   (Week 4) is single-session, no bridge.
 - **Week-closing sections** (last file of Weeks 1–3) end with "Dónde estamos" (recap
   of what works now) + "Qué sigue en la Semana N+1" (what's missing / comes next).
-  Closers: `06-preguntas-puente`, `12-primeros-contenedores`,
-  `18-observabilidad-metrics-logs`. Week 4 closes the course, no preview.
+  Closers: `06-preguntas-puente`, `13-primeros-contenedores`,
+  `19-observabilidad-metrics-logs`. Week 4 closes the course, no preview.
 - Full per-file section plan for all 4 weeks:
   `.claude/designs/2026-06-16-aws-devops-syllabus-breakdown.md`.
 
@@ -148,7 +148,7 @@ Week 3.
   republished so students actually clone them.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
-- Week-1 CloudFormation template (instructor-provided): `taller-semana1.yaml`.
+- Week-1 CloudFormation template (instructor-provided): `taller-aws-devops-semana1.yaml`.
 - Recovery mechanism: tear down and recreate the stack to reset a pod to a
   known-good state ("el seguro del taller").
 - Each participant has their own AWS account / "pod".

@@ -121,7 +121,7 @@ siempre el mismo:
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation,
   ECS/Fargate y DynamoDB.
 - **Navegador** actualizado (Chrome o Firefox).
-- **Template** `taller-semana1.yaml`, provisto por el instructor.
+- **Template** `taller-aws-devops-semana1.yaml`, provisto por el instructor.
 :::
 
 ## Requisitos previos
@@ -131,7 +131,7 @@ Antes de comenzar, confirmar que se cuenta con lo siguiente:
 - **Cuenta AWS** con permisos para CodeCommit, CodeBuild, ECR, CloudFormation, ECS y
   Fargate, y DynamoDB. En caso de duda, consultar con el instructor.
 - **Navegador web** actualizado (Chrome o Firefox recomendados).
-- **Template de CloudFormation** `taller-semana1.yaml`, también provisto por el
+- **Template de CloudFormation** `taller-aws-devops-semana1.yaml`, también provisto por el
   instructor. Se utiliza en la sección 4.
 
 :::inline-slide light
