@@ -5,9 +5,12 @@ phases:
     commands:
       - echo Verificando las herramientas del entorno de build...
       - docker --version
+      - docker buildx version
       - aws --version
   pre_build:
     commands:
+      - echo Ejecutando Hadolint
+      - docker run --rm -i hadolint/hadolint < Dockerfile
       - echo Autenticando con Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
@@ -15,11 +18,15 @@ phases:
       - GIT_SHA_SHORT=$(printf %.12s "$GIT_SHA")
       - SOURCE_BRANCH=${SOURCE_BRANCH:-${CODEBUILD_SOURCE_VERSION#refs/heads/}}
       - BRANCH_TAG=branch-$(printf '%s' "$SOURCE_BRANCH" | tr '/_' '--' | tr -cd '[:alnum:].-')
+      - docker buildx create --name cachebuilder --use
   build:
     commands:
-      - echo Construyendo la imagen Docker...
+      - echo Construyendo y publicando la imagen Docker...
       - |
-        docker build \
+        docker buildx build \
+          --cache-from type=registry,ref=$IMAGE_URI:cache \
+          --cache-to type=registry,ref=$IMAGE_URI:cache,mode=max,image-manifest=true,oci-mediatypes=true \
+          --provenance=false \
           --label org.opencontainers.image.revision="$GIT_SHA" \
           --label org.opencontainers.image.source="$CODEBUILD_SOURCE_REPO_URL" \
           --label com.amazonaws.codebuild.build-arn="$CODEBUILD_BUILD_ARN" \
@@ -30,9 +37,10 @@ phases:
           -t "$IMAGE_URI:$BRANCH_TAG" \
           -t "$IMAGE_URI:$GIT_SHA_SHORT" \
           -t "$IMAGE_URI:$GIT_SHA" \
+          --push \
           .
   post_build:
     commands:
-      - echo Publicando la imagen en ECR...
-      - docker push --all-tags $IMAGE_URI
+      - echo Verificando la imagen publicada en ECR...
+      - aws ecr describe-images --repository-name "$IMAGE_REPO_NAME" --image-ids imageTag="$IMAGE_TAG"
       - echo Build completado.
