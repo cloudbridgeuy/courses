@@ -153,8 +153,16 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  /* Keep overflow available for long slides without adding a visual rail to the
+     presentation. Wheel, trackpad, touch, Page Down, and arrow-key scrolling
+     continue to work normally. */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   touch-action: pan-y;
+}
+
+.reveal .slides > section::-webkit-scrollbar {
+  display: none;
 }
 
 .reveal ol,

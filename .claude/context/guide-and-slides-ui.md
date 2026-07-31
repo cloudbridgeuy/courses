@@ -54,7 +54,9 @@
   it paints over the descenders above. Headings pin `line-height: 1.15`.
 - A dense slide remains at Reveal's fixed canvas height and scrolls vertically inside
   its top-level `<section>` instead of being clipped or auto-shrunk. The scroll panel
-  has `touch-action: pan-y`, so it also works with a touch gesture.
+  has `touch-action: pan-y`, so it also works with a touch gesture. Its scrollbar is
+  hidden (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) so no
+  rail shows during the presentation; wheel/touch/key scrolling still works.
 - Fenced code blocks that declare a language load Shiki on demand. The client-side
   initializer uses the local TextMate definition of `tokyonight-storm`; Mermaid and
   untyped blocks keep their dedicated/plain rendering.
