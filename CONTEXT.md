@@ -92,9 +92,12 @@ reload, so it needs neither step.
   consistent with it.
 - **Console-action links** point at the window they act on — see
   `.claude/context/content-authoring.md`.
-- **Bridge questions** (`preguntas-puente`) split each 5 h week into two sessions
-  (presencial + remota); they sit mid-week, not as a trailing module. The 3 h week
-  (Week 4) is single-session, no bridge.
+- **Bridge questions** (`preguntas-puente`) close a session: they are pondered
+  after it and discussed at the start of the following session. `10`/`16` sit
+  mid-week; Week 1's (`06`) closes the week and bridges into Week 2 — its
+  questions reason from what was built toward Week 2 topics (dependency order,
+  stack updates/change sets, stack separation), not backward as review. The 3 h
+  week (Week 4) is single-session, no bridge.
 - **Week-closing sections** (last file of Weeks 1–3) end with "Dónde estamos" (recap
   of what works now) + "Qué sigue en la Semana N+1" (what's missing / comes next).
   Closers: `06-preguntas-puente`, `13-primeros-contenedores`,

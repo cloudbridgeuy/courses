@@ -1,14 +1,15 @@
 +++
-title = "Anatomía de un template — CloudFormation"
+title = "Anatomía de un template"
 +++
 
-:::title-slide Semana 2
+:::title-slide Semana 2 - CloudFormation
 :::
 
-## De la caja negra al código
+## Interpretando CloudFormation
 
 La Semana 1 terminó con la aplicación en línea, desplegada a partir de un archivo que
-tratamos como una caja negra: `taller-aws-devops-semana1.yaml`. Esta semana se abre esa caja.
+tratamos como una caja negra: `taller-aws-devops-semana1.yaml`. Esta semana se ve
+cómo se compone un archivo de CloudFormation.
 
 El objetivo no es memorizar la sintaxis de CloudFormation, sino **saber leer un
 template**: reconocer qué describe, encontrar dónde se define cada recurso, y entender
@@ -17,7 +18,7 @@ que "alguien configuró una vez" en algo que el equipo entiende, revisa, y modif
 
 ## Por qué infraestructura como código
 
-Configurar recursos a mano desde la consola —*click-ops*— funciona una vez. El
+Configurar recursos a mano desde la consola (*click-ops*) funciona una vez. El
 problema aparece después: nadie recuerda exactamente qué se configuró, no hay registro
 de los cambios, y reproducir el mismo ambiente en otra región o cuenta significa
 repetir decenas de clics sin garantía de que el resultado sea idéntico.

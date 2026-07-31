@@ -2,116 +2,99 @@
 title = "Preguntas puente"
 +++
 
-Estas preguntas abren la sesión del viernes. Conviene pensarlas después de la sesión del
-miércoles, cuando el ambiente todavía está fresco. No se buscan las respuestas de
-inmediato: se razonan desde lo que se construyó. Al comenzar la sesión remota,
-cada participante comparte su respuesta y se discute en conjunto antes de continuar.
+Estas preguntas cierran la Semana 1 y tienden el puente hacia la Semana 2.
+Conviene pensarlas al terminar esta sesión, cuando el ambiente todavía está
+fresco. No se buscan las respuestas de inmediato: se razonan desde lo que se
+construyó, y anticipan lo que la próxima semana abre en detalle. Al comenzar la
+primera sesión de la Semana 2, cada participante comparte su respuesta y se
+discute en conjunto antes de continuar.
 
 :::slide
 ## Preguntas puente
 
-1. ¿Qué hace CodeBuild con el `buildspec.yml`, fase por fase, y dónde queda el
-   resultado?
-2. Si se borra el stack, ¿qué sobrevive: CodeCommit, ECR, ambos, ninguno?
-3. El template desplegó la aplicación tras un ALB: ¿qué pasos manuales se ahorró?
+1. CloudFormation creó los recursos en un orden, y los borró en el orden
+   inverso: ¿cómo sabe ese orden, si el template no lo indica?
+2. Para cambiar un detalle del ambiente (una variable, un puerto), ¿borrar y
+   recrear el stack es la única opción?
+3. Las dos versiones del template difieren solo en la red: ¿qué sugiere eso
+   sobre cómo partir el ambiente en piezas?
 :::
 
 ---
 
 ## Pregunta 1
 
-¿Qué hace exactamente CodeBuild con el `buildspec.yml`, fase por fase, y dónde queda
-el resultado?
+En la pestaña **Events** se vio a CloudFormation crear los recursos en un orden
+preciso: la VPC antes que las subredes, el listener antes que el servicio. Y
+borrarlos en el orden inverso. El template no tiene ninguna lista de pasos:
+¿cómo sabe CloudFormation ese orden?
 
 ::: solucion
-CodeBuild lee el archivo `buildspec.yml` desde la raíz del repositorio de CodeCommit
-y ejecuta los comandos de cada fase en secuencia, dentro de un contenedor efímero
-(un entorno limpio que se destruye al terminar el build):
+El orden no está escrito: se **deduce de las referencias entre recursos**. Cuando
+un recurso menciona a otro (el servicio usa el grupo de destino, el grupo de
+destino vive en la VPC), CloudFormation registra esa dependencia y construye un
+grafo completo: lo referenciado se crea primero, y en el borrado el orden se
+invierte. Para los pocos casos donde la dependencia existe pero no hay
+referencia, el template la declara de forma explícita.
 
-- **`install`**: prepara el entorno de ejecución. En el `buildspec.yml` del taller,
-  esta fase verifica que Docker (con buildx) y la CLI de AWS estén disponibles — la
-  imagen administrada de CodeBuild ya los trae, así que no hay nada que instalar.
-- **`pre_build`**: se ejecuta antes de la construcción principal. En el `buildspec.yml`
-  del taller, esta fase corre `hadolint` sobre el `Dockerfile`, autentica con Amazon
-  ECR usando las credenciales del rol de IAM del proyecto —sin este paso, el push
-  posterior fallaría por falta de permisos— y crea el *builder* de BuildKit que
-  permite exportar cache hacia el registro.
-- **`build`**: ejecuta `docker buildx build` usando el `Dockerfile` en la raíz del
-  repositorio, etiqueta la imagen con el URI completo del repositorio de ECR y la
-  publica en el mismo paso (`--push`), junto con su cache de capas (tag `:cache`).
-- **`post_build`**: verifica con `aws ecr describe-images` que la imagen quedó
-  publicada en el repositorio de ECR.
-
-El resultado —la imagen Docker— queda almacenado en **Amazon ECR**, identificado por
-el URI del repositorio y la etiqueta definida en la variable `IMAGE_TAG` (en este
-caso, `latest`). El entorno de CodeBuild en sí desaparece al terminar: no hay
-servidores que persistan entre builds.
+Ese es exactamente el contenido que se abre la próxima semana: al leer el
+template recurso por recurso aparecen esas referencias (`!Ref`, `!GetAtt`) y la
+dependencia explícita (`DependsOn`), y el orden de la pestaña **Events** pasa
+a tener sentido.
 :::
 
 ---
 
 ## Pregunta 2
 
-Si se borra el stack de CloudFormation, ¿qué sobrevive —el repositorio de CodeCommit,
-la imagen en ECR, ambos, o ninguno? ¿Por qué?
+El ciclo que se practicó fue borrar y recrear el stack completo. Pero si lo que
+se necesita es cambiar un solo detalle del ambiente (una variable de entorno,
+el comportamiento de un puerto), ¿destruir todo es la única opción? ¿Qué se
+esperaría poder hacer?
 
 ::: solucion
-**Sobreviven ambos**: el repositorio de CodeCommit y la imagen en ECR.
+No. CloudFormation permite **actualizar** un stack existente: se le entrega el
+template (igual o modificado) con nuevos valores de parámetros, compara el
+estado deseado con el actual, y aplica **solo la diferencia**. La mayoría de los
+cambios se hacen en el lugar; algunos exigen reemplazar un recurso, y
+CloudFormation lo indica antes de tocar nada mediante un *change set*: una
+vista previa del cambio.
 
-La razón es que CloudFormation solo gestiona los recursos que se declararon en el template.
-El template `taller-aws-devops-semana1.yaml` describe el clúster ECS, el servicio Fargate, el
-Application Load Balancer, la tabla de DynamoDB, los roles de IAM y la configuración
-de red. Esos recursos los creó CloudFormation y los elimina cuando se borra el stack.
+Quien hizo la sección opcional de HTTPS ya ejecutó una actualización así: el
+parámetro `RedirigirAHttps` cambió a `si` y CloudFormation solo modificó la
+acción del listener HTTP; el resto del ambiente ni se enteró.
 
-El repositorio de CodeCommit y el repositorio de ECR (junto con la imagen que contiene)
-se crearon directamente desde la consola, fuera de cualquier stack de CloudFormation.
-CloudFormation no los conoce y no los toca. Por eso al recrear el stack basta con
-proporcionar de nuevo el URI de la imagen: la imagen ya está en ECR, exactamente como
-la dejó el build.
-
-Esta separación es intencional: el código fuente y los artefactos de build tienen un
-ciclo de vida distinto al del ambiente de ejecución. Los primeros crecen con cada
-commit y cada build; el segundo puede destruirse y recrearse cuantas veces sea necesario.
+La próxima semana se practica ese flujo con calma: change sets, qué pasa cuando
+un cambio falla (*rollback*), y qué pasa cuando alguien toca los recursos por
+fuera del template (*drift*).
 :::
 
 ---
 
 ## Pregunta 3
 
-El template desplegó la aplicación detrás de un ALB. ¿Qué pasos manuales se ahorró,
-y cuáles de esos recursos se reconocen en la consola?
+Las dos versiones del template son idénticas salvo en una cosa: una crea la red
+y la otra la recibe como parámetros. Y con la variante, al borrar el stack la
+red sobrevive porque no le pertenece. ¿Qué sugiere eso sobre cómo organizar un
+ambiente más grande: todo en un stack, o partido en piezas? ¿Con qué criterio se
+partiría?
 
 ::: solucion
-El template automatizó al menos los siguientes pasos que, de otro modo, habría que
-ejecutar manualmente desde la consola:
+Sugiere que los recursos con **ciclos de vida distintos** conviene gestionarlos
+en stacks distintos. La red casi nunca cambia y puede ser compartida; los datos
+deben sobrevivir a los despliegues; la aplicación cambia todo el tiempo y es
+descartable. Meter todo en un stack ata esas tres velocidades: borrar la
+aplicación arrastra la red y los datos.
 
-1. Crear la tabla de DynamoDB con el nombre y la configuración de clave correctos.
-2. Crear el clúster de ECS.
-3. Definir la **task definition** de Fargate: especificar la imagen, los límites de
-   CPU y memoria, las variables de entorno, el rol de ejecución.
-4. Crear el **servicio ECS** que mantiene el número de tareas en ejecución y las
-   reemplaza si fallan.
-5. Crear el **Application Load Balancer**, el listener en el puerto 80, y el target
-   group que apunta al servicio ECS.
-6. Crear los **grupos de seguridad** que permiten el tráfico HTTP hacia el ALB y del
-   ALB hacia los contenedores.
-7. Crear el **rol de IAM de ejecución de ECS** para que Fargate pueda descargar la
-   imagen de ECR.
-8. Conectar todo: el ALB al target group, el target group al servicio, el servicio a
-   la task definition, la task definition a la imagen en ECR.
+La variante de VPC existente ya insinuó la solución: la red vive fuera y el
+stack la consume. Y quien hizo la sección opcional de HTTPS la vio completa:
+ese stack agrega un listener al ALB de otro stack sin modificarlo, leyendo los
+valores que el stack base **exporta**.
 
-En la consola se puede verificar cada uno de estos recursos directamente:
-
-- **ECS → Clusters**: se verá el clúster y, dentro de él, el servicio y las tareas en
-  estado `RUNNING`.
-- **EC2 → Load Balancers**: se verá el ALB con su DNS público.
-- **DynamoDB → Tables**: se verá la tabla creada por el template.
-- **IAM → Roles**: se verá el rol de ejecución de ECS cuyo nombre contiene el nombre del
-  stack.
-
-El valor de CloudFormation es que todos esos pasos, incluyendo el orden correcto de
-creación y las dependencias entre recursos, quedan codificados en el archivo YAML.
-Reproducirlos requiere lanzar el template, no recordar los pasos.
+La próxima semana ese criterio se vuelve práctica: el ambiente se separa en
+stacks de **red**, **datos**, y **aplicación**, conectados por ese mismo
+mecanismo de exports e imports, y se comprueba que la aplicación se puede borrar
+y recrear sin tocar los otros dos.
 :::
 
 ---
@@ -125,21 +108,25 @@ del taller funcionando de punta a punta:
 - Un **pipeline de build en CodeBuild** que construye la imagen Docker y la publica
   en **ECR** a partir del `buildspec.yml`.
 - La **aplicación en línea** sobre ECS/Fargate detrás de un ALB, desplegada con un
-  template de CloudFormation.
+  template de CloudFormation, en su versión estándar o en la variante de VPC
+  existente, según la cuenta.
 - El **ciclo de recuperación** practicado: destruir y recrear el ambiente en minutos.
+- Opcionalmente, la aplicación bajo un **dominio propio con HTTPS**, con un stack
+  adicional que se conecta al stack base.
 
-Se construyó, desplegó, y operó el sistema. Lo que todavía es una caja negra es **cómo**
-ese template arma todo por dentro.
+Se construyó, desplegó, y operó el sistema. Aún sin entender cómo se creó el template.
 
 ## Qué sigue en la Semana 2
 
-La próxima semana se abre la caja negra. Se va a:
+La próxima semana se estudia CloudFormation más a fondo. Se va a:
 
-- Leer el template `taller-aws-devops-semana1.yaml` recurso por recurso, y entender la
+- Leer el template de la Semana 1 recurso por recurso, y entender la
   **infraestructura como código**: parámetros, recursos, salidas, y funciones
   intrínsecas.
 - **Actualizar** el stack de forma segura con *change sets*, y ver cómo CloudFormation
   maneja cambios, *drift*, y *rollback*.
+- **Separar** el ambiente en stacks de red, datos, y aplicación, conectados por
+  exports e imports.
 - Conocer los **primeros contenedores** por dentro: las *task definitions* y los
   *services* de ECS/Fargate que el template creó.
 
