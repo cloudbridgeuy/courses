@@ -1044,8 +1044,7 @@ se construye siempre el `HEAD` de `main`.
 18. En ECR, abrir el repositorio y confirmar las entradas con la fecha de hace unos
     minutos: la imagen con sus cuatro tags (`latest`, `branch-main`, SHA corto y SHA
     completo, todos con el mismo *digest*) y el cache de capas de buildx con la
-    etiqueta `cache`. Con la CLI —que agrupa por *digest*, así que muestra dos
-    filas:
+    etiqueta `cache`. Con la CLI:
 
     ```bash
     aws ecr describe-images \
