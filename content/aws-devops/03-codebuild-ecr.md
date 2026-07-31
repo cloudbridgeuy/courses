@@ -463,7 +463,6 @@ Si cambia cualquiera de las tres rutas (el código del `gateway`, una librería 
 `lib/`, o el lockfile cambia alguna de las líneas) cambia con ella el hash combinado.
 El `cut -c1-12` solo lo acorta para que el tag resulte legible.
 :::
-:::
 
 ### El `Dockerfile` no es solo de los desarrolladores
 
@@ -496,6 +495,7 @@ elimina la dependencia de terceros para poder realizar los builds: si el mirror
 público está caído, el pipeline sigue funcionando.
 
 :::inline-slide
+::: info
 ### Un registro de artefactos administrado
 
 ::: warning
@@ -507,7 +507,7 @@ realizarlo correctamente, es algo muy poderoso. AWS nos puede ayudar con la gest
 - *External connections*: el paquete se descarga del upstream público una sola vez, y queda retenido
 - **[ECR pull-through cache](https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html)**: lo mismo para imágenes base: Docker Hub, ECR Public, GHCR
 - Los paquetes de sistema (`apt`) quedan fuera — para eso, la imagen base corporativa
-
+:::
 :::
 
 Lo mismo aplica a las **imágenes base**. Es muy usual depender de imágenes públicas
@@ -516,11 +516,12 @@ con problemas de *rate limiting* en CI: los límites de descarga se comparten po
 y los runners de CI los agotan rápido. Además, usualmente apuntamos las etiquetas a
 `latest`, perdiendo el control de qué estamos introduciendo cada vez que hacemos un
 nuevo `build`. Es mejor utilizar la [galería pública de ECR](https://gallery.ecr.aws/),
-que no impone los límites agresivos de Docker Hub —o, mejor aún, nuestro propio
+que no impone los límites agresivos de Docker Hub. O, mejor aún, nuestro propio
 repositorio: con un *pull-through cache* logramos ambas cosas a la vez, y es
 exactamente lo que configuramos en el
 [Ejercicio 6](#ejercicio-6-servir-las-imagenes-base-desde-nuestro-registro).
-Y en cualquier caso, conviene fijar las imágenes base por su *digest* y
+
+En cualquier caso, conviene fijar las imágenes base por su *digest* y
 no solamente por etiqueta, en pos de asegurar que siempre hacemos el build con la
 misma imagen base:
 
@@ -788,11 +789,11 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
 3. Seguir los logs. Se verán las cuatro fases: verificación de herramientas; lint,
     autenticación con ECR y creación del *builder*; `docker buildx build` (que
     construye y publica en un solo paso); y la verificación en ECR. Al final de
-    `pre_build`, el log imprime **los tags resueltos para esta build** —los URIs
-    completos con `latest`, `branch-…` y el SHA del commit— que deben coincidir con
+    `pre_build`, el log imprime **los tags resueltos para esta build**, los URIs
+    completos con `latest`, `branch-…` y el SHA del commit. Estos deben coincidir con
     lo que luego aparece en ECR. La aplicación se
     compila dentro del build, por lo que la primera vez el proceso tarda entre 10 y
-    20 minutos — un buen momento para la discusión guiada.
+    20 minutos.
 4. Al terminar, el estado cambia a **Succeeded** (en verde) o **Failed** (en rojo).
     Si falla, el log indica en qué línea ocurrió el error.
 
@@ -823,12 +824,16 @@ de cada build queda guardado en **CloudWatch Logs**:
 1. Volver a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abrir el repositorio `taller-aws-<su-nombre>`.
 2. En la pestaña **Images**, se verá una fila por etiqueta recién publicada: `latest`,
    `branch-main`, el SHA corto y el SHA completo del commit —los mismos tags que el
-   log imprimió al final de `pre_build`— más `cache`, el cache de capas que buildx
+   log imprimió al final de `pre_build`, más `cache`. El cache de capas que buildx
    exportó al registro y que acelerará los builds siguientes. Observar el *digest*:
    las cuatro primeras comparten el mismo, porque son la misma imagen con distintos
-   nombres; esa es su identidad inmutable aunque `latest` se actualice. Copiar el
-   **Image URI** de `latest` (no el de `cache`). Se necesitará en la siguiente
-   sección para lanzar el stack de CloudFormation.
+   nombres; esa es su identidad inmutable aunque `latest` se actualice.
+
+::: info
+Copiar el **Image URI** de `latest` (no el de `cache`). Se necesitará en la
+siguiente sección para lanzar el stack de CloudFormation.
+:::
+
 3. La misma verificación con la CLI —`describe-images` agrupa por *digest*, por lo
    que muestra dos filas: la imagen con todos sus tags, y el cache:
 
@@ -856,17 +861,17 @@ de cada build queda guardado en **CloudWatch Logs**:
    +-----------------------------------+-------------------------------------------------------------------------------+
    ```
 
-## ECR más allá del push: retención, replicación y escaneo
+## ECR más allá del push: retención, replicación, acceso y escaneo
 
 Con la primera imagen publicada, el repositorio ya cumple su rol mínimo: recibir
 imágenes y servirlas. Pero un registro de producción no se administra solo, y ECR
-trae tres funcionalidades que conviene conocer desde el primer día.
+trae cuatro funcionalidades que conviene conocer desde el primer día.
 
 ### Políticas de lifecycle: decidir qué se guarda y por cuánto tiempo
 
 Cada build de hoy dejó cuatro tags nuevos en el repositorio; un pipeline activo genera
-decenas por semana. El almacenamiento de ECR es barato —alrededor de $0.10 por GB al
-mes, un costo casi despreciable frente al resto de la infraestructura—, pero la buena
+decenas por semana. El almacenamiento de ECR es barato (alrededor de $0.10 por GB al
+mes, un costo casi despreciable frente al resto de la infraestructura,) pero la buena
 práctica no pasa por el costo: pasa por definir de forma explícita **cuál es la
 política de la empresa para la retención de imágenes**, y expresarla como reglas en el
 repositorio en lugar de depender de limpiezas manuales.
@@ -876,22 +881,24 @@ Eso se hace con una **Lifecycle policy** (en la consola: dentro del repositorio,
 imágenes por estado de tag (con tag, sin tag) y por prefijo o patrón (`branch-*`), y
 las expira por antigüedad (`sinceImagePushed`) o por cantidad (`imageCountMoreThan`:
 "conservar solo las últimas N"). Un detalle importante: una regla selecciona la
-imagen completa —el *digest* con todos sus tags—, no un tag individual.
+imagen completa. El *digest* con todos sus tags, no un tag individual.
 
+::: warning
 Hay una trampa conocida: configurar la limpieza **en términos de tiempo** y borrar una
 imagen que está corriendo en producción. Mientras las tareas ya lanzadas sigan
-corriendo no pasa nada —el runtime ya tiene la imagen descargada—, pero en el momento
+corriendo no pasa nada. El runtime ya tiene la imagen descargada. Pero en el momento
 en que haga falta escalar, reemplazar una tarea caída, o volver a registrar el
 servicio, el *pull* falla porque la imagen ya no existe. El fallo aparece justo cuando
 el sistema está bajo presión, que es el peor momento posible. ECR no sabe qué está
 desplegado: la política borra lo que las reglas seleccionan, esté en producción o no.
+:::
 
 #### Cómo mitigar el borrado de imágenes en producción
 
 - **Preferir cantidad sobre tiempo para las imágenes desplegables.** Una regla de
   "conservar las últimas N" garantiza historial aunque el proyecto pase meses sin
   desplegar; una regla de "borrar lo más viejo que X días", tras una temporada sin
-  pushes, se lleva todas las imágenes — incluida la que está en producción.
+  pushes, se lleva todas las imágenes, incluida la que está en producción.
 - **Separar los tags efímeros de los de release.** Aplicar las reglas agresivas solo
   a las imágenes sin tag y a los prefijos efímeros (`branch-*`, SHAs); los tags de
   release (`v*`, `release-*`) reciben una retención larga, o ninguna regla.
@@ -904,16 +911,89 @@ desplegado: la política borra lo que las reglas seleccionan, esté en producci�
 ### Replicación entre regiones
 
 En **Private registry → Replication** se configuran reglas de replicación: cada push a
-la región de origen se copia automáticamente a otras regiones —o a otras cuentas—.
+la región de origen se copia automáticamente a otras regiones, o a otras cuentas.
 Esto puede ser útil, y hasta necesario, al desarrollar un plan de **Disaster
 Recovery**: si la región primaria queda fuera de servicio, los artefactos de deploy ya
 existen en la región de recuperación, y el ambiente puede recrearse sin depender de la
 región caída. También reduce la latencia de *pull* en despliegues multi-región.
 
-Dos detalles a tener en cuenta: la replicación copia los pushes, no los borrados —una
-lifecycle policy de la región de origen no limpia las réplicas—, así que cada región
+::: warning
+Dos detalles a tener en cuenta: la replicación copia los pushes, no los borrados. Una
+lifecycle policy de la región de origen no limpia las réplicas, así que cada región
 de destino necesita su propia política; y solo se replica lo que se publica después de
 crear la regla, lo ya existente no se copia retroactivamente.
+:::
+
+### Compartir imágenes fuera de la cuenta
+
+En una organización real, las imágenes rara vez viven en la misma cuenta que las
+consume: un patrón común es una cuenta de *shared services* que construye y publica,
+y cuentas de desarrollo, staging y producción que solo hacen *pull*. ECR cubre ambos
+extremos del espectro: acceso privado entre cuentas conocidas, y publicación abierta
+al mundo.
+
+#### De forma privada: repository policy
+
+El acceso entre cuentas no requiere copiar nada. Cada repositorio acepta una
+**repository policy** —una política basada en recursos, editable en
+**Permissions → Edit policy JSON** dentro del repositorio, que declara quién puede
+hacer *pull*. Para que sea segura:
+
+- **Conceder solo las acciones de pull**: `ecr:BatchGetImage`,
+  `ecr:GetDownloadUrlForLayer` y `ecr:BatchCheckLayerAvailability`. Nunca `ecr:*`.
+- **Nombrar a los consumidores de forma explícita**: el ARN de cada cuenta
+  (`arn:aws:iam::<cuenta>:root`) o, mejor dentro de una organización, la condición
+  `aws:PrincipalOrgID` — cualquier cuenta de la organización, y nadie más:
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowPullFromOrg",
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": [
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchCheckLayerAvailability"
+        ],
+        "Condition": {
+          "StringEquals": { "aws:PrincipalOrgID": "o-xxxxxxxxxx" }
+        }
+      }
+    ]
+  }
+  ```
+
+- **Recordar que el permiso tiene dos puertas.** En un acceso entre cuentas deben
+  abrirse ambas: la repository policy del lado del repositorio, y la política de IAM
+  del rol consumidor. Por ejemplo, el *task execution role* de un servicio ECS en la
+  otra cuenta, que además necesita `ecr:GetAuthorizationToken` para autenticarse.
+
+Cuando las cuentas consumidoras son muchas, o están en otras regiones, la
+alternativa es la **replicación cross-account** de la sección anterior: cada cuenta
+hace *pull* de su propia copia local, y la policy se reduce a los permisos de
+replicación.
+
+#### De forma pública: Amazon ECR Public
+
+Cuando la imagen es para el mundo (ejemplo: una herramienta open source o una imagen base
+propia) el mecanismo **no** es abrir el repositorio privado con un
+`"Principal": "*"` sin condición. Para eso existe **Amazon ECR Public**: un registro
+separado, con URLs de la forma `public.ecr.aws/<alias>/...` y una galería navegable
+([gallery.ecr.aws](https://gallery.ecr.aws).) La misma de donde el pull-through
+cache del Ejercicio 6 sirve las imágenes oficiales de Docker. Se publica
+autenticándose contra `us-east-1`; cualquiera puede hacer *pull*, incluso sin cuenta
+de AWS (de forma anónima, con límites de tasa más bajos que autenticado).
+
+::: warning
+Publicar una imagen expone **todas sus capas**: cualquier archivo copiado durante el
+build, y los valores pasados como `ARG`, quedan descargables por cualquiera (basta
+`docker history` para listarlos.) Antes de publicar: revisar que ningún secreto,
+credencial o código privado haya entrado en una capa, y asumir que lo publicado ya
+fue copiado — despublicar no lo recupera.
+:::
 
 ### Escaneo de vulnerabilidades
 
@@ -926,25 +1006,25 @@ nadie lance nada.
 
 Los *findings* quedan visibles por imagen en la consola y se publican como eventos, lo
 que abre la puerta a automatizarlos. Al día de hoy es sencillo combinarlos con
-**agentes** que sugieren remediaciones fáciles —actualizar la imagen base, subir una
-dependencia— y las vuelcan directamente en el código mediante **PRs automatizadas**.
-La revisión sigue siendo humana, pero el ciclo completo —detectar, proponer,
-reconstruir, republicar— corre sobre la misma estructura de CI/CD que se armó en esta
+**agentes** que sugieren remediaciones fáciles (actualizar la imagen base, subir una
+dependencia) y las vuelcan directamente en el código mediante **PRs automatizadas**.
+La revisión sigue siendo humana, pero el ciclo completo (detectar, proponer,
+reconstruir, republicar,) corre sobre la misma estructura de CI/CD que se armó en esta
 sesión: ese es el valor de haberla construido.
 
 ## Un adelanto: enterarse cuando el build termina
 
 Hoy se lanzó el build a mano y se siguieron los logs en pantalla. En un equipo real nadie se
-queda mirando la consola: el build avisa solo cuando termina —en éxito o en error— por
-el canal donde el equipo ya conversa. En este curso ese canal es **Microsoft Teams**.
+queda mirando la consola: el build avisa solo cuando termina (en éxito o en error) por
+el canal donde el equipo ya conversa. Por ejemplo: **Microsoft Teams**.
 
 No se configura esta semana, pero conviene ver el flujo desde ahora, porque es la
 pieza que cierra el pipeline en la Semana 3.
 
 ::: extra Cómo se notifica un build a Microsoft Teams
 El evento de fin de build (o de un *stage* de CodePipeline) lo capturan las **reglas
-de notificación de los Developer Tools** —llamadas históricamente *CodeStar
-Notifications*— y lo publican en un **tema de Amazon SNS**. Desde SNS, **AWS Chatbot**
+de notificación de los Developer Tools**, llamadas históricamente *CodeStar
+Notifications*, y lo publican en un **tema de Amazon SNS**. Desde SNS, **AWS Chatbot**
 lo entrega a un canal de Microsoft Teams.
 
 ```
@@ -959,7 +1039,7 @@ Una aclaración de nombres: el servicio **AWS CodeStar** (el de proyectos y dash
 fue discontinuado en 2024. Las **reglas de notificación** que se usan aquí son otra
 cosa, siguen vigentes, y son parte de los Developer Tools.
 
-En el laboratorio no se conecta Teams por participante —sería inviable. En su lugar,
+En el laboratorio no se conecta Teams por participante, sería inviable. En su lugar,
 los eventos de la cuenta llegan a la **aplicación del instructor**, que los muestra como
 avisos (*toasts*) en esta misma guía. El mecanismo del lab es un espejo del flujo real:
 lo que aquí aparece como un *toast*, en la organización aparecería en un canal de Teams.
@@ -1235,18 +1315,126 @@ upstream, el build usa exactamente la imagen fijada.
 {{ejercicio-4}}
 :::
 
-:::slide
-## ECR más allá del push
+:::slide light
+## ECR más allá del push: lifecycle
 
-- **Lifecycle** — la retención de imágenes es una política de la empresa, expresada
-  como reglas en el repositorio. Cuidado con las reglas por tiempo: pueden borrar la
-  imagen que está en producción, y el *pull* falla justo al escalar.
-  - Mitigar: "últimas N" en vez de días, tags de release protegidos, re-tag al
-    promocionar, *preview* antes de aplicar.
-- **Replicación** — copia automática de cada push a otras regiones o cuentas;
-  pieza clave de un plan de **Disaster Recovery**.
-- **Escaneo** — búsqueda continua de CVEs conocidos (Amazon Inspector). Findings +
-  agentes → remediaciones como PRs automatizadas, sobre el mismo CI/CD.
+La retención de imágenes es una **política de la empresa**.
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 25, "rankSpacing": 45}}}%%
+flowchart LR
+    ecr[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>repositorio")]
+    ecr --> q{"¿qué regla<br/>lo limpia?"}
+    q -->|"por tiempo<br/>(&gt; 90 días)"| del["borra también la<br/>imagen en producción"]
+    del --> fail["escalar → ✗ pull falla"]
+    q -->|"últimas N, y<br/>release-* protegido"| keep["lo desplegado<br/>siempre existe"]
+    keep --> ok["escalar → ✓ pull"]
+    classDef ecrNode fill:#fff7ed,stroke:#ed7100,stroke-width:2px,color:#7c2d12
+    classDef decisionNode fill:#fff7ed,stroke:#ed7100,color:#7c2d12
+    classDef badNode fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef fastNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    class ecr ecrNode
+    class q decisionNode
+    class del,fail badNode
+    class keep,ok fastNode
+```
+
+::: warning
+Hay que tener cuidado con la limpieza de imagenes por tiempo.
+
+Mitigación: usar las "últimas N" en vez de días, tags de release protegidos,
+re-tag al promocionar, *preview* antes de aplicar.
+:::
+:::
+
+:::slide light
+## ECR más allá del push: replicación
+
+Cada push a la región de origen se copia solo.
+
+::: info
+Clave de un plan de **Disaster Recovery**.
+:::
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 55}}}%%
+flowchart LR
+    push["<img src='/static/docker.svg' width='42' /><br/>docker push"]
+    push ==> src[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>us-east-2<br/>(origen)")]
+    src -.->|"réplica automática"| west[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>us-west-2")]
+    src -.->|"réplica automática"| acct[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>otra cuenta")]
+    west --> dr["DR: recrear el ambiente<br/>sin la región caída"]
+    classDef dockerNode fill:#eff8ff,stroke:#2396ed,color:#0c4a6e
+    classDef ecrNode fill:#fff7ed,stroke:#ed7100,stroke-width:2px,color:#7c2d12
+    classDef fastNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    class push dockerNode
+    class src,west,acct ecrNode
+    class dr fastNode
+```
+
+Se replican los pushes, no los borrados: cada destino define su propia lifecycle
+policy.
+:::
+
+:::slide light
+## ECR más allá del push: acceso
+
+En un *pull* entre cuentas deben abrirse **dos puertas**; lo público va por
+**Amazon ECR Public**.
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 50}, "themeVariables": {"clusterBkg": "#f8fafc", "clusterBorder": "#94a3b8", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
+    subgraph consumidora["cuenta consumidora"]
+        ecs["servicio ECS"]
+        iam["puerta 1: IAM del<br/>task execution role"]
+        ecs --> iam
+    end
+    subgraph shared["cuenta shared services"]
+        pol["puerta 2: repository policy<br/>solo pull + aws:PrincipalOrgID"]
+        repo[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>ECR privado")]
+        pol --> repo
+    end
+    iam ==>|"pull"| pol
+    pub[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>ECR Public")] -->|"pull anónimo"| world["cualquiera, sin<br/>cuenta de AWS"]
+    classDef plainNode fill:#ffffff,stroke:#94a3b8,color:#0f172a
+    classDef gateNode fill:#fefce8,stroke:#ca8a04,color:#713f12
+    classDef ecrNode fill:#fff7ed,stroke:#ed7100,stroke-width:2px,color:#7c2d12
+    class ecs,world plainNode
+    class iam,pol gateNode
+    class repo,pub ecrNode
+```
+:::
+
+:::slide light
+## ECR más allá del push: escaneo
+
+Búsqueda continua de CVEs conocidos (Amazon Inspector). Findings + agentes →
+remediaciones como **PRs automatizadas**, sobre el mismo CI/CD.
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 25, "rankSpacing": 45}}}%%
+flowchart LR
+    ecr[("<img src='/static/aws-ecr.svg' width='40' height='40' /><br/>imagen")]
+    ecr --> insp["Amazon Inspector<br/>escaneo continuo"]
+    insp -->|"CVE nuevo"| finding["finding"]
+    finding --> agent["agente"]
+    agent -->|"PR automatizada"| cc["<img src='/static/aws-codecommit.svg' width='40' height='40' /><br/>repo"]
+    cc --> cb["<img src='/static/aws-codebuild.svg' width='40' height='40' /><br/>build"]
+    cb ==>|"imagen corregida"| ecr
+    classDef ecrNode fill:#fff7ed,stroke:#ed7100,stroke-width:2px,color:#7c2d12
+    classDef plainNode fill:#ffffff,stroke:#94a3b8,color:#0f172a
+    classDef badNode fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef agentNode fill:#faf5ff,stroke:#9333ea,color:#581c87
+    classDef repoNode fill:#ffffff,stroke:#c925d1,color:#4a044e
+    classDef fastNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    class ecr ecrNode
+    class insp plainNode
+    class finding badNode
+    class agent agentNode
+    class cc repoNode
+    class cb fastNode
+```
 :::
 
 :::slide light

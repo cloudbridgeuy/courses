@@ -108,7 +108,7 @@ reload, so it needs neither step.
 |------|-------|------|
 | `01-introduccion` | DevOps, pipeline narrative, services table, how-to-use | 15–20 min |
 | `02-codecommit` | Pre-reqs (HTTPS/SSH/Identity Center) · versioning · clone/remote/push · branching · ej. 1–2 | 60–75 min |
-| `03-codebuild-ecr` | Build problem · CodeBuild · ECR · `buildspec.yml` · `Dockerfile` deep-dive (re-tagging, monorepo, hadolint, cache, pull-through cache) · create ECR + CodeBuild project + IAM · run build · ej. 3–6 | 100–120 min |
+| `03-codebuild-ecr` | Build problem · CodeBuild · ECR · `buildspec.yml` · `Dockerfile` deep-dive (re-tagging, monorepo, hadolint, cache, pull-through cache) · create ECR + CodeBuild project + IAM · run build · ECR beyond push (lifecycle, replication, cross-account/public access, scanning) · ej. 3–6 | 100–120 min |
 | `04-despliegue` | CloudFormation as black box · launch stack · ej. 7 | 30–45 min |
 | `05-teardown` | Tear down + recreate ("el seguro del taller") · ej. 8 | 30–40 min |
 | `06-preguntas-puente` | 3 bridge questions to Week 2 | 15–20 min |
