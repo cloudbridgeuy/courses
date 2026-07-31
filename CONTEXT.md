@@ -70,11 +70,11 @@ CodePipeline → CloudWatch**.
 **Content status.** Written (Week 1): `01`–`06`. Written (Week 2):
 `07-cloudformation-anatomia`, `08-leer-el-template`, `09-actualizar-stacks`,
 `10-preguntas-puente`, `11-buenas-practicas-troubleshooting`,
-`12-primeros-contenedores` (ej. 7–9). Written (Week 3): `13-operar-contenedores`,
+`12-primeros-contenedores` (ej. 9–11). Written (Week 3): `13-operar-contenedores`,
 `14-cicd-y-el-pipeline`, `15-preguntas-puente`, `16-codepipeline-en-la-practica`,
-`17-notificaciones-teams`, `18-observabilidad-metrics-logs` (ej. 10–13). Written
+`17-notificaciones-teams`, `18-observabilidad-metrics-logs` (ej. 12–15). Written
 (Week 4): `19-dashboards-y-alarmas`, `20-container-insights-trazabilidad`,
-`21-cierre-del-curso` (ej. 14–15 + optional capstone ej. 16). **All 4 weeks
+`21-cierre-del-curso` (ej. 16–17 + optional capstone ej. 18). **All 4 weeks
 authored.**
 
 **Note:** new content files are not served until added to a `[[session]]` in
@@ -108,9 +108,9 @@ reload, so it needs neither step.
 |------|-------|------|
 | `01-introduccion` | DevOps, pipeline narrative, services table, how-to-use | 15–20 min |
 | `02-codecommit` | Pre-reqs (HTTPS/SSH/Identity Center) · versioning · clone/remote/push · branching · ej. 1–2 | 60–75 min |
-| `03-codebuild-ecr` | Build problem · CodeBuild · ECR · `buildspec.yml` · create ECR + CodeBuild project + IAM · run build · ej. 3–4 | 75–90 min |
-| `04-despliegue` | CloudFormation as black box · launch stack · ej. 5 | 30–45 min |
-| `05-teardown` | Tear down + recreate ("el seguro del taller") · ej. 6 | 30–40 min |
+| `03-codebuild-ecr` | Build problem · CodeBuild · ECR · `buildspec.yml` · `Dockerfile` deep-dive (re-tagging, monorepo, hadolint, cache, pull-through cache) · create ECR + CodeBuild project + IAM · run build · ej. 3–6 | 100–120 min |
+| `04-despliegue` | CloudFormation as black box · launch stack · ej. 7 | 30–45 min |
+| `05-teardown` | Tear down + recreate ("el seguro del taller") · ej. 8 | 30–40 min |
 | `06-preguntas-puente` | 3 bridge questions to Week 2 | 15–20 min |
 
 Active content ≈ 3.5 h; reaches ~5 h counting passive waits (first build 10–20 min —
@@ -130,11 +130,22 @@ Week 3.
 
 **Lab parameters.**
 - Lab code source repo: `https://github.com/cloudbridgeuy/courses`.
-- The repo root ships the lab build files (added 2026-07-30): a 4-phase
-  `buildspec.yml` (install verifies tools · pre_build ECR login · build
-  `docker build`+tag · post_build `docker push`) and a multi-stage `Dockerfile`
-  that compiles `courses_server` (content embeds at compile time). The GitHub
-  snapshot must be republished so students actually clone them.
+- The repo root ships the lab build files (added 2026-07-30, reworked 2026-07-31):
+  a 4-phase `buildspec.yml` (install verifies tools incl. buildx · pre_build
+  hadolint + ECR login + `docker buildx create --use` · build `docker buildx build`
+  with ECR registry cache (`:cache` tag, `mode=max`, `--provenance=false`) and
+  `--push` · post_build `aws ecr describe-images` verification) and a multi-stage
+  `Dockerfile` that compiles `courses_server` (content embeds at compile time),
+  pinned by base-image digest and apt package versions (hadolint-clean). Exercise 5
+  (session 03) enables CodeBuild local cache. Exercise 6 (session 03) sets up an
+  ECR Public pull-through cache (prefix `ecr-public`, inline policy
+  `ecr:BatchImportUpstreamImage` + `ecr:CreateRepository` on the CodeBuild role)
+  and repoints both Dockerfile `FROM` lines at
+  `<account>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/…` — same
+  digests as Docker Hub (verified identical 2026-07-31), so the `@sha256:` pins
+  don't change. Exercises renumbered course-wide to be continuous 1–18 (04: ej. 7,
+  05: ej. 8, week 2+ shifted +2). The GitHub snapshot must be
+  republished so students actually clone them.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
 - Week-1 CloudFormation template (instructor-provided): `taller-semana1.yaml`.

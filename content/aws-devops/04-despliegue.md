@@ -113,8 +113,8 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 
 ---
 
-{#ejercicio-5}
-### Ejercicio 5 — Desplegar la aplicación
+{#ejercicio-7}
+### Ejercicio 7 — Desplegar la aplicación
 
 Lanzar el stack de CloudFormation con el template `taller-semana1.yaml` provisto por
 el instructor. Usar como URI de la imagen el valor copiado de ECR al terminar el
@@ -142,5 +142,5 @@ aplicación está en línea.
 :::
 
 :::slide light
-{{ejercicio-5}}
+{{ejercicio-7}}
 :::

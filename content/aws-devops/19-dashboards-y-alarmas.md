@@ -93,8 +93,8 @@ La alarma comienza en `INSUFFICIENT_DATA`, pasa a `OK` cuando hay datos, y entra
 
 ---
 
-{#ejercicio-14}
-### Ejercicio 14 — Componer un dashboard y armar una alarma
+{#ejercicio-16}
+### Ejercicio 16 — Componer un dashboard y armar una alarma
 
 Crear un dashboard de CloudWatch con, al menos, la CPU del servicio, la latencia del ALB,
 y los errores 5XX. Luego crear una alarma sobre la CPU del servicio (umbral 70%) cuya
@@ -114,5 +114,5 @@ acción publique en el tema de SNS del taller.
 :::
 
 :::slide light
-{{ejercicio-14}}
+{{ejercicio-16}}
 :::

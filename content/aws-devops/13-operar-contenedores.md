@@ -127,8 +127,8 @@ CloudWatch Logs identificado en la Semana 2.
 
 ---
 
-{#ejercicio-10}
-### Ejercicio 10 — Configurar el escalado y verificar la salud
+{#ejercicio-12}
+### Ejercicio 12 — Configurar el escalado y verificar la salud
 
 Configurar auto scaling para el servicio con seguimiento de CPU (objetivo 50%, mínimo 1,
 máximo 4 tareas). Luego, en el target group del ALB, confirmar que las tareas están
@@ -147,5 +147,5 @@ registradas como sanas.
 :::
 
 :::slide light
-{{ejercicio-10}}
+{{ejercicio-12}}
 :::

@@ -159,8 +159,8 @@ Una describe; el otro opera.
 
 ---
 
-{#ejercicio-9}
-### Ejercicio 9 — Reconocer lo que está corriendo
+{#ejercicio-11}
+### Ejercicio 11 — Reconocer lo que está corriendo
 
 Desde la consola de ECS, identificar para la aplicación: la tarea en ejecución, la
 revisión de la task definition que la originó, el URI de la imagen que ejecuta, y el
@@ -182,7 +182,7 @@ grupo de CloudWatch Logs al que escribe.
 :::
 
 :::slide light
-{{ejercicio-9}}
+{{ejercicio-11}}
 :::
 
 ---

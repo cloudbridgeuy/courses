@@ -95,8 +95,8 @@ de CodeBuild.
 
 ---
 
-{#ejercicio-6}
-### Ejercicio 6 — Destruir, y recrear, el ambiente
+{#ejercicio-8}
+### Ejercicio 8 — Destruir, y recrear, el ambiente
 
 Eliminar el stack de CloudFormation por completo. Confirmar que la aplicación ya no
 responde. Luego recrear el stack con los mismos parámetros y confirmar que la aplicación
@@ -128,5 +128,5 @@ vuelve a estar en línea.
 :::
 
 :::slide light
-{{ejercicio-6}}
+{{ejercicio-8}}
 :::

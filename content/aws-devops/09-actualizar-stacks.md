@@ -122,8 +122,8 @@ través del stack.
 
 ---
 
-{#ejercicio-8}
-### Ejercicio 8 — Actualizar el stack con un change set
+{#ejercicio-10}
+### Ejercicio 10 — Actualizar el stack con un change set
 
 Aumentar el número de tareas del servicio de una a dos. Hacerlo modificando el template,
 creando un change set, verificando que el servicio se **modifica** sin reemplazo, y
@@ -145,5 +145,5 @@ ejecutando el cambio. Confirmar que hay dos tareas en ejecución.
 :::
 
 :::slide light
-{{ejercicio-8}}
+{{ejercicio-10}}
 :::

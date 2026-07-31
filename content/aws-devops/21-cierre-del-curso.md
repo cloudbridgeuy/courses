@@ -93,8 +93,8 @@ temas nuevos desde cero.
 Para cerrar el taller con todo en movimiento a la vez, este ejercicio integrador
 recorre el sistema entero de punta a punta.
 
-{#ejercicio-16}
-### Ejercicio 16 — Del error a la corrección, por el pipeline
+{#ejercicio-18}
+### Ejercicio 18 — Del error a la corrección, por el pipeline
 
 Provocar una falla en la aplicación, detectarla por la observabilidad montada,
 diagnosticarla con el método de la caja de herramientas, y corregirla con un commit que
@@ -118,7 +118,7 @@ fluya por el pipeline hasta el despliegue.
 :::
 
 :::slide light
-{{ejercicio-16}}
+{{ejercicio-18}}
 :::
 
 :::slide

@@ -100,8 +100,8 @@ método de troubleshooting operacional que el taller deja como herramienta.
 
 ---
 
-{#ejercicio-15}
-### Ejercicio 15 — Activar Insights y seguir un hilo
+{#ejercicio-17}
+### Ejercicio 17 — Activar Insights y seguir un hilo
 
 Activar Container Insights en el clúster. Luego recorrer el camino completo: observar la CPU
 por tarea del servicio, identificar una ventana de tiempo, y leer en Logs Insights las
@@ -128,5 +128,5 @@ líneas del contenedor en esa ventana.
 :::
 
 :::slide light
-{{ejercicio-15}}
+{{ejercicio-17}}
 :::

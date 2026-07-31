@@ -118,8 +118,8 @@ un template largo sin perderse.
 
 ---
 
-{#ejercicio-7}
-### Ejercicio 7 — Seguir el rastro de la imagen
+{#ejercicio-9}
+### Ejercicio 9 — Seguir el rastro de la imagen
 
 Abrir `taller-semana1.yaml` y seguir el recorrido del URI de la imagen: desde el parámetro
 que lo recibe, hasta el recurso que finalmente lo usa para ejecutar el contenedor.
@@ -140,5 +140,5 @@ recurso de destino.
 :::
 
 :::slide light
-{{ejercicio-7}}
+{{ejercicio-9}}
 :::

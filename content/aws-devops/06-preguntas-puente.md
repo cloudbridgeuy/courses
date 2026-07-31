@@ -29,17 +29,18 @@ y ejecuta los comandos de cada fase en secuencia, dentro de un contenedor efíme
 (un entorno limpio que se destruye al terminar el build):
 
 - **`install`**: prepara el entorno de ejecución. En el `buildspec.yml` del taller,
-  esta fase verifica que Docker y la CLI de AWS estén disponibles — la imagen
-  administrada de CodeBuild ya los trae, así que no hay nada que instalar.
+  esta fase verifica que Docker (con buildx) y la CLI de AWS estén disponibles — la
+  imagen administrada de CodeBuild ya los trae, así que no hay nada que instalar.
 - **`pre_build`**: se ejecuta antes de la construcción principal. En el `buildspec.yml`
-  del taller, esta fase autentica con Amazon ECR usando las credenciales del rol de
-  IAM del proyecto. Sin este paso, el `docker push` posterior fallaría por falta de
-  permisos.
-- **`build`**: ejecuta `docker build` usando el `Dockerfile` en la raíz del
-  repositorio, produciendo una imagen local dentro del entorno de CodeBuild. Luego
-  etiqueta esa imagen con el URI completo del repositorio de ECR.
-- **`post_build`**: ejecuta `docker push` para transferir la imagen etiquetada desde
-  el entorno efímero de CodeBuild hacia el repositorio privado de ECR.
+  del taller, esta fase corre `hadolint` sobre el `Dockerfile`, autentica con Amazon
+  ECR usando las credenciales del rol de IAM del proyecto —sin este paso, el push
+  posterior fallaría por falta de permisos— y crea el *builder* de BuildKit que
+  permite exportar cache hacia el registro.
+- **`build`**: ejecuta `docker buildx build` usando el `Dockerfile` en la raíz del
+  repositorio, etiqueta la imagen con el URI completo del repositorio de ECR y la
+  publica en el mismo paso (`--push`), junto con su cache de capas (tag `:cache`).
+- **`post_build`**: verifica con `aws ecr describe-images` que la imagen quedó
+  publicada en el repositorio de ECR.
 
 El resultado —la imagen Docker— queda almacenado en **Amazon ECR**, identificado por
 el URI del repositorio y la etiqueta definida en la variable `IMAGE_TAG` (en este
