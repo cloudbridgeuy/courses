@@ -41,13 +41,14 @@ el ambiente completo se reconstituye en minutos, sin volver a hacer el build ni
 resubir el código.
 
 :::slide
-## El seguro del taller
+## Teardown
 
 Borrar y recrear el stack devuelve el ambiente a un estado conocido en minutos.
 
 **Sobrevive** (fuera del stack): el repo de CodeCommit, la imagen en ECR, el proyecto
-de CodeBuild —y, con la variante `vpc-existente`, la red de la cuenta.
-**Se borra** (lo gestiona el stack): ECS, Fargate, ALB, DynamoDB, IAM, y la red que
+de CodeBuild. Con la variante `vpc-existente`, la red de la cuenta tambien.
+
+**Se borra**: ECS, Fargate, ALB, DynamoDB, IAM, y la red que
 el template haya creado.
 :::
 
@@ -60,6 +61,12 @@ el template haya creado.
 3. Pulsar **Delete**.
 4. En el diálogo de confirmación, pulsar **Delete stack**.
 
+::: warning
+Si se hizo la sección opcional de HTTPS, borrar primero el stack
+`taller-aws-<su-nombre>-https`. CloudFormation bloquea el borrado del stack
+base mientras otro stack use sus exports.
+:::
+
 ### Seguir los eventos de borrado
 
 1. CloudFormation comienza a eliminar los recursos en orden inverso al de creación
@@ -68,15 +75,17 @@ el template haya creado.
 2. Esperar hasta que el stack desaparezca de la lista o, si la consola lo muestra,
    hasta que el estado sea **DELETE_COMPLETE**. El proceso toma entre 3 y 6 minutos.
 
-> **Nota:** si algún recurso no puede eliminarse automáticamente (por ejemplo, una
-> tabla de DynamoDB con protección contra eliminación, o un bucket de S3 con objetos),
-> el estado cambiará a **DELETE_FAILED** y el evento fallido indicará el recurso y el
-> motivo. El instructor indicará cómo proceder en ese caso.
+::: warning
+Si algún recurso no puede eliminarse automáticamente (por ejemplo, una
+tabla de DynamoDB con protección contra eliminación, o un bucket de S3 con objetos),
+el estado cambiará a **DELETE_FAILED** y el evento fallido indicará el recurso y el
+motivo.
+:::
 
 ### Confirmar que la aplicación ya no está en línea
 
 1. Intentar abrir de nuevo la URL del ALB usada antes. El navegador debe mostrar
-   un error de conexión —el balanceador ya no existe.
+   un error de conexión.
 
 ## Práctica guiada: recrear el stack
 
@@ -91,9 +100,55 @@ el template haya creado.
 4. En el campo del URI de la imagen, pegar el mismo URI de ECR usado antes.
     La imagen sigue en ECR — no es necesario volver a hacer el build. Con la
     variante de VPC existente, seleccionar también la misma VPC y las mismas
-    subredes.
+    subredes. Si se usó la sección opcional de HTTPS, dejar `RedirigirAHttps`
+    en `no` hasta volver a desplegar el stack `taller-aws-<su-nombre>-https`.
 5. Pulsar **Next**, aceptar las capacidades de IAM, y pulsar **Submit**.
 6. En la pestaña **Events**, esperar a que el estado vuelva a **CREATE_COMPLETE**.
+
+Con la `awscli`:
+
+{#bash-recrear-stack}
+```bash
+export TALLER="taller-aws-<nombre>"
+
+# URI de la imagen (sigue en ECR)
+IMAGE="$(aws ecr describe-repositories \
+   --repository-names $TALLER \
+   --query "repositories[0].repositoryUri" \
+   --output text):latest"
+
+# VPC por defecto y sus dos primeras subredes (ordenadas por AZ)
+VPC=$(aws ec2 describe-vpcs \
+   --filters Name=is-default,Values=true \
+   --query "Vpcs[0].VpcId" \
+   --output text)
+
+read -r SUBRED_A SUBRED_B <<< "$(aws ec2 describe-subnets \
+   --filters Name=vpc-id,Values="$VPC" \
+   --query "sort_by(Subnets,&AvailabilityZone)[:2].SubnetId" \
+   --output text)"
+
+echo $VPC $SUBRED_A $SUBRED_B
+
+# Recrear el stack con los mismos parámetros
+aws cloudformation create-stack \
+   --stack-name $TALLER \
+   --template-body file://infra/templates/taller-aws-devops-semana1-vpc-existente.yaml \
+   --parameters \
+     ParameterKey=ImageUri,ParameterValue="$IMAGE" \
+     ParameterKey=VpcId,ParameterValue="$VPC" \
+     ParameterKey=SubredAId,ParameterValue="$SUBRED_A" \
+     ParameterKey=SubredBId,ParameterValue="$SUBRED_B" \
+   --capabilities CAPABILITY_IAM
+
+# Esperar CREATE_COMPLETE y obtener la nueva URL
+aws cloudformation wait stack-create-complete --stack-name $TALLER
+
+aws cloudformation describe-stacks \
+   --stack-name $TALLER \
+   --query "Stacks[0].Outputs[?OutputKey=='ALBUrl'].OutputValue" \
+   --output text
+```
 
 ### Verificar que la aplicación está de nuevo en línea
 
@@ -131,12 +186,15 @@ vuelve a estar en línea.
 4. En el campo del URI de la imagen, pegar el URI de ECR con la etiqueta `latest`.
    La imagen sigue disponible en ECR sin necesidad de un nuevo build. Con la
    variante de VPC existente, seleccionar también la misma VPC y las mismas
-   subredes.
+   subredes. Dejar `RedirigirAHttps` en `no` hasta volver a desplegar el stack
+   de HTTPS, si se usa.
 5. Avanzar por las pantallas, aceptar las capacidades de IAM, y pulsar **Submit**.
 6. En la pestaña **Events**, esperar a **CREATE_COMPLETE**.
 7. En la pestaña **Outputs**, copiar la nueva URL del ALB.
 8. Abrirla en el navegador. La guía del taller debe cargarse de nuevo —el ambiente
     está completamente restaurado.
+
+{{bash-recrear-stack}}
 :::
 
 :::slide light

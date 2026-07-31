@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Extra · HTTPS con dominio propio
+
+# Template opcional que expone la aplicación de la Semana 1 por HTTPS bajo un
+# dominio propio. Requiere una hosted zone de Route 53 en la misma cuenta.
+# Se despliega como un stack aparte, después del stack base, y agrega:
+#
+#  - Un certificado de ACM para el dominio, validado automáticamente por DNS
+#    en la hosted zone (CloudFormation crea el registro de validación y espera
+#    a que el certificado se emita).
+#  - Un registro alias en Route 53 que apunta el dominio al ALB.
+#  - Un listener HTTPS (443) en el ALB del stack base, hacia el mismo grupo de
+#    destino, y la regla que abre el puerto 443 en su grupo de seguridad.
+#
+# No modifica el template base: lee el ALB por el nombre del stack, vía los
+# exports que este publica (Fn::ImportValue). Por eso, CloudFormation bloquea
+# el borrado del stack base mientras este stack exista: borrar primero este.
+
+Parameters:
+  AppStackName:
+    Type: String
+    Description: >-
+      Nombre del stack de la Semana 1 ya desplegado, dueño del ALB, por
+      ejemplo taller-aws-maria.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+    ConstraintDescription: Debe ser un nombre de stack de CloudFormation.
+
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Hosted zone de Route 53 que contiene el dominio.
+
+  NombreDominio:
+    Type: String
+    Description: >-
+      Dominio completo para la aplicación, dentro de la hosted zone, por
+      ejemplo maria.courses.cloudbridge.com.uy.
+    AllowedPattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    ConstraintDescription: Debe ser un nombre de dominio en minúsculas, por ejemplo maria.courses.cloudbridge.com.uy.
+
+Resources:
+  Certificado:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref NombreDominio
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref NombreDominio
+          HostedZoneId: !Ref HostedZoneId
+
+  # Registro alias: el ALB no tiene IPs estables, así que el dominio apunta al
+  # nombre DNS del balanceador usando su zona canónica.
+  RegistroDns:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref NombreDominio
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::ImportValue: !Sub "${AppStackName}-alb-dns"
+        HostedZoneId:
+          Fn::ImportValue: !Sub "${AppStackName}-alb-zona"
+
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Fn::ImportValue: !Sub "${AppStackName}-alb-arn"
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref Certificado
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Fn::ImportValue: !Sub "${AppStackName}-grupo-destino-arn"
+
+  IngresoHttps:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Fn::ImportValue: !Sub "${AppStackName}-sg-alb-id"
+      Description: Trafico HTTPS publico hacia el balanceador
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+Outputs:
+  UrlHttps:
+    Description: URL pública de la aplicación por HTTPS
+    Value: !Sub "https://${NombreDominio}"

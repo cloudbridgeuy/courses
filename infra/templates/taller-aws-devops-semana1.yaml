@@ -3,8 +3,9 @@ Description: Taller AWS DevOps — Semana 1
 
 # Ambiente completo de la Semana 1: la imagen publicada en ECR corre como un
 # servicio Fargate detrás de un ALB, con una tabla de DynamoDB para las apps
-# interactivas de la guía. La configuración de DNS se realiza fuera de banda:
-# la salida ALBUrl expone el nombre DNS generado por el balanceador.
+# interactivas de la guía. La salida ALBUrl expone el nombre DNS generado por
+# el balanceador (HTTP). El template opcional taller-aws-devops-extra-https.yaml
+# agrega HTTPS con dominio propio, consumiendo los exports del final.
 
 Parameters:
   ImageUri:
@@ -14,6 +15,18 @@ Parameters:
     ConstraintDescription: >-
       Debe ser un URI de ECR con etiqueta, por ejemplo
       123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
+
+  RedirigirAHttps:
+    Type: String
+    Default: "no"
+    AllowedValues: ["no", "si"]
+    Description: >-
+      Con "si", el listener HTTP (80) redirige a HTTPS (443) en lugar de
+      servir la aplicación. Usar solo con el template opcional de HTTPS ya
+      desplegado, que es el que crea el listener 443.
+
+Conditions:
+  RedirigirHttps: !Equals [!Ref RedirigirAHttps, "si"]
 
 Resources:
   # --- Base de datos ---
@@ -288,6 +301,9 @@ Resources:
         - Key: deregistration_delay.timeout_seconds
           Value: "15"
 
+  # El listener 80 existe siempre: el servicio ECS exige que el grupo de
+  # destino esté asociado a un listener para poder crearse. Con RedirigirAHttps
+  # en "si" deja de servir la aplicación y responde 301 hacia HTTPS.
   ListenerHTTP:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -295,8 +311,15 @@ Resources:
       Port: 80
       Protocol: HTTP
       DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref GrupoDestino
+        - !If
+          - RedirigirHttps
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+          - Type: forward
+            TargetGroupArn: !Ref GrupoDestino
 
 Outputs:
   ALBUrl:
@@ -309,7 +332,31 @@ Outputs:
   ALBDnsName:
     Description: Nombre DNS del balanceador, para configurar el DNS externo
     Value: !GetAtt BalanceadorApp.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-dns"
 
   ALBHostedZoneId:
     Description: Zona canónica del balanceador, para registros alias en Route 53
     Value: !GetAtt BalanceadorApp.CanonicalHostedZoneID
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-zona"
+
+  # Exports para el template opcional de HTTPS: le permiten agregar un listener
+  # 443 y abrir el puerto sin modificar este stack.
+  ALBArn:
+    Description: ARN del balanceador, para agregarle listeners desde otro stack
+    Value: !Ref BalanceadorApp
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-arn"
+
+  TargetGroupArn:
+    Description: ARN del grupo de destino, para listeners agregados desde otro stack
+    Value: !Ref GrupoDestino
+    Export:
+      Name: !Sub "${AWS::StackName}-grupo-destino-arn"
+
+  ALBSecurityGroupId:
+    Description: Grupo de seguridad del balanceador, para abrir puertos desde otro stack
+    Value: !Ref GrupoSeguridadALB
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-alb-id"

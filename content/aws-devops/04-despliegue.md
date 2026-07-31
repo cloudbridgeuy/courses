@@ -57,9 +57,11 @@ Como se mencionó, la versión estándar del template también crea recursos de 
 Verificar qué template se está usando, para no crear recursos innecesarios.
 :::
 
-Los únicos parámetros configurables son el **nombre del stack** y el **URI de la
+Los parámetros principales son el **nombre del stack** y el **URI de la
 imagen en ECR**. La variante de VPC existente pide además la red, como se detalla
-abajo. El resto lo gestiona el template.
+abajo. Ambas versiones muestran también un parámetro `RedirigirAHttps`, que se
+deja en `no`: pertenece a la sección opcional de HTTPS, al final de esta
+sección. El resto lo gestiona el template.
 
 ::: extra Si la cuenta ya tiene una VPC que se debe reutilizar
 El template estándar crea su propia VPC por participante. En cuentas donde eso no
@@ -189,7 +191,8 @@ Si el template funciona bien, la consola debería ofrecer automáticamente estos
 :::
 
 4. Revisar los demás parámetros. Dejarlos con sus valores predeterminados a menos que se
-   indique lo contrario.
+   indique lo contrario. En particular, dejar **RedirigirAHttps** en `no` —solo
+   se cambia si más adelante se hace la sección opcional de HTTPS.
 5. Pulsar **Next**.
 
 ### Confirmar y lanzar
@@ -279,16 +282,113 @@ aplicación está en línea.
 ::: info
 Si el template funciona bien, la consola debería ofrecer automáticamente estos valores.
 :::
-8. Pulsar **Next** para llegar a la pantalla de revisión.
-9. En la sección **Capabilities**, marcar la casilla de aceptación de recursos de IAM.
-10. Pulsar **Submit**.
-11. En la pestaña **Events**, esperar a que el estado del stack llegue a
+8. Dejar el parámetro **RedirigirAHttps** en `no` —pertenece a la sección
+   opcional de HTTPS.
+9. Pulsar **Next** para llegar a la pantalla de revisión.
+10. En la sección **Capabilities**, marcar la casilla de aceptación de recursos de IAM.
+11. Pulsar **Submit**.
+12. En la pestaña **Events**, esperar a que el estado del stack llegue a
     **CREATE_COMPLETE**.
-12. En la pestaña **Outputs**, copiar el valor de **ALBUrl**.
-13. Abrir esa URL en el navegador. Se verá la plataforma del taller corriendo desde el
+13. En la pestaña **Outputs**, copiar el valor de **ALBUrl**.
+14. Abrir esa URL en el navegador. Se verá la plataforma del taller corriendo desde el
     despliegue.
 :::
 
 :::slide light
 {{ejercicio-7}}
+:::
+
+## Opcional: exponer la aplicación por HTTPS
+
+La URL del ALB usa HTTP plano sobre un dominio generado por AWS
+(`…elb.amazonaws.com`). Para el taller alcanza, pero un servicio real se publica
+por HTTPS y bajo un dominio propio. Esta sección es opcional y requiere una
+**hosted zone de Route 53** en la misma cuenta.
+
+El template `taller-aws-devops-extra-https.yaml` se despliega como un stack
+aparte, **después** del stack de esta sección, y agrega tres piezas:
+
+- Un **certificado de ACM** para el dominio elegido, validado automáticamente
+  por DNS en la hosted zone.
+- Un **registro alias** en Route 53 que apunta el dominio al ALB.
+- Un **listener HTTPS (443)** en el ALB, hacia el mismo servicio, junto con la
+  regla del grupo de seguridad que abre el puerto.
+
+No modifica el stack base: lee el ALB por el nombre del stack, mediante los
+valores que este exporta. Ese mecanismo de exports e imports se explica en
+detalle en la Semana 2.
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-extra-https.yaml" type="yaml" toggleable></cb-file>
+:::
+
+### Desplegar el stack de HTTPS
+
+1. En CloudFormation, pulsar **Create stack → With new resources (standard)** y
+   subir `taller-aws-devops-extra-https.yaml`.
+2. En **Stack name**, escribir `taller-aws-<su-nombre>-https`.
+3. Completar los parámetros:
+   - **AppStackName** — el nombre del stack ya desplegado:
+     `taller-aws-<su-nombre>`.
+   - **HostedZoneId** — la consola ofrece las hosted zones de la cuenta como
+     desplegable. Seleccionar la zona del dominio
+     (`courses.cloudbridge.com.uy`).
+   - **NombreDominio** — el dominio completo para la aplicación, dentro de la
+     zona: `<su-nombre>.courses.cloudbridge.com.uy`.
+
+   Con la `awscli`:
+   ```bash
+   ❯ aws route53 list-hosted-zones-by-name \
+      --dns-name courses.cloudbridge.com.uy \
+      --query "HostedZones[0].Id" \
+      --output text
+   /hostedzone/Z0123456789ABCDEFGHIJ
+   ```
+   El ID de la zona es la parte final, después de `/hostedzone/`.
+4. Pulsar **Next** hasta la pantalla de resumen y pulsar **Submit**. Este
+   template no crea recursos de IAM, así que no pide capacidades.
+5. La creación tarda unos minutos más de lo habitual: CloudFormation espera a
+   que el certificado se valide por DNS antes de crear el listener.
+6. En la pestaña **Outputs**, copiar **UrlHttps** y abrirla en el navegador. La
+   aplicación responde en `https://<su-nombre>.courses.cloudbridge.com.uy`, con
+   el candado del certificado. La URL HTTP del ALB sigue funcionando.
+
+### Dejar de servir la aplicación por HTTP
+
+Con el listener HTTPS activo, se puede hacer que HTTP deje de servir contenido.
+Los templates de la Semana 1 aceptan el parámetro **RedirigirAHttps**: con
+`si`, el listener HTTP responde una redirección permanente (301) hacia HTTPS.
+El puerto 80 queda abierto solo para redirigir —cerrarlo del todo dejaría sin
+respuesta a quien escriba la URL sin `https://`, y el servicio ECS exige de
+todos modos un listener asociado al grupo de destino para poder crearse.
+
+Actualizar el stack base con el nuevo valor —el resto de los parámetros no
+cambia:
+
+```bash
+❯ aws cloudformation update-stack \
+   --stack-name taller-aws-<su-nombre> \
+   --template-body file://infra/templates/taller-aws-devops-semana1-vpc-existente.yaml \
+   --parameters \
+     ParameterKey=ImageUri,UsePreviousValue=true \
+     ParameterKey=VpcId,UsePreviousValue=true \
+     ParameterKey=SubredAId,UsePreviousValue=true \
+     ParameterKey=SubredBId,UsePreviousValue=true \
+     ParameterKey=RedirigirAHttps,ParameterValue=si \
+   --capabilities CAPABILITY_IAM
+```
+
+(Con el template estándar, dejar solo `ImageUri` y `RedirigirAHttps`.)
+
+::: info
+Tras la redirección, usar siempre la URL del dominio. La URL del ALB
+(`http://…elb.amazonaws.com`) redirige a HTTPS con su propio nombre de host, y
+el certificado emitido para el dominio no coincide, así que el navegador
+muestra una advertencia. Es el comportamiento esperado.
+:::
+
+::: warning
+CloudFormation no permite borrar un stack cuyos exports están en uso. Antes de
+la práctica de destrucción de la siguiente sección, borrar primero el stack
+`taller-aws-<su-nombre>-https`.
 :::

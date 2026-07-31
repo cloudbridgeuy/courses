@@ -149,9 +149,23 @@ Week 3.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
 - Instructor-provided CloudFormation templates (in `infra/templates/`): Week 1
-  monolith `taller-aws-devops-semana1.yaml`; Week 2 split
+  monolith `taller-aws-devops-semana1.yaml` plus variant
+  `…-semana1-vpc-existente.yaml` (takes `VpcId`/`SubredAId`/`SubredBId` instead
+  of creating the network); Week 2 split
   `taller-aws-devops-semana2-{red,datos,app}.yaml` (lifecycle separation; the
-  table migrates via resource import in `12-separar-stacks`, ej. 11).
+  table migrates via resource import in `12-separar-stacks`, ej. 11) plus
+  `…-semana2-red-existente.yaml` (network from params, SGs only, same five
+  exports as `-red`). Extras: `…-extra-subredes-publicas.yaml` (account admin
+  deploys once: two public subnets + routing on an existing VPC, optional
+  existing-IGW param) and `…-extra-https.yaml` (optional per participant: ACM
+  cert DNS-validated in a Route 53 hosted zone — workshop zone
+  `courses.cloudbridge.com.uy` — alias record, and a 443 listener on the week-1
+  ALB via `Fn::ImportValue`; guide section at the end of `04-despliegue`).
+  Both Week 1 templates export
+  `${StackName}-{alb-arn,alb-dns,alb-zona,grupo-destino-arn,sg-alb-id}` for the
+  HTTPS add-on, and take `RedirigirAHttps` (default `no`; `si` turns listener 80
+  into a 301 to HTTPS — set only while the `-https` stack exists, and delete
+  that stack first on teardown since its imports block the base stack's delete).
 - Recovery mechanism: tear down and recreate the stack to reset a pod to a
   known-good state ("el seguro del taller").
 - Each participant has their own AWS account / "pod".
