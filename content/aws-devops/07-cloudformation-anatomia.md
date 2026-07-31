@@ -8,7 +8,7 @@ title = "Anatomía de un template — CloudFormation"
 ## De la caja negra al código
 
 La Semana 1 terminó con la aplicación en línea, desplegada a partir de un archivo que
-tratamos como una caja negra: `taller-semana1.yaml`. Esta semana se abre esa caja.
+tratamos como una caja negra: `taller-aws-devops-semana1.yaml`. Esta semana se abre esa caja.
 
 El objetivo no es memorizar la sintaxis de CloudFormation, sino **saber leer un
 template**: reconocer qué describe, encontrar dónde se define cada recurso, y entender

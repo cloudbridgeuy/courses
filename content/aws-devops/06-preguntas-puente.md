@@ -59,7 +59,7 @@ la imagen en ECR, ambos, o ninguno? ¿Por qué?
 **Sobreviven ambos**: el repositorio de CodeCommit y la imagen en ECR.
 
 La razón es que CloudFormation solo gestiona los recursos que se declararon en el template.
-El template `taller-semana1.yaml` describe el clúster ECS, el servicio Fargate, el
+El template `taller-aws-devops-semana1.yaml` describe el clúster ECS, el servicio Fargate, el
 Application Load Balancer, la tabla de DynamoDB, los roles de IAM y la configuración
 de red. Esos recursos los creó CloudFormation y los elimina cuando se borra el stack.
 
@@ -135,7 +135,7 @@ ese template arma todo por dentro.
 
 La próxima semana se abre la caja negra. Se va a:
 
-- Leer el template `taller-semana1.yaml` recurso por recurso, y entender la
+- Leer el template `taller-aws-devops-semana1.yaml` recurso por recurso, y entender la
   **infraestructura como código**: parámetros, recursos, salidas, y funciones
   intrínsecas.
 - **Actualizar** el stack de forma segura con *change sets*, y ver cómo CloudFormation

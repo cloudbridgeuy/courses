@@ -1,5 +1,5 @@
 +++
-title = "El despliegue — CloudFormation como caja negra"
+title = "El despliegue: CloudFormation como caja negra"
 +++
 
 ## El salto de la imagen a la aplicación
@@ -11,15 +11,17 @@ configurar la red. Hacer eso paso a paso desde la consola tomaría más de una h
 sería difícil de reproducir exactamente.
 
 **AWS CloudFormation** resuelve este problema con un enfoque declarativo: se describe
-en un archivo YAML o JSON qué recursos se quieren —un clúster ECS, un servicio Fargate,
-un ALB, una tabla DynamoDB, grupos de seguridad, roles de IAM— y CloudFormation los
+en un archivo YAML o JSON qué recursos se quieren: un clúster ECS, un servicio Fargate,
+un ALB, una tabla DynamoDB, grupos de seguridad, roles de IAM. Luego CloudFormation los
 crea todos en el orden correcto, manejando las dependencias automáticamente.
 
 ## El template de esta semana
 
-El instructor provee el archivo `taller-semana1.yaml`. Este template es, por ahora,
-una **caja negra**: se lanza con dos parámetros y se obtiene un ambiente funcional
-en minutos. No es necesario entender su contenido esta semana —eso es el tema de la Semana 2.
+El instructor provee el archivo
+`./infra/templates/taller-aws-devops-semana1.yaml`. Este template es, por
+ahora, una **caja negra**: se lanza con dos parámetros y se obtiene un ambiente
+funcional en minutos. No es necesario entender su contenido todavía. Esto lo
+veremos durante la Semana 2.
 
 Lo que despliega el template:
 
@@ -63,7 +65,7 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 
 1. Pulsar **Create stack** y seleccionar **With new resources (standard)**.
 2. En la sección **Specify template**, seleccionar **Upload a template file**.
-3. Pulsar **Choose file** y seleccionar el archivo `taller-semana1.yaml` provisto por
+3. Pulsar **Choose file** y seleccionar el archivo `taller-aws-devops-semana1.yaml` provisto por
    el instructor.
 4. Pulsar **Next**.
 
@@ -90,7 +92,7 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 1. En la pantalla de revisión, desplazarse hasta la sección **Capabilities** al pie
     de la página. Se verá un aviso sobre que el template puede crear recursos de IAM.
     Marcar la casilla **I acknowledge that AWS CloudFormation might create IAM
-    resources with custom names**.
+    resources**.
 2. Pulsar **Submit** (o **Create stack**, según la versión de la consola).
 
 ### Seguir la creación del stack
@@ -116,7 +118,7 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 {#ejercicio-7}
 ### Ejercicio 7 — Desplegar la aplicación
 
-Lanzar el stack de CloudFormation con el template `taller-semana1.yaml` provisto por
+Lanzar el stack de CloudFormation con el template `taller-aws-devops-semana1.yaml` provisto por
 el instructor. Usar como URI de la imagen el valor copiado de ECR al terminar el
 Ejercicio 4. Al terminar, abrir la URL del ALB en el navegador y confirmar que la
 aplicación está en línea.
@@ -125,7 +127,7 @@ aplicación está en línea.
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
 2. Pulsar **Create stack → With new resources (standard)**.
 3. Seleccionar **Upload a template file**, pulsar **Choose file**, y subir
-   `taller-semana1.yaml`.
+   `taller-aws-devops-semana1.yaml`.
 4. Pulsar **Next**.
 5. En **Stack name**, escribir `taller-<su-nombre>`.
 6. En el campo del URI de la imagen, pegar el URI completo de ECR con la etiqueta

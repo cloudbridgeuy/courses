@@ -59,7 +59,7 @@ template y aplicando el cambio con un change set.
 
 ### Modificar el template
 
-1. Abrir `taller-semana1.yaml` en el editor.
+1. Abrir `taller-aws-devops-semana1.yaml` en el editor.
 2. Localizar el recurso `ServicioApp` (tipo `AWS::ECS::Service`).
 3. Cambiar la propiedad `DesiredCount` de `1` a `2`:
 
@@ -77,7 +77,7 @@ template y aplicando el cambio con un change set.
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-<su-nombre>`.
 2. Pulsar **Stack actions → Create change set for current stack**.
 3. Seleccionar **Replace existing template → Upload a template file**, y subir el
-   `taller-semana1.yaml` modificado.
+   `taller-aws-devops-semana1.yaml` modificado.
 4. Avanzar por las pantallas (los parámetros siguen igual) hasta llegar a la vista del
    change set. Pulsar **Create change set** y asignarle un nombre, por ejemplo
    `escalar-a-dos`.
@@ -130,7 +130,7 @@ creando un change set, verificando que el servicio se **modifica** sin reemplazo
 ejecutando el cambio. Confirmar que hay dos tareas en ejecución.
 
 ::: solucion
-1. En `taller-semana1.yaml`, cambiar `DesiredCount` de `1` a `2` en el recurso
+1. En `taller-aws-devops-semana1.yaml`, cambiar `DesiredCount` de `1` a `2` en el recurso
    `ServicioApp`, y guardar.
 2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), seleccionar el stack y pulsar
    **Stack actions → Create change set for current stack**.

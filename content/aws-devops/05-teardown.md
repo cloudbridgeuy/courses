@@ -22,7 +22,7 @@ sea la urgencia sino la calma. Se borra, se recrea, se sigue.
 
 Antes de borrar el stack, es útil entender qué destruye CloudFormation y qué no.
 
-El template `taller-semana1.yaml` crea y gestiona: el clúster ECS, el servicio Fargate,
+El template `taller-aws-devops-semana1.yaml` crea y gestiona: el clúster ECS, el servicio Fargate,
 el ALB, la tabla de DynamoDB, los roles de IAM, y la configuración de red. Todos esos
 recursos **se eliminan** cuando se borra el stack.
 
@@ -78,7 +78,7 @@ de CodeBuild.
 ### Lanzar el stack de nuevo
 
 1. Con el stack eliminado, pulsar **Create stack → With new resources (standard)**.
-2. Subir nuevamente el template `taller-semana1.yaml`. (Si la consola ofrece
+2. Subir nuevamente el template `taller-aws-devops-semana1.yaml`. (Si la consola ofrece
    reutilizar el template anterior porque se subió recientemente, se puede hacer.)
 3. En **Stack name**, usar exactamente el mismo nombre: `taller-<su-nombre>`.
 4. En el campo del URI de la imagen, pegar el mismo URI de ECR usado antes.
@@ -116,7 +116,7 @@ vuelve a estar en línea.
 **Recreación:**
 
 1. Pulsar **Create stack → With new resources (standard)**.
-2. Subir el template `taller-semana1.yaml` (o reutilizar el cargado anteriormente).
+2. Subir el template `taller-aws-devops-semana1.yaml` (o reutilizar el cargado anteriormente).
 3. En **Stack name**, escribir `taller-<su-nombre>`.
 4. En el campo del URI de la imagen, pegar el URI de ECR con la etiqueta `latest`.
    La imagen sigue disponible en ECR sin necesidad de un nuevo build.

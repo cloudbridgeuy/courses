@@ -5,10 +5,10 @@ title = "Leer el template paso a paso"
 ## El template de la Semana 1, por dentro
 
 Ya se conocen las secciones de un template. Ahora se recorre el archivo real que desplegó
-la aplicación, `taller-semana1.yaml`, recurso por recurso, conectando cada bloque con lo
+la aplicación, `taller-aws-devops-semana1.yaml`, recurso por recurso, conectando cada bloque con lo
 que se vio en la consola la semana pasada.
 
-Abrir el archivo `taller-semana1.yaml` en el editor de texto —es el mismo que se subió a
+Abrir el archivo `taller-aws-devops-semana1.yaml` en el editor de texto —es el mismo que se subió a
 CloudFormation. Se leerá de arriba hacia abajo.
 
 ## El encabezado y los parámetros
@@ -38,11 +38,15 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: collection
+          AttributeType: S
+        - AttributeName: key
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: collection
           KeyType: HASH
+        - AttributeName: key
+          KeyType: RANGE
 ```
 
 Este es el recurso que se vio en **DynamoDB → Tables**. Note que no tiene `TableName`:
@@ -121,7 +125,7 @@ un template largo sin perderse.
 {#ejercicio-9}
 ### Ejercicio 9 — Seguir el rastro de la imagen
 
-Abrir `taller-semana1.yaml` y seguir el recorrido del URI de la imagen: desde el parámetro
+Abrir `taller-aws-devops-semana1.yaml` y seguir el recorrido del URI de la imagen: desde el parámetro
 que lo recibe, hasta el recurso que finalmente lo usa para ejecutar el contenedor.
 Identificar el nombre del parámetro, la función intrínseca que lo transporta, y el
 recurso de destino.
