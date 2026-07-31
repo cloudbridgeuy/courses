@@ -18,6 +18,12 @@ phases:
       - GIT_SHA_SHORT=$(printf %.12s "$GIT_SHA")
       - SOURCE_BRANCH=${SOURCE_BRANCH:-${CODEBUILD_SOURCE_VERSION#refs/heads/}}
       - BRANCH_TAG=branch-$(printf '%s' "$SOURCE_BRANCH" | tr '/_' '--' | tr -cd '[:alnum:].-')
+      - |
+        echo "Tags resueltos para esta build:"
+        echo "  $IMAGE_URI:$IMAGE_TAG"
+        echo "  $IMAGE_URI:$BRANCH_TAG"
+        echo "  $IMAGE_URI:$GIT_SHA_SHORT"
+        echo "  $IMAGE_URI:$GIT_SHA"
       - docker buildx create --name cachebuilder --use
   build:
     commands:

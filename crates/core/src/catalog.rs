@@ -88,7 +88,11 @@ fn assemble_session(
 
         uses_solutions |= rendered.uses_solutions;
         uses_mermaid |= rendered.uses_mermaid;
-        uses_syntax_highlighting |= rendered.html.contains("<code class=\"language-");
+        uses_syntax_highlighting |= rendered.html.contains("<code class=\"language-")
+            || rendered.html.contains("<cb-file")
+            || rendered.slide_html.iter().any(|slide| {
+                slide.html.contains("<code class=\"language-") || slide.html.contains("<cb-file")
+            });
         uses_apps |= rendered.uses_apps;
         all_slides.extend(rendered.slide_html);
 
@@ -111,11 +115,13 @@ fn assemble_session(
         assets.push_script(MERMAID_JS_PATH);
         assets.push_script(MERMAID_INIT_JS_PATH);
     }
-    if uses_syntax_highlighting {
-        assets.push_script(SHIKI_INIT_JS_PATH);
-    }
     if uses_apps {
         assets.push_script(APPS_JS_PATH);
+    }
+    // `cb-file` creates its code block when apps.js runs, so apps must be
+    // registered before Shiki scans the document for language-tagged blocks.
+    if uses_syntax_highlighting {
+        assets.push_script(SHIKI_INIT_JS_PATH);
     }
 
     Ok((

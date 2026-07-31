@@ -4,6 +4,7 @@
 
 mod content;
 mod dev;
+mod file_apps;
 mod routes;
 mod site;
 
@@ -80,13 +81,18 @@ async fn main() -> Result<()> {
             // a fatal configuration error, handled below.
             let site = SiteHandle::new(dev::load_from_disk(root));
             let (reload, _rx) = broadcast::channel::<()>(RELOAD_CHANNEL_CAPACITY);
-            let watcher = dev::spawn_watcher(root.to_path_buf(), site.clone(), reload.clone())
-                .wrap_err_with(|| {
-                    format!(
-                        "failed to watch {DEV_ROOT_ENV}={}: it must point at the repository root",
-                        root.display()
-                    )
-                })?;
+            let watcher = dev::spawn_watcher(
+                root.to_path_buf(),
+                site.clone(),
+                reload.clone(),
+                content::embedded_file_paths(),
+            )
+            .wrap_err_with(|| {
+                format!(
+                    "failed to watch {DEV_ROOT_ENV}={}: it must point at the repository root",
+                    root.display()
+                )
+            })?;
             let ctx = DevCtx {
                 reload,
                 root: root.to_path_buf(),

@@ -176,3 +176,20 @@ CB_DEV_ROOT=$PWD cargo run -p courses_server   # without Docker
 Details in `.claude/context/dev-workflow.md`.
 
 A frontmatter or manifest error prints the file name and reason, then aborts.
+
+## Referenciar archivos del repositorio
+
+Para mostrar un archivo fuente sin copiarlo manualmente al Markdown, use `cb-file`
+dentro de un bloque `:::app`. La ruta es relativa a la raíz del repositorio y el
+atributo `type` selecciona el lenguaje usado por el resaltado de sintaxis:
+
+```md
+:::app
+<cb-file path="./buildspec.yml" type="yaml"></cb-file>
+:::
+```
+
+El archivo se incorpora al sitio durante el build, por lo que la versión publicada
+queda sincronizada con el contenido del repositorio. Solo se permiten archivos de
+texto UTF-8 dentro del repositorio; rutas absolutas y recorridos como `../` se
+rechazan.

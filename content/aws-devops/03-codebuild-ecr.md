@@ -153,54 +153,9 @@ El archivo `buildspec.yml` vive en la raíz del repositorio que se clonó y subi
 CodeCommit en la sección anterior, junto al `Dockerfile`. Es el contrato entre el
 código y CodeBuild, y usa las cuatro fases:
 
-```yaml
-version: 0.2
-
-phases:
-  install:
-    commands:
-      - echo Verificando las herramientas del entorno de build...
-      - docker --version
-      - docker buildx version
-      - aws --version
-  pre_build:
-    commands:
-      - echo Ejecutando Hadolint
-      - docker run --rm -i hadolint/hadolint < Dockerfile
-      - echo Autenticando con Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
-      - GIT_SHA=$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - GIT_SHA_SHORT=$(printf %.12s "$GIT_SHA")
-      - SOURCE_BRANCH=${SOURCE_BRANCH:-${CODEBUILD_SOURCE_VERSION#refs/heads/}}
-      - BRANCH_TAG=branch-$(printf '%s' "$SOURCE_BRANCH" | tr '/_' '--' | tr -cd '[:alnum:].-')
-      - docker buildx create --name cachebuilder --use
-  build:
-    commands:
-      - echo Construyendo y publicando la imagen Docker...
-      - |
-        docker buildx build \
-          --cache-from type=registry,ref=$IMAGE_URI:cache \
-          --cache-to type=registry,ref=$IMAGE_URI:cache,mode=max,image-manifest=true,oci-mediatypes=true \
-          --provenance=false \
-          --label org.opencontainers.image.revision="$GIT_SHA" \
-          --label org.opencontainers.image.source="$CODEBUILD_SOURCE_REPO_URL" \
-          --label com.amazonaws.codebuild.build-arn="$CODEBUILD_BUILD_ARN" \
-          --label com.amazonaws.codebuild.project-arn="$CODEBUILD_PROJECT_ARN" \
-          --label com.amazonaws.codebuild.initiator="$CODEBUILD_INITIATOR" \
-          --label com.amazonaws.codecommit.repository-arn="${CODECOMMIT_REPOSITORY_ARN:-}" \
-          -t "$IMAGE_URI:$IMAGE_TAG" \
-          -t "$IMAGE_URI:$BRANCH_TAG" \
-          -t "$IMAGE_URI:$GIT_SHA_SHORT" \
-          -t "$IMAGE_URI:$GIT_SHA" \
-          --push \
-          .
-  post_build:
-    commands:
-      - echo Verificando la imagen publicada en ECR...
-      - aws ecr describe-images --repository-name "$IMAGE_REPO_NAME" --image-ids imageTag="$IMAGE_TAG"
-      - echo Build completado.
-```
+:::app
+<cb-file path="./buildspec.yml" type="yaml"></cb-file>
+:::
 
 De más está decir que cada `command` puede invocar cualquier herramienta o script dentro
 del ambiente de CodeBuild, o dentro del repositorio. Los `commands` se ejecutan desde
@@ -792,10 +747,19 @@ crear un tag, según las reglas de promoción acordadas por el equipo.
       Docker images or want your builds to get elevated privileges**. Es
       **obligatoria** para que CodeBuild pueda ejecutar el daemon de Docker y
       construir imágenes de contenedor.
+    - En **Host kernel**, seleccionar `kernel-6 (Amazon Linux 2023)`. Este campo elige el
+      sistema operativo del *host* donde corre el contenedor del build (la imagen
+      curada ya es Amazon Linux 2023). El valor predeterminado, Amazon Linux 2,
+      sigue soportado, pero la consola muestra un aviso en el proyecto
+      recomendando migrar.
     - En **Compute**, seleccionar **4 vCPUs, 8 GiB memory** —la compilación de Rust
       dentro del build aprovecha los núcleos adicionales.
     - Dejar **Docker server configuration** sin activar (en el Ejercicio 4 se explica
       esta opción).
+
+> **Nota:** si el proyecto ya fue creado con el valor predeterminado, la consola
+> muestra un aviso azul recomendando el cambio. Se corrige en **Edit project →
+> Environment → Additional configuration → Host kernel → Amazon Linux 2023**.
 
 ### Agregar permisos de ECR al rol de CodeBuild
 
@@ -842,21 +806,74 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
     `buildspec.yml`. La pestaña **Build logs** muestra la salida en tiempo real.
 3. Seguir los logs. Se verán las cuatro fases: verificación de herramientas; lint,
     autenticación con ECR y creación del *builder*; `docker buildx build` (que
-    construye y publica en un solo paso); y la verificación en ECR. La aplicación se
+    construye y publica en un solo paso); y la verificación en ECR. Al final de
+    `pre_build`, el log imprime **los tags resueltos para esta build** —los URIs
+    completos con `latest`, `branch-…` y el SHA del commit— que deben coincidir con
+    lo que luego aparece en ECR. La aplicación se
     compila dentro del build, por lo que la primera vez el proceso tarda entre 10 y
     20 minutos — un buen momento para la discusión guiada.
 4. Al terminar, el estado cambia a **Succeeded** (en verde) o **Failed** (en rojo).
     Si falla, el log indica en qué línea ocurrió el error.
 
+### Repasar los logs completos en CloudWatch
+
+La pestaña **Build logs** muestra solo el tramo final de la salida. El log completo
+de cada build queda guardado en **CloudWatch Logs**:
+
+1. Encima del log, pulsar el enlace **View entire log**. Se abre el *log stream* de
+    ese build en CloudWatch Logs.
+2. El mismo destino se alcanza desde [**CloudWatch → Log groups**](https://console.aws.amazon.com/cloudwatch/home#logsV2:log-groups):
+    CodeBuild crea un grupo por proyecto (`/aws/codebuild/taller-aws-<su-nombre>-build`)
+    y, dentro, un *stream* por build, identificado por el ID del build. En el stream,
+    el campo **Filter events** busca texto en todo el log. Por ejemplo,
+    `"Tags resueltos"` localiza el bloque impreso al final de `pre_build`.
+3. Con la CLI:
+
+    ```bash
+    export TALLER=taller-aws-<su-nombre>
+    aws logs tail "/aws/codebuild/$TALLER-build" --since 1h
+    ```
+
+    Con `--follow`, el comando queda esperando y va mostrando las líneas nuevas,
+    útil para seguir un build en curso desde la terminal.
+
 ### Verificar la imagen en ECR
 
 1. Volver a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abrir el repositorio `taller-aws-<su-nombre>`.
-2. En la pestaña **Images**, se verán **dos** entradas recién publicadas: la imagen
-   con la etiqueta `latest`, y otra con la etiqueta `cache` — el cache de capas que
-   buildx exportó al registro y que acelerará los builds siguientes. Copiar el
-   **Image URI** de `latest` (no el de `cache`). Se necesitará en la siguiente sección
-   para lanzar el stack de CloudFormation. También observar el *digest*: es la
-   identidad inmutable de la imagen aunque `latest` se actualice.
+2. En la pestaña **Images**, se verá una fila por etiqueta recién publicada: `latest`,
+   `branch-main`, el SHA corto y el SHA completo del commit —los mismos tags que el
+   log imprimió al final de `pre_build`— más `cache`, el cache de capas que buildx
+   exportó al registro y que acelerará los builds siguientes. Observar el *digest*:
+   las cuatro primeras comparten el mismo, porque son la misma imagen con distintos
+   nombres; esa es su identidad inmutable aunque `latest` se actualice. Copiar el
+   **Image URI** de `latest` (no el de `cache`). Se necesitará en la siguiente
+   sección para lanzar el stack de CloudFormation.
+3. La misma verificación con la CLI —`describe-images` agrupa por *digest*, por lo
+   que muestra dos filas: la imagen con todos sus tags, y el cache:
+
+   ```bash
+   aws ecr describe-images \
+     --repository-name "$TALLER" \
+     --query "sort_by(imageDetails,&imagePushedAt)[].{tags:join(', ',imageTags),pushed:imagePushedAt}" \
+     --output table
+   ```
+
+   Por ejemplo:
+
+   ```bash
+   ❯ aws ecr describe-images \
+     --repository-name "$TALLER" \
+     --query "sort_by(imageDetails,&imagePushedAt)[].{tags:join(', ',imageTags),pushed:imagePushedAt}" \
+     --output table
+   ---------------------------------------------------------------------------------------------------------------------
+   |                                                  DescribeImages                                                   |
+   +-----------------------------------+-------------------------------------------------------------------------------+
+   |              pushed               |                                     tags                                      |
+   +-----------------------------------+-------------------------------------------------------------------------------+
+   |  2026-07-31T13:56:49.501000-03:00 |  branch-main, cd5906be4801, latest, cd5906be4801c59a22b7c6816ea2683e85700fd1  |
+   |  2026-07-31T13:57:23.661000-03:00 |  cache                                                                        |
+   +-----------------------------------+-------------------------------------------------------------------------------+
+   ```
 
 ## Un adelanto: enterarse cuando el build termina
 
@@ -970,6 +987,7 @@ se construye siempre el `HEAD` de `main`.
 8. En **Service role**, seleccionar **New service role**.
 9. Expandir **Additional configuration** y activar la casilla **Privileged**. Sin
    esta opción, Docker no puede ejecutarse dentro del build y el proceso falla.
+   En **Host kernel**, seleccionar `kernel-6 (Amazon Linux 2023)`.
 
 ::: info
 **Running mode** elige dónde corre el buildspec:
@@ -1020,16 +1038,37 @@ se construye siempre el `HEAD` de `main`.
     ```
 16. Volver a CodeBuild, abrir el proyecto, y pulsar **Start build**.
 17. En la pestaña **Build logs**, seguir la ejecución hasta que el estado sea
-    **Succeeded**.
-18. En ECR, abrir el repositorio y confirmar que aparecen dos entradas con la fecha
-    de hace unos minutos: la imagen con la etiqueta `latest`, y el cache de capas de
-    buildx con la etiqueta `cache`. Con la CLI:
+    **Succeeded**. El log completo queda en CloudWatch Logs (**View entire log**, o
+    el grupo `/aws/codebuild/taller-aws-<su-nombre>-build`); con la CLI:
+    `aws logs tail "/aws/codebuild/$TALLER-build" --since 1h`.
+18. En ECR, abrir el repositorio y confirmar las entradas con la fecha de hace unos
+    minutos: la imagen con sus cuatro tags (`latest`, `branch-main`, SHA corto y SHA
+    completo, todos con el mismo *digest*) y el cache de capas de buildx con la
+    etiqueta `cache`. Con la CLI —que agrupa por *digest*, así que muestra dos
+    filas:
 
     ```bash
     aws ecr describe-images \
       --repository-name "$TALLER" \
-      --query 'sort_by(imageDetails,&imagePushedAt)[].{tag:imageTags[0],pushed:imagePushedAt}' \
+      --query "sort_by(imageDetails,&imagePushedAt)[].{tags:join(', ',imageTags),pushed:imagePushedAt}" \
       --output table
+    ```
+
+    Por ejemplo:
+
+    ```bash
+    ❯ aws ecr describe-images \
+      --repository-name "$TALLER" \
+      --query "sort_by(imageDetails,&imagePushedAt)[].{tags:join(', ',imageTags),pushed:imagePushedAt}" \
+      --output table
+    ---------------------------------------------------------------------------------------------------------------------
+    |                                                  DescribeImages                                                   |
+    +-----------------------------------+-------------------------------------------------------------------------------+
+    |              pushed               |                                     tags                                      |
+    +-----------------------------------+-------------------------------------------------------------------------------+
+    |  2026-07-31T13:56:49.501000-03:00 |  branch-main, cd5906be4801, latest, cd5906be4801c59a22b7c6816ea2683e85700fd1  |
+    |  2026-07-31T13:57:23.661000-03:00 |  cache                                                                        |
+    +-----------------------------------+-------------------------------------------------------------------------------+
     ```
 :::
 

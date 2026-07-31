@@ -21,6 +21,8 @@ content and onto disk, with a file watcher that reloads on save.
   `content/` and `crates/server/static/` fires the watcher — there is no
   filename allowlist, so vendored bundles like `reveal.min.js` and the
   dev-reload client itself also qualify.
+- Each repository file referenced by a `<cb-file>` element is watched directly,
+  so editing it reloads the current dev page and refreshes the rendered source.
 - Hot-served: content (`*.md`, `course.toml`) is always re-read from disk;
   static assets are re-read only for the six files in `text_asset`
   (`guide.css`, `slides.css`, `cb-widgets.css`, `apps.js`, `toggle.js`,

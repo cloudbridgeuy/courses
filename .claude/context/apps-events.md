@@ -175,6 +175,11 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   `{ value, method }`, locking like `cb-cpu-burst` when gated.
 - Lock UI + unlock modal (see "Lock UI" above): dims gated widgets, validates the
   secret via `/events/verify`, stores it in `sessionStorage` under `cb-apps-secret`.
+- `<cb-file path="./buildspec.yml" type="yaml">` is a read-only app. The server
+  resolves its repository-relative path while rendering, embeds its UTF-8 source in
+  the element, and the client renders it as a Shiki-highlighted code block. It never
+  receives a filesystem endpoint, so a published course cannot expose arbitrary
+  repository files.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

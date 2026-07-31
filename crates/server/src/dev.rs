@@ -51,7 +51,7 @@ fn build_site(root: &Path) -> Result<RenderedSite> {
             .and_then(|name| name.to_str())
             .ok_or_eyre("content subdirectory with a non-UTF-8 name")?
             .to_owned();
-        courses.push(load_course(&slug, &path).wrap_err_with(|| format!("course {slug:?}"))?);
+        courses.push(load_course(root, &slug, &path).wrap_err_with(|| format!("course {slug:?}"))?);
     }
 
     courses.sort_by(|a, b| a.course.slug.as_str().cmp(b.course.slug.as_str()));
@@ -60,7 +60,7 @@ fn build_site(root: &Path) -> Result<RenderedSite> {
 
 /// Reads one course directory into the same `CourseInput` the embedded loader
 /// builds in `crate::content`, then hands it to the pure parser.
-fn load_course(slug: &str, dir: &Path) -> Result<LoadedCourse> {
+fn load_course(root: &Path, slug: &str, dir: &Path) -> Result<LoadedCourse> {
     let manifest_path = dir.join("course.toml");
     let manifest = std::fs::read_to_string(&manifest_path)
         .wrap_err_with(|| format!("could not read {}", manifest_path.display()))?;
@@ -86,6 +86,10 @@ fn load_course(slug: &str, dir: &Path) -> Result<LoadedCourse> {
         }
         let contents = std::fs::read_to_string(&path)
             .wrap_err_with(|| format!("could not read {}", path.display()))?;
+        let contents = crate::file_apps::expand_file_apps(&contents, |source| {
+            std::fs::read_to_string(root.join(source)).ok()
+        })
+        .wrap_err_with(|| format!("could not expand cb-file references in {}", path.display()))?;
         files.push((name.to_owned(), contents));
     }
     files.sort_by(|a, b| a.0.cmp(&b.0));
@@ -113,18 +117,21 @@ pub fn spawn_watcher(
     root: PathBuf,
     site: SiteHandle,
     reload: broadcast::Sender<()>,
+    file_app_paths: &[&str],
 ) -> Result<RecommendedWatcher> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    let source_paths: Vec<PathBuf> = file_app_paths.iter().map(|path| root.join(path)).collect();
+    let source_paths_for_events = source_paths.clone();
 
     // notify calls this from its own thread. It does no work beyond filtering,
     // so a burst of events cannot stall the watcher.
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
         match result {
             Ok(event) => {
-                let relevant = event
-                    .paths
-                    .iter()
-                    .any(|path| path.to_str().is_some_and(courses_core::is_reload_trigger));
+                let relevant = event.paths.iter().any(|path| {
+                    path.to_str().is_some_and(courses_core::is_reload_trigger)
+                        || source_paths_for_events.iter().any(|source| source == path)
+                });
                 if relevant {
                     // A send error only means the reload task is gone; ignore.
                     let _ = tx.send(());
@@ -141,6 +148,12 @@ pub fn spawn_watcher(
             .watch(&path, RecursiveMode::Recursive)
             .wrap_err_with(|| format!("could not watch {}", path.display()))?;
         tracing::info!("watching {}", path.display());
+    }
+    for source in &source_paths {
+        watcher
+            .watch(source, RecursiveMode::NonRecursive)
+            .wrap_err_with(|| format!("could not watch cb-file source {}", source.display()))?;
+        tracing::info!(path = %source.display(), "watching cb-file source");
     }
 
     tokio::spawn(async move {

@@ -694,4 +694,32 @@
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Custom element: <cb-file>
+  // Attributes: path, type, data-content
+  //
+  // The server fills data-content from a repository file while rendering the
+  // course. The component deliberately has no fetch URL: published courses do
+  // not expose the repository filesystem to the browser.
+  // ---------------------------------------------------------------------------
+
+  customElements.define(
+    "cb-file",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this._rendered) return;
+        this._rendered = true;
+
+        var type = this.getAttribute("type") || "text";
+        var content = this.getAttribute("data-content") || "";
+        var pre = document.createElement("pre");
+        var code = document.createElement("code");
+        code.className = "language-" + type;
+        code.textContent = content;
+        pre.appendChild(code);
+        this.appendChild(pre);
+      }
+    }
+  );
 })();

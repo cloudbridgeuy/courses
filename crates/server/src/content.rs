@@ -9,6 +9,15 @@ use include_dir::{Dir, include_dir};
 
 static CONTENT: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../content");
 
+mod embedded_files {
+    include!(concat!(env!("OUT_DIR"), "/embedded_file_apps.rs"));
+}
+
+/// Repository files referenced by `<cb-file>` elements at compile time.
+pub fn embedded_file_paths() -> &'static [&'static str] {
+    embedded_files::EMBEDDED_FILE_PATHS
+}
+
 /// Parses every course under `content/`, and pre-renders the full site.
 pub fn load_site() -> Result<RenderedSite> {
     let mut courses: Vec<LoadedCourse> = Vec::new();
@@ -43,7 +52,11 @@ fn load_course(slug: &str, dir: &Dir<'static>) -> Result<LoadedCourse> {
         let contents = file
             .contents_utf8()
             .ok_or_eyre(format!("non-UTF-8 section file: {name}"))?;
-        files.push((name.to_owned(), contents.to_owned()));
+        let contents = crate::file_apps::expand_file_apps(contents, |path| {
+            embedded_files::embedded_file(path).map(str::to_owned)
+        })
+        .wrap_err_with(|| format!("could not expand cb-file references in {name}"))?;
+        files.push((name.to_owned(), contents));
     }
 
     let input = CourseInput {
@@ -72,6 +85,11 @@ mod tests {
         let session = &site.pages["aws-devops/del-codigo-a-la-imagen"];
         assert!(session.contains("class=\"solucion\""));
         assert!(session.contains("/static/toggle.js"));
+        assert!(session.contains("<cb-file path=\"buildspec.yml\" type=\"yaml\""));
+        assert!(session.contains("data-content=\"version: 0.2"));
+        let apps_at = session.find("/static/apps.js").unwrap();
+        let shiki_at = session.find("/static/shiki-init.js").unwrap();
+        assert!(apps_at < shiki_at, "cb-file must render before Shiki runs");
         // index tree links the session
         assert!(
             site.index_html

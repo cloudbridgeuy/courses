@@ -194,8 +194,10 @@ SSE bus.
   - `toast-demo` broadcasts a demo `Notification` on the bus, so a guide preview
     toast renders through the exact path real SNS events use. No AWS call.
 - **Client**: `static/apps.js` — `<cb-cpu-burst>`, `<cb-counter>`, `<cb-metric>`,
-  `<cb-toast-demo>`, lock UI, multiplexed `EventSource`. Loaded when `uses_apps`
-  flag is set (via `:::app`).
+  `<cb-toast-demo>`, and the read-only `<cb-file>` source viewer, plus lock UI and
+  multiplexed `EventSource`. `<cb-file>` accepts a repository-relative UTF-8 path;
+  the server embeds the source during rendering rather than exposing a filesystem
+  route. The bundle loads when `uses_apps` is set (via `:::app`).
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret
@@ -227,10 +229,11 @@ SSE bus.
 
 - Run: `cargo run -p courses_server`; local dev port `8090`.
 - **Content and static assets are embedded at build time** (`include_dir!` for
-  `content/`, `include_str!` for CSS/JS). Any content/CSS/JS change requires
-  `cargo build -p courses_server` before it is served. This production path is
-  unaffected by dev mode below — unchanged behavior, bad content still aborts
-  startup.
+  `content/`, `include_str!` for CSS/JS, and a generated `include_str!` registry
+  for each repository file referenced by `<cb-file>`). Any referenced source,
+  content, CSS, or JS change requires `cargo build -p courses_server` before it is
+  served. This production path is unaffected by dev mode below — unchanged behavior,
+  bad content still aborts startup.
 - Lint gate before done: `cargo xtask lint` (fallback `cargo run -p xtask -- lint`).
 
 ### Dev mode / hot reload
@@ -238,10 +241,10 @@ SSE bus.
 - **`CB_DEV_ROOT`** (repo root; trimmed, empty counts as absent) switches the
   server to read `content/` and six text assets (`guide.css`, `slides.css`,
   `cb-widgets.css`, `apps.js`, `toggle.js`, `mermaid-init.js`) from disk, with a
-  `notify` watcher that hot reloads on save. `cargo xtask dev` sets it
-  automatically; `CB_DEV_ROOT=$PWD cargo run -p courses_server` is the
-  Docker-free equivalent. Deliberately excluded from `.env.example` (a
-  machine-specific absolute path).
+  `notify` watcher that hot reloads on save. It also watches each source referenced
+  by `<cb-file>`. `cargo xtask dev` sets it automatically; `CB_DEV_ROOT=$PWD cargo
+  run -p courses_server` is the Docker-free equivalent. Deliberately excluded from
+  `.env.example` (a machine-specific absolute path).
 - **`GET /dev/reload`** — dev-only SSE route the browser client
   (`static/dev-reload.js`) subscribes to; answers 404 in production.
 - Topic guide: `.claude/context/dev-workflow.md`.

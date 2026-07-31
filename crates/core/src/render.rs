@@ -255,9 +255,9 @@ pub fn render_slideshow_page(
     } else {
         String::new()
     };
-    let uses_syntax_highlighting = slides_html
-        .iter()
-        .any(|slide| slide.html.contains("<code class=\"language-"));
+    let uses_syntax_highlighting = slides_html.iter().any(|slide| {
+        slide.html.contains("<code class=\"language-") || slide.html.contains("<cb-file")
+    });
     let shiki_script = if uses_syntax_highlighting {
         format!("<script defer src=\"{SHIKI_INIT_JS_PATH}\"></script>\n")
     } else {

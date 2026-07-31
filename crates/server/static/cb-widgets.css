@@ -12,6 +12,14 @@
   margin: 1rem 0;
 }
 
+cb-file {
+  display: block;
+}
+
+cb-file > pre {
+  margin: 0;
+}
+
 .cb-app-btn {
   display: inline-flex;
   align-items: center;
