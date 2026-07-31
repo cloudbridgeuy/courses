@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Extra · Subredes públicas sobre una VPC existente
+
+# Template de reparación para cuentas que tienen una VPC pero sin subredes
+# públicas utilizables: crea dos subredes públicas en zonas de disponibilidad
+# distintas, con su tabla de rutas y salida a internet, dentro de la VPC
+# indicada. Si la VPC ya tiene un Internet Gateway, se pasa su ID como
+# parámetro; si no, el template crea y adjunta uno (una VPC solo admite un
+# Internet Gateway).
+#
+# Lo despliega una sola vez quien administra la cuenta —no es por
+# participante. Los stacks del taller que reciben la VPC como parámetro
+# (las variantes "vpc-existente" y "red-existente") consumen las subredes
+# que salen en los outputs. Borrar este stack exige borrar antes los stacks
+# del taller que usan las subredes.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC existente donde se crean las subredes.
+
+  # Los CIDR no tienen default porque dependen del rango de la VPC: deben ser
+  # dos bloques libres dentro de su CidrBlock (consola VPC → Your VPCs).
+  CidrSubredA:
+    Type: String
+    Description: Bloque CIDR libre dentro de la VPC para la primera subred, por ejemplo 172.31.100.0/24.
+    AllowedPattern: '^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$'
+    ConstraintDescription: Debe ser un bloque CIDR, por ejemplo 172.31.100.0/24.
+
+  CidrSubredB:
+    Type: String
+    Description: Bloque CIDR libre dentro de la VPC para la segunda subred, por ejemplo 172.31.101.0/24.
+    AllowedPattern: '^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$'
+    ConstraintDescription: Debe ser un bloque CIDR, por ejemplo 172.31.101.0/24.
+
+  InternetGatewayId:
+    Type: String
+    Default: ""
+    Description: >-
+      ID del Internet Gateway ya adjunto a la VPC (consola VPC → Internet
+      gateways). Dejar vacío para que el template cree y adjunte uno.
+    AllowedPattern: '^(igw-[0-9a-f]+)?$'
+    ConstraintDescription: Debe ser un ID igw-… o quedar vacío.
+
+Conditions:
+  CrearGateway: !Equals [!Ref InternetGatewayId, ""]
+  GatewayExistente: !Not [!Condition CrearGateway]
+
+Resources:
+  SubredPublicaA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref CidrSubredA
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-a"
+
+  SubredPublicaB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref CidrSubredB
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-b"
+
+  GatewayInternet:
+    Type: AWS::EC2::InternetGateway
+    Condition: CrearGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-igw"
+
+  VinculoGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CrearGateway
+    Properties:
+      VpcId: !Ref VpcId
+      InternetGatewayId: !Ref GatewayInternet
+
+  TablaRutas:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica"
+
+  # La ruta de salida existe en dos versiones excluyentes, según el gateway
+  # sea creado por este stack o recibido como parámetro. Solo una se crea.
+  RutaSalidaGatewayNuevo:
+    Type: AWS::EC2::Route
+    Condition: CrearGateway
+    DependsOn: VinculoGateway
+    Properties:
+      RouteTableId: !Ref TablaRutas
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref GatewayInternet
+
+  RutaSalidaGatewayExistente:
+    Type: AWS::EC2::Route
+    Condition: GatewayExistente
+    Properties:
+      RouteTableId: !Ref TablaRutas
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayId
+
+  AsociacionSubredA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaA
+      RouteTableId: !Ref TablaRutas
+
+  AsociacionSubredB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaB
+      RouteTableId: !Ref TablaRutas
+
+Outputs:
+  SubredPublicaAId:
+    Description: ID de la primera subred pública, para los stacks del taller
+    Value: !Ref SubredPublicaA
+
+  SubredPublicaBId:
+    Description: ID de la segunda subred pública, para los stacks del taller
+    Value: !Ref SubredPublicaB

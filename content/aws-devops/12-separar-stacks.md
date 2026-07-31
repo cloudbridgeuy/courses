@@ -38,9 +38,9 @@ El instructor provee los tres templates:
 
 | Template | Stack | Contiene |
 | --- | --- | --- |
-| `taller-aws-devops-semana2-red.yaml` | `taller-<su-nombre>-red` | VPC, subredes, gateway, grupos de seguridad |
-| `taller-aws-devops-semana2-datos.yaml` | `taller-<su-nombre>-datos` | La tabla de DynamoDB, con `DeletionPolicy: Retain` |
-| `taller-aws-devops-semana2-app.yaml` | `taller-<su-nombre>-app` | Clúster, servicio, task definition, ALB, roles de IAM |
+| `taller-aws-devops-semana2-red.yaml` | `taller-aws-<su-nombre>-red` | VPC, subredes, gateway, grupos de seguridad |
+| `taller-aws-devops-semana2-datos.yaml` | `taller-aws-<su-nombre>-datos` | La tabla de DynamoDB, con `DeletionPolicy: Retain` |
+| `taller-aws-devops-semana2-app.yaml` | `taller-aws-<su-nombre>-app` | Clúster, servicio, task definition, ALB, roles de IAM |
 
 ## El contrato entre stacks
 
@@ -67,6 +67,26 @@ anterior. Y como todo contrato, obliga: mientras el stack de aplicación importe
 valor, CloudFormation **impide borrar o modificar** el stack que lo exporta. El orden
 de borrado deja de ser una convención y pasa a estar garantizado por la plataforma:
 primero la aplicación, después los datos, al final la red.
+
+::: extra El contrato en acción: reutilizar una VPC existente
+La separación paga un dividendo inmediato. En cuentas donde no se crea una VPC por
+participante —por cuota o por política del cliente—, el instructor provee la variante
+`taller-aws-devops-semana2-red-existente.yaml`: recibe como parámetros una **VPC
+existente** (la VPC por defecto de la cuenta sirve) y **dos subredes públicas en
+zonas de disponibilidad distintas**, crea únicamente los grupos de seguridad, y
+publica todo bajo los **mismos cinco exports** que el stack de red estándar.
+
+Los stacks de datos y de aplicación no cambian ni una línea. Ese es el punto: el
+stack de aplicación importa `-vpc-id` sin poder distinguir —ni necesitar
+distinguir— si la red la creó CloudFormation o la adoptó de la cuenta. Un contrato
+bien definido hace intercambiable a quien lo cumple.
+
+Si la VPC disponible no tiene subredes públicas utilizables, el template
+`taller-aws-devops-extra-subredes-publicas.yaml` —desplegado una sola vez por quien
+administra la cuenta— las crea: dos subredes en zonas distintas, su tabla de rutas,
+y la salida a internet, con el Internet Gateway existente como parámetro opcional
+(si no se indica, lo crea y lo adjunta).
+:::
 
 ## El problema: la tabla ya tiene datos
 
@@ -106,7 +126,7 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
 1. Resolver el nombre físico de la tabla a partir del stack:
 
    ```bash
-   export STACK=taller-<su-nombre>
+   export STACK=taller-aws-<su-nombre>
    TABLA=$(aws cloudformation describe-stack-resources \
      --stack-name "$STACK" \
      --logical-resource-id TablaApp \
@@ -146,7 +166,7 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    ```
 
 2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home),
-   seleccionar el stack `taller-<su-nombre>` y aplicar el cambio con un change set,
+   seleccionar el stack `taller-aws-<su-nombre>` y aplicar el cambio con un change set,
    como en la sección anterior: **Stack actions → Create change set for current
    stack**, subir el template modificado, y ejecutarlo. `TablaApp` aparece como
    **Modify** sin reemplazo —la política es metadata del stack, no toca la tabla.
@@ -169,7 +189,7 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
 
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir `taller-aws-devops-semana2-red.yaml`.
-3. En **Stack name**, escribir `taller-<su-nombre>-red`. No tiene parámetros.
+3. En **Stack name**, escribir `taller-aws-<su-nombre>-red`. No tiene parámetros.
 4. Pulsar **Next** hasta **Submit**, y esperar a **CREATE_COMPLETE**.
 
 ### Crear el stack de datos, importando la tabla
@@ -181,7 +201,7 @@ Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
 3. En la pantalla **Identify resources**, CloudFormation lista los recursos del
    template que necesitan un identificador. Para `TablaApp`, pegar en **TableName**
    el nombre físico de la tabla (el valor de `$TABLA`).
-4. En **Stack name**, escribir `taller-<su-nombre>-datos`, y pulsar **Next**.
+4. En **Stack name**, escribir `taller-aws-<su-nombre>-datos`, y pulsar **Next**.
 5. Revisar el resumen: la operación es **Import**, y no crea ni modifica nada más.
    Pulsar **Import resources**.
 6. En la pestaña **Events**, esperar a **IMPORT_COMPLETE**. La tabla no se reinició
@@ -191,9 +211,9 @@ Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
 
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir `taller-aws-devops-semana2-app.yaml`.
-3. En **Stack name**, escribir `taller-<su-nombre>-app`.
+3. En **Stack name**, escribir `taller-aws-<su-nombre>-app`.
 4. Completar los tres parámetros: el **URI de la imagen** en ECR, y los nombres de
-   los otros dos stacks: `taller-<su-nombre>-red` y `taller-<su-nombre>-datos`.
+   los otros dos stacks: `taller-aws-<su-nombre>-red` y `taller-aws-<su-nombre>-datos`.
 5. Aceptar la capacidad de IAM, pulsar **Submit**, y esperar a **CREATE_COMPLETE**.
 
 ### Verificar que nada se perdió
@@ -254,15 +274,15 @@ un contador antes de empezar y demostrar, al final, que sigue ahí.
    (`collection = counters`, `key = migracion`).
 3. Agregar `DeletionPolicy: Retain` a `TablaApp` en
    `taller-aws-devops-semana1.yaml` y aplicarlo con un change set.
-4. Borrar el stack `taller-<su-nombre>`. En **Events**, la tabla queda como
+4. Borrar el stack `taller-aws-<su-nombre>`. En **Events**, la tabla queda como
    **DELETE_SKIPPED**; verificar con `aws dynamodb describe-table` que sigue
    `ACTIVE`.
-5. Crear `taller-<su-nombre>-red` con `taller-aws-devops-semana2-red.yaml`
+5. Crear `taller-aws-<su-nombre>-red` con `taller-aws-devops-semana2-red.yaml`
    (sin parámetros).
-6. Crear `taller-<su-nombre>-datos` con **Create stack → With existing resources
+6. Crear `taller-aws-<su-nombre>-datos` con **Create stack → With existing resources
    (import resources)**, subiendo `taller-aws-devops-semana2-datos.yaml` y pegando
    `$TABLA` como **TableName**. Esperar a **IMPORT_COMPLETE**.
-7. Crear `taller-<su-nombre>-app` con `taller-aws-devops-semana2-app.yaml`,
+7. Crear `taller-aws-<su-nombre>-app` con `taller-aws-devops-semana2-app.yaml`,
    completando el URI de la imagen y los nombres de los stacks de red y de datos.
    Aceptar la capacidad de IAM.
 8. Abrir la **ALBUrl** de los outputs y confirmar que la guía carga. Releer el

@@ -8,7 +8,7 @@ En un sistema operado manualmente, un error puede dejar el ambiente en un estado
 inconsistente difícil de diagnosticar y corregir. El tiempo de recuperación depende de
 cuánto se recuerde de cómo se construyó originalmente, y de si esa memoria es precisa.
 
-Cuando el ambiente se define como código —en este caso, un template de CloudFormation—
+Cuando el ambiente se define como código, en nuestro caso un template de CloudFormation,
 la situación cambia radicalmente. Si algo sale mal, la corrección no es reconstruir desde
 la memoria: es borrar y volver a crear. El proceso es el mismo que se siguió hace unos
 minutos, tarda lo mismo, y produce exactamente el mismo resultado. El **costo de un
@@ -22,19 +22,23 @@ sea la urgencia sino la calma. Se borra, se recrea, se sigue.
 
 Antes de borrar el stack, es útil entender qué destruye CloudFormation y qué no.
 
-El template `taller-aws-devops-semana1.yaml` crea y gestiona: el clúster ECS, el servicio Fargate,
-el ALB, la tabla de DynamoDB, los roles de IAM, y la configuración de red. Todos esos
-recursos **se eliminan** cuando se borra el stack.
+El stack de la Semana 1 crea y gestiona: el clúster ECS, el servicio Fargate, el ALB,
+la tabla de DynamoDB, los roles de IAM, los grupos de seguridad, y —con el template
+estándar— la VPC y sus subredes. Todos esos recursos **se eliminan** cuando se borra
+el stack.
 
 Lo que **no** forma parte del stack y por lo tanto **sobrevive**:
 
 - El **repositorio de CodeCommit** con todo el historial de commits.
 - El **repositorio de ECR** con la imagen Docker publicada.
 - El **proyecto de CodeBuild** configurado en la sección anterior.
+- Con la variante `vpc-existente`: la **VPC y las subredes** de la cuenta. El stack
+  las recibe como parámetros y no las gestiona, así que el borrado no las toca.
 
-Esto significa que al recrear el stack basta con volver a proporcionar el URI de la
-imagen en ECR: el ambiente completo se reconstituye en minutos, sin volver a hacer el
-build ni resubir el código.
+Esto significa que al recrear el stack basta con volver a proporcionar los mismos
+parámetros —el URI de la imagen en ECR y, con la variante, la VPC y las subredes—:
+el ambiente completo se reconstituye en minutos, sin volver a hacer el build ni
+resubir el código.
 
 :::slide
 ## El seguro del taller
@@ -42,8 +46,9 @@ build ni resubir el código.
 Borrar y recrear el stack devuelve el ambiente a un estado conocido en minutos.
 
 **Sobrevive** (fuera del stack): el repo de CodeCommit, la imagen en ECR, el proyecto
-de CodeBuild.
-**Se borra** (lo gestiona el stack): ECS, Fargate, ALB, DynamoDB, IAM, red.
+de CodeBuild —y, con la variante `vpc-existente`, la red de la cuenta.
+**Se borra** (lo gestiona el stack): ECS, Fargate, ALB, DynamoDB, IAM, y la red que
+el template haya creado.
 :::
 
 ## Práctica guiada: borrar el stack
@@ -51,7 +56,7 @@ de CodeBuild.
 ### Iniciar la eliminación
 
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. En la lista de stacks, seleccionar el stack `taller-<su-nombre>`.
+2. En la lista de stacks, seleccionar el stack `taller-aws-<su-nombre>`.
 3. Pulsar **Delete**.
 4. En el diálogo de confirmación, pulsar **Delete stack**.
 
@@ -78,11 +83,15 @@ de CodeBuild.
 ### Lanzar el stack de nuevo
 
 1. Con el stack eliminado, pulsar **Create stack → With new resources (standard)**.
-2. Subir nuevamente el template `taller-aws-devops-semana1.yaml`. (Si la consola ofrece
-   reutilizar el template anterior porque se subió recientemente, se puede hacer.)
-3. En **Stack name**, usar exactamente el mismo nombre: `taller-<su-nombre>`.
+2. Subir nuevamente el mismo template usado la primera vez
+   —`taller-aws-devops-semana1.yaml` o `taller-aws-devops-semana1-vpc-existente.yaml`.
+   (Si la consola ofrece reutilizar el template anterior porque se subió
+   recientemente, se puede hacer.)
+3. En **Stack name**, usar exactamente el mismo nombre: `taller-aws-<su-nombre>`.
 4. En el campo del URI de la imagen, pegar el mismo URI de ECR usado antes.
-    La imagen sigue en ECR — no es necesario volver a hacer el build.
+    La imagen sigue en ECR — no es necesario volver a hacer el build. Con la
+    variante de VPC existente, seleccionar también la misma VPC y las mismas
+    subredes.
 5. Pulsar **Next**, aceptar las capacidades de IAM, y pulsar **Submit**.
 6. En la pestaña **Events**, esperar a que el estado vuelva a **CREATE_COMPLETE**.
 
@@ -106,7 +115,7 @@ vuelve a estar en línea.
 **Destrucción:**
 
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. Seleccionar el stack `taller-<su-nombre>`.
+2. Seleccionar el stack `taller-aws-<su-nombre>`.
 3. Pulsar **Delete → Delete stack**.
 4. En la pestaña **Events**, seguir los eventos hasta que el stack desaparezca de la
    lista.
@@ -116,10 +125,13 @@ vuelve a estar en línea.
 **Recreación:**
 
 1. Pulsar **Create stack → With new resources (standard)**.
-2. Subir el template `taller-aws-devops-semana1.yaml` (o reutilizar el cargado anteriormente).
-3. En **Stack name**, escribir `taller-<su-nombre>`.
+2. Subir el mismo template usado la primera vez (o reutilizar el cargado
+   anteriormente).
+3. En **Stack name**, escribir `taller-aws-<su-nombre>`.
 4. En el campo del URI de la imagen, pegar el URI de ECR con la etiqueta `latest`.
-   La imagen sigue disponible en ECR sin necesidad de un nuevo build.
+   La imagen sigue disponible en ECR sin necesidad de un nuevo build. Con la
+   variante de VPC existente, seleccionar también la misma VPC y las mismas
+   subredes.
 5. Avanzar por las pantallas, aceptar las capacidades de IAM, y pulsar **Submit**.
 6. En la pestaña **Events**, esperar a **CREATE_COMPLETE**.
 7. En la pestaña **Outputs**, copiar la nueva URL del ALB.

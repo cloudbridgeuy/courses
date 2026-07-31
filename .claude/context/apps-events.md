@@ -180,7 +180,10 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   the element, and the client renders it as a Shiki-highlighted code block. It never
   receives a filesystem endpoint, so a published course cannot expose arbitrary
   repository files. The authored path is preserved and rendered as a small label at
-  the upper-left edge of the code block.
+  the upper-left edge of the code block. `toggleable` hides the code at first;
+  `open` makes a toggleable block start open. Each rendered file also has decrease,
+  increase, and copy controls. The decrease and increase controls only change the
+  file content size. Their own size stays fixed.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

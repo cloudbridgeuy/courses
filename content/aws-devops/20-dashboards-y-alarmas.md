@@ -73,7 +73,7 @@ Vigila sola; avisa por el canal que ya usa el equipo.
 ### Crear el dashboard
 
 1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home) y pulsar **Create dashboard**. Nombrarlo
-   `taller-<su-nombre>`.
+   `taller-aws-<su-nombre>`.
 2. Agregar un *widget* de línea con la métrica `CPUUtilization` del servicio de ECS.
 3. Agregar otro widget con `TargetResponseTime` del ALB.
 4. Agregar un tercero con `HTTPCode_Target_5XX_Count`. Guardar el dashboard.
@@ -102,7 +102,7 @@ acción publique en el tema de SNS del taller.
 
 ::: solucion
 1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home), pulsar **Create dashboard** y nombrarlo
-   `taller-<su-nombre>`.
+   `taller-aws-<su-nombre>`.
 2. Agregar widgets de línea para `CPUUtilization` (ECS, el servicio),
    `TargetResponseTime` y `HTTPCode_Target_5XX_Count` (ALB). Guardar.
 3. Abrir [**CloudWatch → Alarms → Create alarm**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:).

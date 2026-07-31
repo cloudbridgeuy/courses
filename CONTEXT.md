@@ -200,7 +200,8 @@ SSE bus.
   `<cb-toast-demo>`, and the read-only `<cb-file>` source viewer, plus lock UI and
   multiplexed `EventSource`. `<cb-file>` accepts a repository-relative UTF-8 path;
   the server embeds the source during rendering rather than exposing a filesystem
-  route. The bundle loads when `uses_apps` is set (via `:::app`).
+  route. It can start collapsed with `toggleable`, and provides content-size and copy
+  controls. The bundle loads when `uses_apps` is set (via `:::app`).
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret

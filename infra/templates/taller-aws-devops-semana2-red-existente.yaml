@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Red existente
+
+# Variante de la capa de red para cuentas donde no se crea una VPC por
+# participante: en lugar de crear la red, adopta una VPC existente (por
+# ejemplo, la VPC por defecto de la cuenta) y dos subredes públicas, crea solo
+# los grupos de seguridad, y publica todo bajo los mismos exports que el stack
+# de red estándar. Los stacks de datos y de aplicación no cambian: el contrato
+# de exports hace que no puedan distinguir si la red fue creada o adoptada.
+#
+# Requisitos de la red recibida:
+#  - Las dos subredes deben estar en zonas de disponibilidad distintas (lo
+#    exige el balanceador).
+#  - Las subredes deben ser públicas: con ruta 0.0.0.0/0 hacia un Internet
+#    Gateway. Las subredes de la VPC por defecto cumplen ambas condiciones.
+#  - Si la VPC no tiene subredes así, el template
+#    taller-aws-devops-extra-subredes-publicas.yaml las crea.
+
+Parameters:
+  # Los tipos AWS::EC2::*::Id hacen que la consola muestre un desplegable con
+  # los recursos de la cuenta, en vez de un campo de texto libre.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC existente donde se despliega el taller.
+
+  SubredAId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Primera subred pública de la VPC.
+
+  SubredBId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Segunda subred pública, en una zona de disponibilidad distinta.
+
+Resources:
+  # Los grupos de seguridad sí se crean por stack, aunque la VPC sea
+  # compartida: son gratis, no chocan entre participantes, y se van con el
+  # teardown.
+
+  GrupoSeguridadALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico HTTP publico hacia el balanceador
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  GrupoSeguridadServicio:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico del balanceador hacia el contenedor
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref GrupoSeguridadALB
+
+# El contrato público es idéntico al del stack de red estándar: mismos cinco
+# exports, mismos nombres. La VPC y las subredes se re-exportan desde los
+# parámetros. El stack de aplicación importa estos valores sin saber —ni
+# necesitar saber— que la red no la creó CloudFormation.
+Outputs:
+  VpcId:
+    Description: ID de la VPC adoptada
+    Value: !Ref VpcId
+    Export:
+      Name: !Sub "${AWS::StackName}-vpc-id"
+
+  SubredPublicaAId:
+    Description: ID de la primera subred pública
+    Value: !Ref SubredAId
+    Export:
+      Name: !Sub "${AWS::StackName}-subred-a-id"
+
+  SubredPublicaBId:
+    Description: ID de la segunda subred pública
+    Value: !Ref SubredBId
+    Export:
+      Name: !Sub "${AWS::StackName}-subred-b-id"
+
+  GrupoSeguridadALBId:
+    Description: ID del grupo de seguridad del balanceador
+    Value: !Ref GrupoSeguridadALB
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-alb-id"
+
+  GrupoSeguridadServicioId:
+    Description: ID del grupo de seguridad del servicio
+    Value: !Ref GrupoSeguridadServicio
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-servicio-id"

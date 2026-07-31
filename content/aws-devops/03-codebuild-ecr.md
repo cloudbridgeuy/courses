@@ -260,7 +260,7 @@ El `Dockerfile` es la otra mitad del contrato: el `buildspec.yml` declara *cuán
 vive en la raíz del repositorio:
 
 :::app
-<cb-file path="./Dockerfile" type="dockerfile"></cb-file>
+<cb-file path="./Dockerfile" type="dockerfile" toggleable></cb-file>
 :::
 
 ### Beneficios, y sus trampas

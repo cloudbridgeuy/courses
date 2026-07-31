@@ -40,7 +40,14 @@ pub fn expand_file_apps(
         rendered.push_str(&escape_html(source_path));
         rendered.push_str("\" type=\"");
         rendered.push_str(&escape_html(file_type));
-        rendered.push_str("\" data-content=\"");
+        rendered.push('"');
+        if has_boolean_attribute(tag, "toggleable") {
+            rendered.push_str(" toggleable");
+        }
+        if has_boolean_attribute(tag, "open") {
+            rendered.push_str(" open");
+        }
+        rendered.push_str(" data-content=\"");
         rendered.push_str(&escape_html(&source));
         rendered.push_str("\"></cb-file>");
 
@@ -68,7 +75,10 @@ fn quoted_attribute<'a>(tag: &'a str, wanted: &str) -> Option<&'a str> {
         let key = &rest[..key_end];
         rest = rest[key_end..].trim_start();
         if !rest.starts_with('=') {
-            return None;
+            if key == wanted {
+                return None;
+            }
+            continue;
         }
         rest = rest[1..].trim_start();
         let quote = rest.chars().next()?;
@@ -82,6 +92,43 @@ fn quoted_attribute<'a>(tag: &'a str, wanted: &str) -> Option<&'a str> {
         if key == wanted {
             return Some(value);
         }
+    }
+}
+
+fn has_boolean_attribute(tag: &str, wanted: &str) -> bool {
+    let Some(mut rest) = tag.strip_prefix("<cb-file") else {
+        return false;
+    };
+    loop {
+        rest = rest.trim_start();
+        if rest.is_empty() || rest.starts_with('>') || rest.starts_with("/>") {
+            return false;
+        }
+        let Some(key_end) =
+            rest.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+        else {
+            return false;
+        };
+        let key = &rest[..key_end];
+        rest = rest[key_end..].trim_start();
+        if !rest.starts_with('=') {
+            if key == wanted {
+                return true;
+            }
+            continue;
+        }
+        rest = rest[1..].trim_start();
+        let Some(quote) = rest.chars().next() else {
+            return false;
+        };
+        if quote != '\'' && quote != '"' {
+            return false;
+        }
+        rest = &rest[quote.len_utf8()..];
+        let Some(value_end) = rest.find(quote) else {
+            return false;
+        };
+        rest = &rest[value_end + quote.len_utf8()..];
     }
 }
 
@@ -128,5 +175,15 @@ mod tests {
         let err =
             expand_file_apps("<cb-file path=\"missing.yml\"></cb-file>", |_| None).unwrap_err();
         assert!(err.to_string().contains("unknown file: missing.yml"));
+    }
+
+    #[test]
+    fn preserves_toggleable_attributes() {
+        let expanded = expand_file_apps(
+            "<cb-file toggleable path=\"Dockerfile\" type=\"dockerfile\" open></cb-file>",
+            |path| (path == "Dockerfile").then(|| "FROM scratch".to_owned()),
+        )
+        .unwrap();
+        assert!(expanded.contains("type=\"dockerfile\" toggleable open"));
     }
 }

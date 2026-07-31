@@ -17,15 +17,33 @@ cb-file {
   position: relative;
 }
 
-cb-file > pre {
+/* The header is absolute. Only a closed file needs a normal-flow height. */
+cb-file.cb-file-closed {
+  min-height: 1.8rem;
+}
+
+cb-file .cb-file-content {
+  display: block;
+}
+
+cb-file .cb-file-content[hidden] {
+  display: none !important;
+}
+
+cb-file .cb-file-content > pre {
   margin: 0;
 }
 
-.cb-file-path {
+.cb-file-header {
   position: absolute;
   z-index: 1;
   top: -5px;
   left: 0.9rem;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.cb-file-path {
   padding: 0.12em 0.55em;
   border: 1px solid var(--cb-teal, #5fc8be);
   border-radius: 4px;
@@ -34,6 +52,24 @@ cb-file > pre {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.78rem;
   line-height: 1.25;
+}
+
+.cb-file-toggle {
+  margin-left: 0.25rem;
+  min-width: 1.85em;
+  border: 1px solid var(--cb-teal, #5fc8be);
+  border-radius: 4px;
+  background: var(--cb-ink, #2d2926);
+  color: #fff;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cb-file-toggle:hover,
+.cb-file-toggle:focus-visible {
+  background: var(--cb-teal, #5fc8be);
+  outline: none;
 }
 
 .cb-app-btn {

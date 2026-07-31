@@ -72,6 +72,7 @@ fn assemble_session(
     let mut uses_mermaid = false;
     let mut uses_syntax_highlighting = false;
     let mut uses_apps = false;
+    let mut uses_file_apps = false;
     let mut all_slides = Vec::new();
 
     for file in &entry.sections {
@@ -93,6 +94,11 @@ fn assemble_session(
             || rendered.slide_html.iter().any(|slide| {
                 slide.html.contains("<code class=\"language-") || slide.html.contains("<cb-file")
             });
+        uses_file_apps |= rendered.html.contains("<cb-file")
+            || rendered
+                .slide_html
+                .iter()
+                .any(|slide| slide.html.contains("<cb-file"));
         uses_apps |= rendered.uses_apps;
         all_slides.extend(rendered.slide_html);
 
@@ -108,7 +114,7 @@ fn assemble_session(
         });
     }
 
-    if uses_solutions {
+    if uses_solutions || uses_file_apps {
         assets.push_script(TOGGLE_JS_PATH);
     }
     if uses_mermaid {
@@ -146,7 +152,7 @@ fn in_file(file: &str, error: &Error) -> Error {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::assets::{SHIKI_INIT_JS_PATH, TOGGLE_JS_PATH};
+    use crate::assets::{APPS_JS_PATH, SHIKI_INIT_JS_PATH, TOGGLE_JS_PATH};
 
     fn make_section(title: &str, body: &str) -> String {
         format!("+++\ntitle = \"{title}\"\n+++\n{body}")
@@ -231,6 +237,26 @@ mod tests {
             !loaded.session_assets[0]
                 .scripts
                 .contains(&TOGGLE_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn file_app_injects_toggle_apps_and_shiki_scripts() {
+        let body = ":::app\n<cb-file path=\"./sample.yml\" type=\"yaml\"></cb-file>\n:::\n";
+        let files = make_files(&[("01-file.md", make_section("File", body))]);
+        let input = CourseInput {
+            slug: "course-file",
+            manifest: &make_manifest_one_session("Course File", &["01-file.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert_eq!(
+            loaded.session_assets[0].scripts,
+            vec![
+                TOGGLE_JS_PATH.to_owned(),
+                APPS_JS_PATH.to_owned(),
+                SHIKI_INIT_JS_PATH.to_owned(),
+            ]
         );
     }
 

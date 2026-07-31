@@ -121,18 +121,46 @@ document.addEventListener("DOMContentLoaded", () => {
   for (const pre of document.querySelectorAll("pre")) {
     const code = pre.querySelector("code");
     if (!code || pre.closest(".cb-code")) continue;
+    const fileContent = pre.closest(".cb-file-content");
 
     const wrap = document.createElement("div");
     wrap.className = "cb-code";
     pre.parentNode.insertBefore(wrap, pre);
     wrap.appendChild(pre);
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "cb-copy";
-    button.innerHTML = CB_CLIPBOARD_ICON;
-    button.setAttribute("aria-label", "Copiar código");
-    button.addEventListener("click", async () => {
+    const controls = document.createElement("div");
+    controls.className = "cb-code-controls";
+
+    if (fileContent) {
+      let scale = 1;
+      const updateScale = () => {
+        fileContent.style.fontSize = scale + "em";
+      };
+      const fontButton = (label, delta) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "cb-file-font-control";
+        button.textContent = label;
+        button.setAttribute(
+          "aria-label",
+          delta > 0 ? "Aumentar tamaño de código" : "Reducir tamaño de código",
+        );
+        button.addEventListener("click", () => {
+          scale = Math.max(0.7, Math.min(1.7, scale + delta));
+          updateScale();
+        });
+        return button;
+      };
+      controls.appendChild(fontButton("−", -0.1));
+      controls.appendChild(fontButton("+", 0.1));
+    }
+
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "cb-copy";
+    copy.innerHTML = CB_CLIPBOARD_ICON;
+    copy.setAttribute("aria-label", "Copiar código");
+    copy.addEventListener("click", async () => {
       try {
         const text = code.textContent;
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -147,18 +175,19 @@ document.addEventListener("DOMContentLoaded", () => {
           document.execCommand("copy");
           document.body.removeChild(area);
         }
-        button.innerHTML = CB_CHECK_ICON;
-        button.classList.add("cb-copied");
-        button.setAttribute("aria-label", "Código copiado");
+        copy.innerHTML = CB_CHECK_ICON;
+        copy.classList.add("cb-copied");
+        copy.setAttribute("aria-label", "Código copiado");
       } catch {
-        button.setAttribute("aria-label", "No se pudo copiar");
+        copy.setAttribute("aria-label", "No se pudo copiar");
       }
       setTimeout(() => {
-        button.innerHTML = CB_CLIPBOARD_ICON;
-        button.classList.remove("cb-copied");
-        button.setAttribute("aria-label", "Copiar código");
+        copy.innerHTML = CB_CLIPBOARD_ICON;
+        copy.classList.remove("cb-copied");
+        copy.setAttribute("aria-label", "Copiar código");
       }, 1500);
     });
-    wrap.appendChild(button);
+    controls.appendChild(copy);
+    wrap.appendChild(controls);
   }
 });

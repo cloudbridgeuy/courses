@@ -697,7 +697,7 @@
 
   // ---------------------------------------------------------------------------
   // Custom element: <cb-file>
-  // Attributes: path, type, data-content
+  // Attributes: path, type, data-content, toggleable, open
   //
   // The server fills data-content from a repository file while rendering the
   // course. The component deliberately has no fetch URL: published courses do
@@ -714,16 +714,45 @@
         var type = this.getAttribute("type") || "text";
         var content = this.getAttribute("data-content") || "";
         var path = this.getAttribute("path") || "archivo";
+        var toggleable = this.hasAttribute("toggleable");
+        var isOpen = !toggleable || this.hasAttribute("open");
+        var header = document.createElement("span");
+        header.className = "cb-file-header";
         var label = document.createElement("span");
         label.className = "cb-file-path";
         label.textContent = path;
+        header.appendChild(label);
         var pre = document.createElement("pre");
         var code = document.createElement("code");
+        var body = document.createElement("span");
+        body.className = "cb-file-content";
         code.className = "language-" + type;
         code.textContent = content;
         pre.appendChild(code);
-        this.appendChild(label);
-        this.appendChild(pre);
+        body.appendChild(pre);
+        if (toggleable) {
+          var handle = document.createElement("button");
+          handle.type = "button";
+          handle.className = "cb-file-toggle";
+          var updateState = () => {
+            // Shiki replaces the inner <pre> while it highlights the code. The
+            // wrapper remains in the DOM, so it is the stable visibility target.
+            body.hidden = !isOpen;
+            handle.textContent = isOpen ? "▾" : "▸";
+            handle.title = isOpen ? "Ocultar archivo" : "Mostrar archivo";
+            handle.setAttribute("aria-expanded", String(isOpen));
+            this.toggleAttribute("open", isOpen);
+            this.classList.toggle("cb-file-closed", !isOpen);
+          };
+          handle.addEventListener("click", () => {
+            isOpen = !isOpen;
+            updateState();
+          });
+          header.appendChild(handle);
+          updateState();
+        }
+        this.appendChild(header);
+        this.appendChild(body);
       }
     }
   );

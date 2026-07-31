@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Taller AWS DevOps — Semana 2 · Red compartida
 
 # Capa de red del taller: VPC, subredes públicas, salida a internet, y grupos
-# de seguridad. Es la capa que menos cambia — se despliega una vez y varios
+# de seguridad. Es la capa que menos cambia. Se despliega una vez y varios
 # stacks de aplicación pueden construirse encima. No recibe parámetros y no
 # guarda estado: se puede destruir y recrear siempre que ningún stack dependa
 # de sus exports.

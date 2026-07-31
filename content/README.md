@@ -189,8 +189,18 @@ atributo `type` selecciona el lenguaje usado por el resaltado de sintaxis:
 :::
 ```
 
+Add `toggleable` to hide the code at first. Add `open` when it must start open:
+
+```md
+:::app
+<cb-file path="./Dockerfile" type="dockerfile" toggleable open></cb-file>
+:::
+```
+
 El archivo se incorpora al sitio durante el build, por lo que la versión publicada
 queda sincronizada con el contenido del repositorio. Solo se permiten archivos de
 texto UTF-8 dentro del repositorio; rutas absolutas y recorridos como `../` se
 rechazan. El bloque muestra la ruta escrita en una etiqueta superpuesta en su esquina
-superior izquierda.
+superior izquierda. A `toggleable` block keeps this label and shows a handle to open
+or close the code. Rendered files also provide decrease, increase, and copy controls.
+The first two change only the code size.

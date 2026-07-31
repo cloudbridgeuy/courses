@@ -74,7 +74,7 @@ template y aplicando el cambio con un change set.
 
 ### Crear el change set
 
-1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-<su-nombre>`.
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-aws-<su-nombre>`.
 2. Pulsar **Stack actions → Create change set for current stack**.
 3. Seleccionar **Replace existing template → Upload a template file**, y subir el
    `taller-aws-devops-semana1.yaml` modificado.

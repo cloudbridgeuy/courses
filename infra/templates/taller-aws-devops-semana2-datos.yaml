@@ -2,13 +2,13 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Taller AWS DevOps — Semana 2 · Datos
 
 # Capa de datos del taller: solo la tabla de DynamoDB. Está en su propio stack
-# porque su ciclo de vida es distinto — el ambiente de ejecución se destruye y
+# porque su ciclo de vida es distinto. El ambiente de ejecución se destruye y
 # recrea sin dolor; los datos deben sobrevivir a esos ciclos.
 #
 # Este stack no se lanza con "Create stack" normal: se crea IMPORTANDO la
 # tabla que quedó huérfana al borrar el stack monolítico de la Semana 1
 # (Create stack → With existing resources). Por eso la tabla lleva
-# `DeletionPolicy: Retain` — el import lo exige en cada recurso importado, y
+# `DeletionPolicy: Retain`. El import lo exige en cada recurso importado, y
 # además protege los datos si alguien borra este stack.
 
 Resources:
@@ -16,7 +16,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     # Retain también ante un reemplazo: si una actualización obligara a crear
-    # una tabla nueva, la vieja —con los datos— no se borra.
+    # una tabla nueva, la vieja con los datos no se borra.
     UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST

@@ -290,6 +290,29 @@
   border: 0;
 }
 
+/* File-reference apps use the same compact chrome as a code-block label. Long
+   repository paths must not consume a slide's layout while their code is closed. */
+.reveal .cb-file-header {
+  top: -0.3em;
+  left: 0.55em;
+  font-size: 0.42em;
+}
+
+.reveal .cb-file-path {
+  max-width: 22em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reveal .cb-file-toggle {
+  min-width: 1.7em;
+}
+
+.reveal cb-file.cb-file-closed {
+  min-height: 1.35em;
+}
+
 .reveal table {
   margin: 0 auto;
   border-collapse: collapse;
@@ -542,19 +565,36 @@
   position: relative;
 }
 
-.reveal .cb-copy {
+.reveal .cb-code-controls {
   position: absolute;
   top: 0.3em;
   right: 0.3em;
   display: inline-flex;
+  gap: 0.25em;
+}
+
+.reveal .cb-copy,
+.reveal .cb-file-font-control {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25em;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px;
+  font-size: 18px;
+  line-height: 1;
   color: #e8e8e8;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 0.4em;
   cursor: pointer;
+}
+
+.reveal .cb-file-font-control {
+  font-family: inherit;
 }
 
 .reveal .cb-copy.cb-copied {
