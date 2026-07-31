@@ -14,10 +14,26 @@
 
 cb-file {
   display: block;
+  position: relative;
 }
 
 cb-file > pre {
   margin: 0;
+}
+
+.cb-file-path {
+  position: absolute;
+  z-index: 1;
+  top: -5px;
+  left: 0.9rem;
+  padding: 0.12em 0.55em;
+  border: 1px solid var(--cb-teal, #5fc8be);
+  border-radius: 4px;
+  background: var(--cb-ink, #2d2926);
+  color: #fff;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.25;
 }
 
 .cb-app-btn {

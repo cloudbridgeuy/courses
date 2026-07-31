@@ -26,9 +26,9 @@ pub fn expand_file_apps(
             .find('>')
             .ok_or_else(|| eyre!("unterminated <cb-file> tag"))?;
         let tag = &tag_start[..=end];
-        let path = quoted_attribute(tag, "path")
+        let source_path = quoted_attribute(tag, "path")
             .ok_or_else(|| eyre!("<cb-file> is missing a quoted path attribute"))?;
-        let path = normalize_path(path)?;
+        let path = normalize_path(source_path)?;
         let file_type = quoted_attribute(tag, "type").unwrap_or("text");
         if file_type.trim().is_empty() {
             return Err(eyre!("<cb-file> type must not be empty"));
@@ -37,7 +37,7 @@ pub fn expand_file_apps(
             .ok_or_else(|| eyre!("<cb-file> references an unknown file: {path}"))?;
 
         rendered.push_str("<cb-file path=\"");
-        rendered.push_str(&escape_html(&path));
+        rendered.push_str(&escape_html(source_path));
         rendered.push_str("\" type=\"");
         rendered.push_str(&escape_html(file_type));
         rendered.push_str("\" data-content=\"");
@@ -112,7 +112,7 @@ mod tests {
             |path| (path == "buildspec.yml").then(|| "answer: <yes>".to_owned()),
         )
         .unwrap();
-        assert!(expanded.contains("path=\"buildspec.yml\""));
+        assert!(expanded.contains("path=\"./buildspec.yml\""));
         assert!(expanded.contains("type=\"yaml\""));
         assert!(expanded.contains("data-content=\"answer: &lt;yes&gt;\""));
     }

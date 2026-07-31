@@ -192,4 +192,5 @@ atributo `type` selecciona el lenguaje usado por el resaltado de sintaxis:
 El archivo se incorpora al sitio durante el build, por lo que la versión publicada
 queda sincronizada con el contenido del repositorio. Solo se permiten archivos de
 texto UTF-8 dentro del repositorio; rutas absolutas y recorridos como `../` se
-rechazan.
+rechazan. El bloque muestra la ruta escrita en una etiqueta superpuesta en su esquina
+superior izquierda.

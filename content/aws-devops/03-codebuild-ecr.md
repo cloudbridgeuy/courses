@@ -259,28 +259,9 @@ El `Dockerfile` es la otra mitad del contrato: el `buildspec.yml` declara *cuán
 *con qué contexto* se construye; el `Dockerfile` declara *cómo*. El nuestro también
 vive en la raíz del repositorio:
 
-```dockerfile
-# Build stage: compile the server. Course content and static assets are
-# embedded into the binary at compile time, so nothing else ships.
-# aws-lc-sys (TLS for the AWS SDK) needs a C toolchain and cmake.
-FROM rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS builder
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential=12.9 cmake=3.25.1-1 \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY . .
-RUN cargo build --release -p courses_server
-
-# Runtime stage: just the binary plus CA certificates for outbound TLS.
-FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates=20230311+deb12u1 \
-    && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/courses_server /usr/local/bin/courses_server
-ENV PORT=8080
-EXPOSE 8080
-CMD ["courses_server"]
-```
+:::app
+<cb-file path="./Dockerfile" type="dockerfile"></cb-file>
+:::
 
 ### Beneficios, y sus trampas
 
@@ -875,6 +856,82 @@ de cada build queda guardado en **CloudWatch Logs**:
    +-----------------------------------+-------------------------------------------------------------------------------+
    ```
 
+## ECR más allá del push: retención, replicación y escaneo
+
+Con la primera imagen publicada, el repositorio ya cumple su rol mínimo: recibir
+imágenes y servirlas. Pero un registro de producción no se administra solo, y ECR
+trae tres funcionalidades que conviene conocer desde el primer día.
+
+### Políticas de lifecycle: decidir qué se guarda y por cuánto tiempo
+
+Cada build de hoy dejó cuatro tags nuevos en el repositorio; un pipeline activo genera
+decenas por semana. El almacenamiento de ECR es barato —alrededor de $0.10 por GB al
+mes, un costo casi despreciable frente al resto de la infraestructura—, pero la buena
+práctica no pasa por el costo: pasa por definir de forma explícita **cuál es la
+política de la empresa para la retención de imágenes**, y expresarla como reglas en el
+repositorio en lugar de depender de limpiezas manuales.
+
+Eso se hace con una **Lifecycle policy** (en la consola: dentro del repositorio,
+**Lifecycle policy**). Una política es una lista de reglas; cada regla selecciona
+imágenes por estado de tag (con tag, sin tag) y por prefijo o patrón (`branch-*`), y
+las expira por antigüedad (`sinceImagePushed`) o por cantidad (`imageCountMoreThan`:
+"conservar solo las últimas N"). Un detalle importante: una regla selecciona la
+imagen completa —el *digest* con todos sus tags—, no un tag individual.
+
+Hay una trampa conocida: configurar la limpieza **en términos de tiempo** y borrar una
+imagen que está corriendo en producción. Mientras las tareas ya lanzadas sigan
+corriendo no pasa nada —el runtime ya tiene la imagen descargada—, pero en el momento
+en que haga falta escalar, reemplazar una tarea caída, o volver a registrar el
+servicio, el *pull* falla porque la imagen ya no existe. El fallo aparece justo cuando
+el sistema está bajo presión, que es el peor momento posible. ECR no sabe qué está
+desplegado: la política borra lo que las reglas seleccionan, esté en producción o no.
+
+#### Cómo mitigar el borrado de imágenes en producción
+
+- **Preferir cantidad sobre tiempo para las imágenes desplegables.** Una regla de
+  "conservar las últimas N" garantiza historial aunque el proyecto pase meses sin
+  desplegar; una regla de "borrar lo más viejo que X días", tras una temporada sin
+  pushes, se lleva todas las imágenes — incluida la que está en producción.
+- **Separar los tags efímeros de los de release.** Aplicar las reglas agresivas solo
+  a las imágenes sin tag y a los prefijos efímeros (`branch-*`, SHAs); los tags de
+  release (`v*`, `release-*`) reciben una retención larga, o ninguna regla.
+- **Promocionar con un re-tag.** Lo que llega a producción recibe un tag del espacio
+  protegido (`release-*`), de modo que ninguna regla agresiva pueda seleccionarlo.
+- **Ensayar antes de aplicar.** La consola ofrece un *preview* de la política que
+  lista qué imágenes borraría cada regla, sin borrar nada. Ninguna política debería
+  activarse sin pasar por ahí.
+
+### Replicación entre regiones
+
+En **Private registry → Replication** se configuran reglas de replicación: cada push a
+la región de origen se copia automáticamente a otras regiones —o a otras cuentas—.
+Esto puede ser útil, y hasta necesario, al desarrollar un plan de **Disaster
+Recovery**: si la región primaria queda fuera de servicio, los artefactos de deploy ya
+existen en la región de recuperación, y el ambiente puede recrearse sin depender de la
+región caída. También reduce la latencia de *pull* en despliegues multi-región.
+
+Dos detalles a tener en cuenta: la replicación copia los pushes, no los borrados —una
+lifecycle policy de la región de origen no limpia las réplicas—, así que cada región
+de destino necesita su propia política; y solo se replica lo que se publica después de
+crear la regla, lo ya existente no se copia retroactivamente.
+
+### Escaneo de vulnerabilidades
+
+En **Private registry → Scanning** se activa el escaneo de imágenes contra bases de
+CVEs conocidos. El nivel básico escanea el sistema operativo de la imagen en cada push;
+el **enhanced scanning** delega en **Amazon Inspector** y pasa a ser continuo: cubre
+también las dependencias de la aplicación, y re-escanea las imágenes existentes cada
+vez que se publica una vulnerabilidad nueva, trayendo los hallazgos al frente sin que
+nadie lance nada.
+
+Los *findings* quedan visibles por imagen en la consola y se publican como eventos, lo
+que abre la puerta a automatizarlos. Al día de hoy es sencillo combinarlos con
+**agentes** que sugieren remediaciones fáciles —actualizar la imagen base, subir una
+dependencia— y las vuelcan directamente en el código mediante **PRs automatizadas**.
+La revisión sigue siendo humana, pero el ciclo completo —detectar, proponer,
+reconstruir, republicar— corre sobre la misma estructura de CI/CD que se armó en esta
+sesión: ese es el valor de haberla construido.
+
 ## Un adelanto: enterarse cuando el build termina
 
 Hoy se lanzó el build a mano y se siguieron los logs en pantalla. En un equipo real nadie se
@@ -1176,6 +1233,20 @@ upstream, el build usa exactamente la imagen fijada.
 
 :::slide light
 {{ejercicio-4}}
+:::
+
+:::slide
+## ECR más allá del push
+
+- **Lifecycle** — la retención de imágenes es una política de la empresa, expresada
+  como reglas en el repositorio. Cuidado con las reglas por tiempo: pueden borrar la
+  imagen que está en producción, y el *pull* falla justo al escalar.
+  - Mitigar: "últimas N" en vez de días, tags de release protegidos, re-tag al
+    promocionar, *preview* antes de aplicar.
+- **Replicación** — copia automática de cada push a otras regiones o cuentas;
+  pieza clave de un plan de **Disaster Recovery**.
+- **Escaneo** — búsqueda continua de CVEs conocidos (Amazon Inspector). Findings +
+  agentes → remediaciones como PRs automatizadas, sobre el mismo CI/CD.
 :::
 
 :::slide light

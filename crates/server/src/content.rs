@@ -85,7 +85,7 @@ mod tests {
         let session = &site.pages["aws-devops/del-codigo-a-la-imagen"];
         assert!(session.contains("class=\"solucion\""));
         assert!(session.contains("/static/toggle.js"));
-        assert!(session.contains("<cb-file path=\"buildspec.yml\" type=\"yaml\""));
+        assert!(session.contains("<cb-file path=\"./buildspec.yml\" type=\"yaml\""));
         assert!(session.contains("data-content=\"version: 0.2"));
         let apps_at = session.find("/static/apps.js").unwrap();
         let shiki_at = session.find("/static/shiki-init.js").unwrap();

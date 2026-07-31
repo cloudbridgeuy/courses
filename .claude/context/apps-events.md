@@ -179,7 +179,8 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   resolves its repository-relative path while rendering, embeds its UTF-8 source in
   the element, and the client renders it as a Shiki-highlighted code block. It never
   receives a filesystem endpoint, so a published course cannot expose arbitrary
-  repository files.
+  repository files. The authored path is preserved and rendered as a small label at
+  the upper-left edge of the code block.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

@@ -713,11 +713,16 @@
 
         var type = this.getAttribute("type") || "text";
         var content = this.getAttribute("data-content") || "";
+        var path = this.getAttribute("path") || "archivo";
+        var label = document.createElement("span");
+        label.className = "cb-file-path";
+        label.textContent = path;
         var pre = document.createElement("pre");
         var code = document.createElement("code");
         code.className = "language-" + type;
         code.textContent = content;
         pre.appendChild(code);
+        this.appendChild(label);
         this.appendChild(pre);
       }
     }
