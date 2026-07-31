@@ -1,0 +1,315 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 1
+
+# Ambiente completo de la Semana 1: la imagen publicada en ECR corre como un
+# servicio Fargate detrás de un ALB, con una tabla de DynamoDB para las apps
+# interactivas de la guía. La configuración de DNS se realiza fuera de banda:
+# la salida ALBUrl expone el nombre DNS generado por el balanceador.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: URI de la imagen en ECR, con etiqueta.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/[a-z0-9._/-]+:[a-zA-Z0-9._-]+$'
+    ConstraintDescription: >-
+      Debe ser un URI de ECR con etiqueta, por ejemplo
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
+
+Resources:
+  # --- Base de datos ---
+
+  TablaApp:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: collection
+          AttributeType: S
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: collection
+          KeyType: HASH
+        - AttributeName: key
+          KeyType: RANGE
+
+  # --- ECS: clúster, servicio, y task definition ---
+
+  ClusterApp:
+    Type: AWS::ECS::Cluster
+
+  ServicioApp:
+    Type: AWS::ECS::Service
+    DependsOn: ListenerHTTP
+    Properties:
+      Cluster: !Ref ClusterApp
+      DesiredCount: 1
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TareaApp
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubredPublicaA
+            - !Ref SubredPublicaB
+          SecurityGroups:
+            - !Ref GrupoSeguridadServicio
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 8080
+          TargetGroupArn: !Ref GrupoDestino
+
+  TareaApp:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !GetAtt RolEjecucion.Arn
+      TaskRoleArn: !GetAtt RolTarea.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Ref ImageUri
+          PortMappings:
+            - ContainerPort: 8080
+          # Configuración de la aplicación. Dos variables están ausentes a
+          # propósito:
+          #  - CB_APPS_SECRET: un secreto nunca va en texto plano en un
+          #    template. Se agrega en la Semana 2 vía Secrets Manager
+          #    (`Secrets` + `ValueFrom`). Sin él, los handlers corren abiertos
+          #    aunque CB_APPS_GATED diga `all`.
+          #  - CB_HOOK_TOKEN: mismo motivo; solo lo necesita el servidor del
+          #    instructor que recibe los webhooks de SNS.
+          # CB_DEV_ROOT es solo para desarrollo local y no se define aquí.
+          Environment:
+            - Name: PORT
+              Value: "8080"
+            - Name: CB_APPS_TABLE
+              Value: !Ref TablaApp
+            - Name: CB_APPS_PUBLIC_COLLECTIONS
+              Value: counters
+            - Name: CB_APPS_GATED
+              Value: all
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref GrupoLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+
+  GrupoLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AWS::StackName}"
+      RetentionInDays: 7
+
+  # --- Roles de IAM ---
+
+  # Rol de ejecución: lo usa ECS para descargar la imagen y escribir logs.
+  RolEjecucion:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Rol de tarea: lo usa la aplicación dentro del contenedor.
+  RolTarea:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: acceso-tabla-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt TablaApp.Arn
+        - PolicyName: publicar-metricas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                # PutMetricData no acepta un ARN como recurso; el namespace es
+                # la forma de acotar el permiso.
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: Taller/Custom
+
+  # --- Red: VPC, subredes públicas, y salida a internet ---
+
+  VpcApp:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+
+  SubredPublicaA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcApp
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-a"
+
+  SubredPublicaB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcApp
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-b"
+
+  GatewayInternet:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-igw"
+
+  VinculoGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcApp
+      InternetGatewayId: !Ref GatewayInternet
+
+  TablaRutas:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcApp
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica"
+
+  RutaSalida:
+    Type: AWS::EC2::Route
+    DependsOn: VinculoGateway
+    Properties:
+      RouteTableId: !Ref TablaRutas
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref GatewayInternet
+
+  AsociacionSubredA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaA
+      RouteTableId: !Ref TablaRutas
+
+  AsociacionSubredB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaB
+      RouteTableId: !Ref TablaRutas
+
+  # --- Grupos de seguridad ---
+
+  GrupoSeguridadALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico HTTP publico hacia el balanceador
+      VpcId: !Ref VpcApp
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  GrupoSeguridadServicio:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico del balanceador hacia el contenedor
+      VpcId: !Ref VpcApp
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref GrupoSeguridadALB
+
+  # --- Balanceador de carga ---
+
+  BalanceadorApp:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: VinculoGateway
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - !Ref SubredPublicaA
+        - !Ref SubredPublicaB
+      SecurityGroups:
+        - !Ref GrupoSeguridadALB
+      LoadBalancerAttributes:
+        # Las notificaciones en vivo de la guía usan SSE: la conexión queda
+        # abierta y sin tráfico, así que el timeout por defecto (60 s) la corta.
+        - Key: idle_timeout.timeout_seconds
+          Value: "3600"
+
+  GrupoDestino:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcApp
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      HealthCheckPath: /health
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "15"
+
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BalanceadorApp
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref GrupoDestino
+
+Outputs:
+  ALBUrl:
+    Description: URL pública de la aplicación
+    Value: !Sub "http://${BalanceadorApp.DNSName}"
+
+  # El ALB no tiene IPs públicas estables; el DNS externo se configura contra su
+  # nombre DNS (CNAME) o, en Route 53, con un registro alias usando la zona
+  # canónica del balanceador.
+  ALBDnsName:
+    Description: Nombre DNS del balanceador, para configurar el DNS externo
+    Value: !GetAtt BalanceadorApp.DNSName
+
+  ALBHostedZoneId:
+    Description: Zona canónica del balanceador, para registros alias en Route 53
+    Value: !GetAtt BalanceadorApp.CanonicalHostedZoneID
