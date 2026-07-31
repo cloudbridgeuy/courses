@@ -159,8 +159,8 @@ Una describe; el otro opera.
 
 ---
 
-{#ejercicio-11}
-### Ejercicio 11 — Reconocer lo que está corriendo
+{#ejercicio-12}
+### Ejercicio 12 — Reconocer lo que está corriendo
 
 Desde la consola de ECS, identificar para la aplicación: la tarea en ejecución, la
 revisión de la task definition que la originó, el URI de la imagen que ejecuta, y el
@@ -177,12 +177,12 @@ grupo de CloudWatch Logs al que escribe.
    - La **imagen**: el URI de ECR con su etiqueta (el mismo pasado como `ImageUri`).
    - La **CPU y memoria** reservadas.
 5. Comprobar que estos valores coinciden con los del template
-   `taller-semana1.yaml`: el recurso del template y el contenedor en ejecución son la
-   misma cosa, vista desde dos lados.
+   `taller-aws-devops-semana2-app.yaml`: el recurso del template y el contenedor en
+   ejecución son la misma cosa, vista desde dos lados.
 :::
 
 :::slide light
-{{ejercicio-11}}
+{{ejercicio-12}}
 :::
 
 ---

@@ -15,8 +15,8 @@ content and onto disk, with a file watcher that reloads on save.
 
 - `cargo xtask dev` sets it automatically, from the workspace root.
 - Escape hatch without Docker: `CB_DEV_ROOT=$PWD cargo run -p courses_server`.
-  The apps widgets on `17-notificaciones-teams.md` and
-  `18-observabilidad-metrics-logs.md` will not work without DynamoDB Local.
+  The apps widgets on `18-notificaciones-teams.md` and
+  `19-observabilidad-metrics-logs.md` will not work without DynamoDB Local.
 - Watched: every non-hidden `.md`, `.toml`, `.css`, and `.js` file under
   `content/` and `crates/server/static/` fires the watcher — there is no
   filename allowlist, so vendored bundles like `reveal.min.js` and the

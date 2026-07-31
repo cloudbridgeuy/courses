@@ -121,8 +121,8 @@ producción, ese aviso llegaría a un canal de Teams.
 
 ---
 
-{#ejercicio-14}
-### Ejercicio 14 — Notificar los eventos del pipeline
+{#ejercicio-15}
+### Ejercicio 15 — Notificar los eventos del pipeline
 
 Crear una regla de notificación sobre el pipeline que publique, en el tema de SNS del
 taller, los eventos de ejecución exitosa, fallida, y de aprobación pendiente. Disparar una
@@ -141,5 +141,5 @@ ejecución y observar los avisos.
 :::
 
 :::slide light
-{{ejercicio-14}}
+{{ejercicio-15}}
 :::

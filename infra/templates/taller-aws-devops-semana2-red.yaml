@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Red compartida
+
+# Capa de red del taller: VPC, subredes públicas, salida a internet, y grupos
+# de seguridad. Es la capa que menos cambia — se despliega una vez y varios
+# stacks de aplicación pueden construirse encima. No recibe parámetros y no
+# guarda estado: se puede destruir y recrear siempre que ningún stack dependa
+# de sus exports.
+
+Resources:
+  VpcApp:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+
+  SubredPublicaA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcApp
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-a"
+
+  SubredPublicaB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcApp
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica-b"
+
+  GatewayInternet:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-igw"
+
+  VinculoGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcApp
+      InternetGatewayId: !Ref GatewayInternet
+
+  TablaRutas:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcApp
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-publica"
+
+  RutaSalida:
+    Type: AWS::EC2::Route
+    DependsOn: VinculoGateway
+    Properties:
+      RouteTableId: !Ref TablaRutas
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref GatewayInternet
+
+  AsociacionSubredA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaA
+      RouteTableId: !Ref TablaRutas
+
+  AsociacionSubredB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubredPublicaB
+      RouteTableId: !Ref TablaRutas
+
+  GrupoSeguridadALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico HTTP publico hacia el balanceador
+      VpcId: !Ref VpcApp
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  GrupoSeguridadServicio:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico del balanceador hacia el contenedor
+      VpcId: !Ref VpcApp
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref GrupoSeguridadALB
+
+# Los exports son el contrato público de este stack: los nombres se prefijan
+# con el nombre del stack para que varios participantes convivan en la misma
+# cuenta. Mientras otro stack importe uno de estos valores, CloudFormation
+# impide borrar o cambiar este stack — el orden de borrado es app → datos → red.
+Outputs:
+  VpcId:
+    Description: ID de la VPC compartida
+    Value: !Ref VpcApp
+    Export:
+      Name: !Sub "${AWS::StackName}-vpc-id"
+
+  SubredPublicaAId:
+    Description: ID de la primera subred pública
+    Value: !Ref SubredPublicaA
+    Export:
+      Name: !Sub "${AWS::StackName}-subred-a-id"
+
+  SubredPublicaBId:
+    Description: ID de la segunda subred pública
+    Value: !Ref SubredPublicaB
+    Export:
+      Name: !Sub "${AWS::StackName}-subred-b-id"
+
+  GrupoSeguridadALBId:
+    Description: ID del grupo de seguridad del balanceador
+    Value: !Ref GrupoSeguridadALB
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-alb-id"
+
+  GrupoSeguridadServicioId:
+    Description: ID del grupo de seguridad del servicio
+    Value: !Ref GrupoSeguridadServicio
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-servicio-id"

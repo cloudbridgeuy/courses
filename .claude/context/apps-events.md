@@ -203,7 +203,7 @@ custom-element tags in `<div class="cb-app">` and sets `uses_apps`.
 ECS `environment` (plaintext, visible via `DescribeTaskDefinition`) with
 `secrets` + `valueFrom` (pulls from Secrets Manager or SSM at task launch,
 never stored in the task definition). See the Week-2 ECS content
-(`12-primeros-contenedores`) for the in-guide treatment.
+(`13-primeros-contenedores`) for the in-guide treatment.
 
 ## Open items
 

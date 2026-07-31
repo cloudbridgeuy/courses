@@ -33,32 +33,33 @@ slug = "los-primeros-contenedores"
 title = "Los primeros contenedores"
 sections = [
   "11-buenas-practicas-troubleshooting.md",
-  "12-primeros-contenedores.md",
+  "12-separar-stacks.md",
+  "13-primeros-contenedores.md",
 ]
 
 [[session]]
 slug = "operar-el-workload"
 title = "Operar el workload"
 sections = [
-  "13-operar-contenedores.md",
-  "14-cicd-y-el-pipeline.md",
-  "15-preguntas-puente.md",
+  "14-operar-contenedores.md",
+  "15-cicd-y-el-pipeline.md",
+  "16-preguntas-puente.md",
 ]
 
 [[session]]
 slug = "automatizar-y-observar"
 title = "Automatizar y observar"
 sections = [
-  "16-codepipeline-en-la-practica.md",
-  "17-notificaciones-teams.md",
-  "18-observabilidad-metrics-logs.md",
+  "17-codepipeline-en-la-practica.md",
+  "18-notificaciones-teams.md",
+  "19-observabilidad-metrics-logs.md",
 ]
 
 [[session]]
 slug = "observabilidad-y-cierre"
 title = "Observabilidad y cierre"
 sections = [
-  "19-dashboards-y-alarmas.md",
-  "20-container-insights-trazabilidad.md",
-  "21-cierre-del-curso.md",
+  "20-dashboards-y-alarmas.md",
+  "21-container-insights-trazabilidad.md",
+  "22-cierre-del-curso.md",
 ]

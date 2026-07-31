@@ -168,8 +168,8 @@ visto en tiempo real mientras se genera la actividad.
 
 ---
 
-{#ejercicio-15}
-### Ejercicio 15 — Leer la métrica y el log
+{#ejercicio-16}
+### Ejercicio 16 — Leer la métrica y el log
 
 Para la aplicación, abrir la métrica `CPUUtilization` del servicio en CloudWatch, y
 consultar las líneas de log más recientes del contenedor con Logs Insights.
@@ -193,7 +193,7 @@ consultar las líneas de log más recientes del contenedor con Logs Insights.
 :::
 
 :::slide light
-{{ejercicio-15}}
+{{ejercicio-16}}
 :::
 
 ---

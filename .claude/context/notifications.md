@@ -22,7 +22,7 @@ Participant's CodePipeline / CodeBuild (state change)
 > See `.claude/context/apps-events.md` for the full event contract.
 
 Production target is Microsoft Teams (CodeStar Notifications → SNS → AWS Chatbot →
-Teams); the lab swaps only the last hop. See the CI/CD content (`17-notificaciones-teams`).
+Teams); the lab swaps only the last hop. See the CI/CD content (`18-notificaciones-teams`).
 
 ## Where the code lives
 

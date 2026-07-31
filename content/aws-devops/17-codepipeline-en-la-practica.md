@@ -97,8 +97,8 @@ Ahora, entre Build y Deploy, el pipeline se detiene y espera una aprobación exp
 
 ---
 
-{#ejercicio-13}
-### Ejercicio 13 — Crear y ejecutar el pipeline
+{#ejercicio-14}
+### Ejercicio 14 — Crear y ejecutar el pipeline
 
 Crear un pipeline con etapas Source (CodeCommit `main`), Build (el proyecto de CodeBuild)
 y Deploy (el servicio de ECS), con una etapa de **aprobación manual** antes del Deploy.
@@ -129,7 +129,7 @@ llegó a ECS.
 :::
 
 :::slide light
-{{ejercicio-13}}
+{{ejercicio-14}}
 :::
 
 :::slide light

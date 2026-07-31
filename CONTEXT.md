@@ -63,7 +63,7 @@ CodePipeline → CloudWatch**.
 | Sem | Hrs | Título | Contenido |
 |-----|-----|--------|-----------|
 | 1 | 5 | Del código a la imagen desplegada | Intro DevOps · CodeCommit (repos, branching, git) · CodeBuild+ECR (build Docker, versionado) · despliegue inicial con CloudFormation como caja negra |
-| 2 | 5 | Infraestructura como código y los primeros contenedores | CloudFormation (templates YAML, deploy/update, buenas prácticas, troubleshooting) · cierra con ECS/Fargate: task definitions y services |
+| 2 | 5 | Infraestructura como código y los primeros contenedores | CloudFormation (templates YAML, deploy/update, buenas prácticas, troubleshooting) · separación de stacks por ciclo de vida + resource import (migración de la tabla) · cierra con ECS/Fargate: task definitions y services |
 | 3 | 5 | Operar, automatizar y observar | ECS/Fargate restante (networking, escalabilidad, troubleshooting) · CodePipeline (rol, leer pipelines, stages, integración, pipeline básico, aprobación manual + trigger) · inicio de Observabilidad (CloudWatch metrics y logs) |
 | 4 | 3 | Observabilidad y cierre del curso | Termina Observabilidad (dashboards, alarmas, Container Insights, trazabilidad) · cierre: repaso del flujo CI/CD, troubleshooting operacional, próximos pasos |
 
@@ -148,7 +148,10 @@ Week 3.
   republished so students actually clone them.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
-- Week-1 CloudFormation template (instructor-provided): `taller-aws-devops-semana1.yaml`.
+- Instructor-provided CloudFormation templates (in `infra/templates/`): Week 1
+  monolith `taller-aws-devops-semana1.yaml`; Week 2 split
+  `taller-aws-devops-semana2-{red,datos,app}.yaml` (lifecycle separation; the
+  table migrates via resource import in `12-separar-stacks`, ej. 11).
 - Recovery mechanism: tear down and recreate the stack to reset a pod to a
   known-good state ("el seguro del taller").
 - Each participant has their own AWS account / "pod".

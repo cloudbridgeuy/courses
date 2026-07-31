@@ -43,10 +43,16 @@ tabla, un bucket— eso puede ser un desastre. `DeletionPolicy: Retain` indica a
 CloudFormation conservar el recurso aunque se borre el stack.
 
 ```yaml
-  TablaApp:
+  TablaClientes:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
 ```
+
+Note que el template de la Semana 1 **no** marca su `TablaApp` con `Retain`, y es a
+propósito: sus datos son descartables, y el ciclo de destrucción y recreación de la
+Semana 1 exige que borrar el stack no deje nada atrás. `Retain` es para datos que
+duelen perder, no un default. En la próxima sección la tabla cruza exactamente esa
+línea —acumula datos reales— y la política cambia con ella.
 
 ::: warning
 Nunca modificar a mano, desde la consola, un recurso que gestiona un stack. El template
