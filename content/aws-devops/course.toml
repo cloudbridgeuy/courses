@@ -19,8 +19,8 @@ sections = [
 ]
 
 [[session]]
-slug = "abrir-la-caja-negra"
-title = "Abrir la caja negra"
+slug = "comprendiendo-cloudformation"
+title = "CloudFormation"
 sections = [
   "07-cloudformation-anatomia.md",
   "08-leer-el-template.md",
