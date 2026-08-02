@@ -491,6 +491,7 @@ async fn static_file(State(state): State<AppState>, Path(file): Path<String>) ->
         "aws-codecommit.svg" => asset("image/svg+xml", AWS_CODECOMMIT_SVG),
         "aws-codebuild.svg" => asset("image/svg+xml", AWS_CODEBUILD_SVG),
         "aws-ecr.svg" => asset("image/svg+xml", AWS_ECR_SVG),
+        "aws-cloudformation.svg" => asset("image/svg+xml", AWS_CLOUDFORMATION_SVG),
         "docker.svg" => asset("image/svg+xml", DOCKER_SVG),
         _ => not_found(&state.site.load()),
     }
@@ -522,4 +523,5 @@ const CLOUDBRIDGE_WHITE_PNG: &[u8] = include_bytes!("../static/cloudbridge-white
 const AWS_CODECOMMIT_SVG: &str = include_str!("../static/aws-codecommit.svg");
 const AWS_CODEBUILD_SVG: &str = include_str!("../static/aws-codebuild.svg");
 const AWS_ECR_SVG: &str = include_str!("../static/aws-ecr.svg");
+const AWS_CLOUDFORMATION_SVG: &str = include_str!("../static/aws-cloudformation.svg");
 const DOCKER_SVG: &str = include_str!("../static/docker.svg");

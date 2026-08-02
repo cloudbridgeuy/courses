@@ -39,8 +39,15 @@ Parameters:
 ### `DeletionPolicy` para lo que no debe perderse
 
 Por defecto, borrar un stack borra todos sus recursos. Para los que guardan datos —una
-tabla, un bucket— eso puede ser un desastre. `DeletionPolicy: Retain` indica a
-CloudFormation conservar el recurso aunque se borre el stack.
+tabla, un bucket— eso puede ser un desastre. `DeletionPolicy` cambia ese
+comportamiento, y acepta tres valores:
+
+| Valor | Qué hace al borrar el stack |
+| --- | --- |
+| `Delete` | Borra el recurso. Es el valor por defecto. |
+| `Retain` | Deja el recurso en pie, sin stack que lo gestione. |
+| `RetainExceptOnCreate` | Como `Retain`, salvo si se deshace la creación inicial. |
+| `Snapshot` | Toma una copia y después borra el recurso. |
 
 ```yaml
   TablaClientes:
@@ -48,11 +55,84 @@ CloudFormation conservar el recurso aunque se borre el stack.
     DeletionPolicy: Retain
 ```
 
+`Snapshot` es el punto medio —no deja recursos huérfanos acumulando costo, pero tampoco
+pierde los datos—, y solo lo admite una lista corta de tipos que saben sacar copias:
+`AWS::RDS::DBCluster` y `AWS::RDS::DBInstance`, `AWS::Redshift::Cluster`,
+`AWS::Neptune::DBCluster`, `AWS::DocDB::DBCluster`, las dos variantes de
+`AWS::ElastiCache`, y `AWS::EC2::Volume`. **DynamoDB no está en esa lista**: para la
+tabla del taller la única protección disponible es `Retain`.
+
+`RetainExceptOnCreate` resuelve una molestia concreta de `Retain`. Si un stack falla al
+crearse y hace rollback, `Retain` conserva igual el recurso —vacío, recién nacido, sin
+datos que valga la pena salvar— y hay que borrarlo a mano antes de reintentar. Con
+`RetainExceptOnCreate`, ese caso se limpia solo, y el resto se sigue conservando.
+
 Note que el template de la Semana 1 **no** marca su `TablaApp` con `Retain`, y es a
 propósito: sus datos son descartables, y el ciclo de destrucción y recreación de la
 Semana 1 exige que borrar el stack no deje nada atrás. `Retain` es para datos que
-duelen perder, no un default. En la próxima sección la tabla cruza exactamente esa
-línea —acumula datos reales— y la política cambia con ella.
+duelen perder, no un default. En la sección anterior la tabla cruzó exactamente esa
+línea —acumuló datos reales— y la política cambió con ella.
+
+### `UpdateReplacePolicy`: la mitad que suele faltar
+
+`DeletionPolicy` protege el recurso cuando **se borra el stack**. No hace nada cuando
+el stack sigue vivo y una actualización obliga a **reemplazar** el recurso —el
+`Replacement: True` del change set—. En ese caso CloudFormation crea uno nuevo y borra
+el viejo, con `Retain` puesto y todo.
+
+No es un descuido de nadie: es el comportamiento documentado. `DeletionPolicy` cubre
+que el recurso se borre del stack, y **no cubre** que su instancia física se reemplace
+durante una actualización. Ese hueco lo cierra `UpdateReplacePolicy`, que acepta los
+mismos valores y se aplica al reemplazo. Por eso el template de datos lleva los dos:
+
+```yaml
+  TablaApp:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain          # al borrar el stack
+    UpdateReplacePolicy: Retain     # al reemplazar la tabla en una actualización
+```
+
+La regla es simple: **los dos atributos van juntos, siempre**. Poner solo
+`DeletionPolicy` da una sensación de seguridad que no se corresponde con la realidad,
+y el día que alguien cambie una propiedad que exige reemplazo, los datos se van sin
+que nadie haya borrado nada.
+
+:::slide
+## Las dos políticas van juntas
+
+| Atributo | Cuándo actúa |
+| --- | --- |
+| `DeletionPolicy` | Al **borrar el stack**. |
+| `UpdateReplacePolicy` | Al **reemplazar el recurso** en una actualización. |
+
+Valores: `Delete` · `Retain` · `RetainExceptOnCreate` · `Snapshot`.
+
+Solo `DeletionPolicy` **no** protege los datos.
+:::
+
+### Etiquetar el stack, no cada recurso
+
+Las etiquetas de la sección anterior se ponían recurso por recurso. Al lanzar o
+actualizar un stack, la pantalla **Configure stack options** ofrece un juego de
+etiquetas a nivel de stack, y CloudFormation las **propaga a todos los recursos que
+las soporten**. Un solo lugar en vez de decenas.
+
+Sirven para tres cosas concretas: filtrar los recursos del taller en la consola,
+repartir el costo en Cost Explorer, y encontrar lo que quedó vivo al limpiar la
+cuenta. Un mínimo razonable:
+
+| Etiqueta | Valor de ejemplo |
+| --- | --- |
+| `Proyecto` | `taller-aws-devops` |
+| `Ambiente` | `taller` |
+| `Responsable` | `<su-nombre>` |
+
+::: info
+Para que una etiqueta aparezca en los informes de costo hay que activarla como
+*cost allocation tag* en **Billing → Cost allocation tags**, una vez por cuenta. Hasta
+entonces la etiqueta existe en el recurso, pero Cost Explorer no puede agrupar por
+ella.
+:::
 
 ::: warning
 Nunca modificar a mano, desde la consola, un recurso que gestiona un stack. El template
@@ -72,10 +152,87 @@ con claridad y se expone lo que realmente se consume desde afuera.
 ## Buenas prácticas, en una línea
 
 - Nombres lógicos **descriptivos**.
-- Deje que AWS **genere los nombres físicos**.
+- Dejar que AWS **genere los nombres físicos**.
 - Parámetros con **`Default`** para lo habitual.
-- **`DeletionPolicy: Retain`** para los datos.
-- Nunca edite a mano un recurso gestionado por un stack.
+- **`DeletionPolicy`** y **`UpdateReplacePolicy`** en `Retain` para los datos.
+- Etiquetas **a nivel de stack**, no recurso por recurso.
+- Nunca editar a mano un recurso gestionado por un stack.
+:::
+
+## Proteger un stack de un borrado accidental
+
+Las políticas de la sección anterior protegen **un recurso**. Hay dos mecanismos más
+que protegen **el stack entero**, y los dos se configuran fuera del template: viven en
+el stack, no en el archivo.
+
+### Termination protection
+
+Con la protección activada, la acción **Delete** falla con un mensaje claro en lugar de
+borrar nada. Hay que desactivarla a propósito, en una operación aparte, antes de poder
+borrar el stack. Ese segundo paso deliberado es toda la protección: convierte un clic
+distraído en una decisión.
+
+Se activa en **Stack actions → Edit termination protection**, y es la primera cosa que
+conviene hacer con un stack que guarda datos —el de datos de la sección anterior es el
+candidato obvio—. El stack de aplicación, en cambio, es descartable a propósito, y
+protegerlo solo estorbaría.
+
+::: info
+La protección es **por stack**: en un stack anidado se configura en el stack raíz, y
+los hijos la heredan.
+:::
+
+### Stack policies
+
+La termination protection cubre el borrado del stack completo. No dice nada sobre una
+actualización que reemplace un recurso concreto. Para eso está la **stack policy**: un
+documento JSON, asociado al stack, que declara qué recursos puede tocar una
+actualización y cuáles no.
+
+```json
+{
+  "Statement": [
+    { "Effect": "Allow", "Action": "Update:*", "Principal": "*", "Resource": "*" },
+    { "Effect": "Deny",  "Action": ["Update:Replace", "Update:Delete"],
+      "Principal": "*", "Resource": "LogicalResourceId/TablaApp" }
+  ]
+}
+```
+
+Se lee de arriba abajo: todo permitido, salvo reemplazar o borrar `TablaApp`. Un change
+set que intente cualquiera de las dos cosas se rechaza al ejecutarse.
+
+Conviene entender las diferencias con las otras dos herramientas, porque las tres se
+confunden:
+
+| Mecanismo | Qué bloquea | Dónde vive |
+| --- | --- | --- |
+| `DeletionPolicy` / `UpdateReplacePolicy` | Que el recurso **se pierda** | En el template |
+| Stack policy | Que una actualización **toque** ciertos recursos | En el stack |
+| Termination protection | Que se **borre el stack** | En el stack |
+
+Las dos primeras se complementan: la política del template salva los datos, la stack
+policy impide que la operación llegue a ocurrir. Y la stack policy tiene una virtud que
+`UpdateReplacePolicy` no tiene: falla **antes**, con un error, en vez de dejar un
+recurso huérfano.
+
+::: warning
+Una stack policy no protege contra IAM ni reemplaza a IAM. Solo limita lo que las
+actualizaciones de **ese stack** pueden hacer. Quien tenga permisos suficientes puede
+cambiar la política —o borrar el recurso desde la consola del servicio, por fuera del
+stack—. Es una red de seguridad contra el error propio, no un control de acceso.
+:::
+
+:::slide
+## Tres protecciones, tres alcances
+
+| Mecanismo | Qué bloquea |
+| --- | --- |
+| `DeletionPolicy` + `UpdateReplacePolicy` | Que el recurso se pierda |
+| **Stack policy** | Que una actualización toque el recurso |
+| **Termination protection** | Que se borre el stack |
+
+Las dos últimas viven **en el stack**, no en el template.
 :::
 
 ## Troubleshooting: leer un fallo
@@ -103,8 +260,27 @@ exactamente qué pasó.
 | `is not authorized to perform` | Permisos insuficientes en el usuario o rol que lanza el stack. |
 | `limit exceeded` | Se alcanzó un límite de la cuenta (por ejemplo, número de VPC o de EIP). |
 
-La primera fila explica la casilla de capacidades que marcó en la Semana 1: no era un
-trámite, era CloudFormation pidiendo permiso explícito para crear roles de IAM.
+La primera fila explica la casilla de capacidades que se marcó en la Semana 1: no era
+un trámite, era CloudFormation pidiendo permiso explícito para crear roles de IAM.
+
+### Los límites del servicio
+
+Un último grupo de fallos no viene del template sino de los **límites de
+CloudFormation**. Aparecen tarde, cuando un stack ya creció, y desconciertan porque el
+template es válido:
+
+| Límite | Valor |
+| --- | --- |
+| Recursos por stack | 500 |
+| Parámetros, mappings, u outputs por template | 200 cada uno |
+| Tamaño del template subido desde el navegador | 51.200 bytes |
+| Tamaño del template alojado en S3 | 1 MB |
+
+El límite de 51.200 bytes es el que se encuentra primero: pasado ese tamaño, la consola
+deja de aceptar **Upload a template file** y hay que subir el archivo a un bucket de S3
+y darle la URL. Los límites de recursos y de outputs se alcanzan mucho después, y
+cuando pasa, la respuesta no es pelearlos: es **dividir el stack** —exactamente lo que
+se hizo en la sección anterior, ahora por una razón distinta—.
 
 :::slide
 ## Leer un fallo
@@ -122,4 +298,28 @@ de sintaxis, propiedades inválidas, y referencias rotas, sin necesidad de lanza
 Integrada en el editor o en el pipeline, atrapa la mayoría de los errores antes de llegar
 a la consola. La consola también ofrece un botón **Validate** que hace una verificación
 básica de sintaxis al subir el template.
+:::
+
+::: extra Lo mismo desde la línea de comandos
+Todo lo que se hizo por la consola tiene su equivalente en el CLI, y un pipeline
+automatizado lo necesita —la consola no se puede scriptear—. El comando central es
+`aws cloudformation deploy`, que crea el stack si no existe y lo actualiza si existe,
+usando un change set por debajo:
+
+```bash
+aws cloudformation deploy \
+  --stack-name taller-aws-<su-nombre>-app \
+  --template-file taller-aws-devops-semana2-app.yaml \
+  --parameter-overrides ImageUri=... RedStackName=... DatosStackName=... PlataformaStackName=... \
+  --capabilities CAPABILITY_IAM
+```
+
+Con `--no-execute-changeset`, el comando se detiene después de calcular el change set,
+sin aplicarlo: es la versión automatizable del "revisar antes de ejecutar" de la
+sesión anterior, y lo que permite meter una aprobación humana en el medio.
+
+Otros comandos útiles: `validate-template` (sintaxis), `describe-stack-events`
+(la pestaña **Events**), `describe-stacks --query "Stacks[0].Outputs"` (los outputs, en
+un script), y `wait stack-create-complete` (bloquea hasta que el stack termine).
+La Semana 3 los retoma al armar el pipeline.
 :::

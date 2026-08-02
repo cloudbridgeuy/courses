@@ -25,6 +25,7 @@ dónde se corta cuando algo falla.
 Internet
   → Application Load Balancer (puerto 80)
   → Listener
+  → Regla (por ruta, o por nombre)
   → Target Group
   → Tarea de Fargate (contenedor, puerto 8080)
 ```
@@ -34,13 +35,16 @@ Internet
 flowchart LR
   U["Internet"] --> L["ALB<br/>(puerto 80)"]
   L --> LI["Listener"]
-  LI --> TG["Target Group<br/>(health checks)"]
+  LI --> RG["Regla<br/>(ruta / host)"]
+  RG --> TG["Target Group<br/>(health checks)"]
   TG --> T1["Tarea Fargate<br/>(puerto 8080)"]
   TG --> T2["Tarea Fargate<br/>(puerto 8080)"]
 ```
 
 - El **ALB** recibe el tráfico HTTP en el puerto 80, en subredes públicas.
-- El **listener** define en qué puerto escucha el ALB y a qué *target group* reenvía.
+- El **listener** define en qué puerto escucha el ALB.
+- La **regla** decide, por la ruta o por el nombre de host, a qué *target group* va cada
+  petición. Con dos aplicaciones sobre el mismo balanceador, es la pieza que las separa.
 - El **target group** agrupa los destinos —las tareas— y verifica su salud.
 - La **tarea** corre en una subred, con un **grupo de seguridad** que permite el tráfico
   del ALB hacia el puerto del contenedor.
@@ -53,9 +57,44 @@ o un *health check* fallando.
 ### Health checks
 
 El target group verifica periódicamente que cada tarea responda en una ruta de salud
-(por ejemplo, `GET /`). Una tarea que responde es **healthy** y recibe tráfico; una que
-no responde es **unhealthy** y el ALB deja de enviarle peticiones. Si todas las tareas
-están unhealthy, el ALB devuelve `503` aunque los contenedores estén corriendo.
+—en el template del taller, `GET /health`—. Una tarea que responde es **healthy** y
+recibe tráfico; una que no responde es **unhealthy** y el ALB deja de enviarle
+peticiones. Si todas las tareas están unhealthy, el ALB devuelve `503` aunque los
+contenedores estén corriendo.
+
+Conviene notar que el health check **no pasa por la regla**: el target group habla
+directo con la tarea, en su IP privada y en el puerto 8080. Por eso una aplicación
+publicada bajo `/eco/*` igual necesita contestar en `/health`.
+
+### La cadena, vista desde el otro extremo
+
+El diagrama describe la cadena; el servidor de eco de la Semana 2 la **muestra**. Cada
+pedido a `/eco/` vuelve con un bloque `network` que es esa misma cadena, leída desde
+adentro del contenedor:
+
+```json
+"network": {
+  "local":  { "address": "10.0.1.100", "port": 8080 },
+  "peer":   { "address": "10.0.0.5",   "port": 41234 },
+  "client_ip": "203.0.113.7",
+  "forwarded_for": ["203.0.113.7"],
+  "forwarded_proto": "https"
+}
+```
+
+- `local` es el último eslabón: la IP privada de la tarea, en el puerto 8080. Es la
+  dirección exacta que el target group tiene registrada.
+- `peer` es el eslabón anterior, y **no es el navegador**: es el balanceador. La
+  dirección es de la VPC, y cambia entre pedidos, porque el ALB tiene un nodo por subred.
+- `client_ip` y `forwarded_for` sí son el navegador. El ALB lo anotó en
+  `X-Forwarded-For` antes de reenviar.
+
+De ahí sale una regla práctica de operación: una aplicación detrás de un balanceador que
+registre `peer` como dirección del cliente va a registrar siempre la del balanceador. Un
+log de acceso con dos o tres IPs privadas repitiéndose es ese error, visto de lejos.
+
+Repetir el pedido varias veces alterna el valor de `local` entre las tareas sanas del
+target group. Eso es el reparto del balanceador, hecho visible.
 
 ## Escalar el servicio
 
@@ -110,7 +149,9 @@ CloudWatch Logs identificado en la Semana 2.
 
 ### Definir la política
 
-1. Abrir [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home), entrar al clúster,
+   y seleccionar el servicio **de la aplicación** —no el del eco: el clúster tiene los
+   dos, y la política es de un servicio, no del clúster.
 2. En la pestaña **Configuration and tasks**, buscar **Service auto scaling** y pulsar
    **Update**.
 3. Activar **Service auto scaling**, y fijar el número **mínimo** de tareas en `1` y el
@@ -135,7 +176,8 @@ máximo 4 tareas). Luego, en el target group del ALB, confirmar que las tareas e
 registradas como sanas.
 
 ::: solucion
-1. Abrir [**ECS → Clusters → su clúster → su servicio**](https://console.aws.amazon.com/ecs/home).
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home), entrar al clúster,
+   y seleccionar el servicio de la aplicación.
 2. En **Configuration and tasks → Service auto scaling**, pulsar **Update**.
 3. Activar el auto scaling; fijar **mínimo 1**, **máximo 4**.
 4. Agregar una política **Target tracking** sobre

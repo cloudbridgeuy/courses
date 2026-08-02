@@ -88,6 +88,33 @@ Lo construido es una base sólida, no el final del camino. Hacia dónde seguir:
 Cada uno de estos pasos reutiliza lo ya aprendido: son extensiones del mismo flujo, no
 temas nuevos desde cero.
 
+::: extra Más allá del YAML a mano
+El taller escribió CloudFormation directo, y eso es lo correcto para aprender: es la
+capa sobre la que se apoya todo lo demás. En un equipo, el YAML a mano rara vez es la
+última palabra. Tres caminos, de menor a mayor distancia del archivo original:
+
+- **`Transform`** — una sección que le pide a CloudFormation procesar el template antes
+  de desplegarlo. `AWS::Serverless-2016-10-31` activa **SAM**, que convierte veinte
+  líneas de función Lambda, rol, y API en cinco. `AWS::LanguageExtensions` agrega lo que
+  falta en el lenguaje base, como bucles (`Fn::ForEach`) e `Fn::Length`. El resultado
+  sigue siendo un stack de CloudFormation, con sus change sets y sus eventos.
+- **CDK** — define la infraestructura en TypeScript, Python, o Java, y **sintetiza** un
+  template de CloudFormation. Se gana lo que da un lenguaje de verdad —clases, tests,
+  el autocompletado del editor— y se paga con una capa más entre lo que se escribe y lo
+  que se despliega. Todo lo de esta semana sigue aplicando: `cdk deploy` crea un stack
+  de CloudFormation normal, y cuando algo falla se lee la pestaña **Events**.
+- **Terraform** — de HashiCorp, ajeno a AWS y por eso capaz de gestionar varios
+  proveedores con un solo lenguaje. Guarda el estado en un archivo propio en vez de
+  dejarlo en el servicio, lo que da más control y agrega una responsabilidad: ese
+  archivo hay que guardarlo, bloquearlo, y no perderlo. Su `terraform plan` es el
+  equivalente exacto del change set.
+
+Los conceptos no cambian entre las tres: estado deseado contra estado real,
+reconciliación, vista previa antes de aplicar, dependencias entre recursos, y ciclos de
+vida distintos en stacks distintos. Aprendida la idea en CloudFormation, cambiar de
+herramienta es cambiar de sintaxis.
+:::
+
 ## Ejercicio final (opcional): el ciclo completo
 
 Para cerrar el taller con todo en movimiento a la vez, este ejercicio integrador
@@ -120,6 +147,145 @@ fluya por el pipeline hasta el despliegue.
 :::slide light
 {{ejercicio-19}}
 :::
+
+---
+
+## Desarmar el ambiente
+
+Queda un último paso, y no es un trámite administrativo: el teardown es la prueba final
+del contrato entre stacks. Al terminar el taller, el ambiente son **cinco stacks** y una
+tabla que sobrevive a todos ellos. Borrarlos en cualquier orden no funciona.
+
+La razón se explicó en la Semana 2: mientras un stack importe un export, ese export no
+se puede borrar. Empezar por el stack de red termina en un `DELETE_FAILED` con un
+mensaje explícito:
+
+```
+Export taller-aws-maria-red-vpc-id cannot be deleted as it is in use by
+taller-aws-maria-plataforma
+```
+
+No es una falla: es la garantía funcionando. El orden de borrado es el orden de
+creación, al revés.
+
+:::slide
+## El orden inverso
+
+```
+-eco → -app → -datos → -plataforma → -red
+```
+
+Un export no se borra mientras alguien lo importe.
+
+**Borrar es crear, al revés.**
+:::
+
+### Antes de empezar: apagar lo que reconstruye
+
+El pipeline vigila `main` y despliega sobre el servicio de ECS. Si se dispara en medio
+del teardown, vuelve a tocar recursos que se están borrando.
+
+1. Abrir [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home),
+   entrar a `taller-aws-<su-nombre>-pipeline`, y pulsar **Delete pipeline**. La regla de
+   notificación de la Semana 3 se va con él.
+2. El auto scaling no hace falta tocarlo: la política vive dentro del servicio, y
+   desaparece con el stack de aplicación.
+
+### Borrar los stacks, de arriba hacia abajo
+
+En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), borrar en
+este orden, esperando el `DELETE_COMPLETE` de cada uno antes de seguir:
+
+| Orden | Stack | Qué se lleva |
+| --- | --- | --- |
+| 1 | `taller-aws-<su-nombre>-eco` (si se creó) | El servicio de eco, su task definition, su target group, su regla del listener, y su grupo de logs. |
+| 2 | `taller-aws-<su-nombre>-app` | Lo mismo, para la aplicación principal. |
+| 3 | `taller-aws-<su-nombre>-datos` | El stack, pero **no la tabla**. |
+| 4 | `taller-aws-<su-nombre>-plataforma` | El clúster, el balanceador, los listeners, y —si se activó HTTPS— el certificado de ACM y los registros de Route 53. |
+| 5 | `taller-aws-<su-nombre>-red` | La VPC, las subredes, y los grupos de seguridad. |
+
+Los stacks 1 y 2 se pueden borrar a la vez —ninguno importa nada del otro—, y lo mismo
+vale para el 3 y el 4 entre sí. Lo que no se puede es adelantar el 5.
+
+Con la CLI, el orden se expresa esperando:
+
+```bash
+TALLER=taller-aws-<su-nombre>
+for stack in "$TALLER-eco" "$TALLER-app" "$TALLER-datos" \
+             "$TALLER-plataforma" "$TALLER-red"; do
+  aws cloudformation delete-stack --stack-name "$stack"
+  aws cloudformation wait stack-delete-complete --stack-name "$stack"
+done
+```
+
+::: warning
+Si el stack de red queda en `DELETE_FAILED` sobre una subred o un grupo de seguridad,
+casi siempre es una interfaz de red (ENI) que todavía no se liberó —una tarea de Fargate
+que tarda en apagarse—. Esperar un par de minutos y reintentar el borrado suele alcanzar.
+:::
+
+### La tabla que sobrevive
+
+Al borrar el stack de datos, la pestaña **Events** muestra la tabla como
+`DELETE_SKIPPED`. Es exactamente lo que se pidió en la migración con
+`DeletionPolicy: Retain`, y recién ahora se ve el otro lado de esa decisión: la tabla
+queda **sin stack y sin dueño**, viva, facturando, y ocupando su nombre.
+
+Ese es el precio de `Retain`, y se paga a mano:
+
+```bash
+aws dynamodb delete-table --table-name "$TABLA"
+```
+
+La lección operativa: `Retain` no es "más seguro" sin más. Traslada la responsabilidad
+del borrado de CloudFormation a una persona. Un recurso retenido y olvidado es una
+factura que nadie revisa.
+
+### Lo que nunca estuvo en un stack
+
+Los cinco stacks no cubren todo el taller. Buena parte de la Semana 1, y de la Semana 4,
+se creó a mano por la consola, y por eso no se borra sola:
+
+| Recurso | Servicio |
+| --- | --- |
+| Repositorio `taller-aws-<su-nombre>` | CodeCommit |
+| Proyecto `taller-aws-<su-nombre>-build` | CodeBuild |
+| Repositorio `taller-aws-<su-nombre>`, con sus imágenes | ECR |
+| El bucket de artefactos que creó CodePipeline (`codepipeline-<región>-…`) | S3 |
+| El dashboard, y la alarma `cpu-alta-<su-nombre>` | CloudWatch |
+| El grupo de logs `/aws/codebuild/taller-aws-<su-nombre>-build` | CloudWatch Logs |
+| Los roles de servicio que crearon las consolas (`codebuild-…`, `AWSCodePipelineServiceRole-…`) | IAM |
+
+Un bucket de S3 con objetos no se borra hasta vaciarlo, y un repositorio de ECR con
+imágenes pide `--force`.
+
+::: extra La lista se hace sola cuando todo es un stack
+Esta tabla existe porque el taller creó recursos por la consola para poder enseñarlos
+uno a uno. Un ambiente definido enteramente como código no la necesita: se borran los
+stacks en orden inverso, y no queda nada.
+
+Ese es el argumento más práctico a favor de la infraestructura como código, y es el
+único que solo se aprecia al desarmar: **lo que no está en un template se borra a mano,
+o no se borra.**
+:::
+
+### Confirmar que no queda nada
+
+1. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), filtrar
+   por `taller-aws-<su-nombre>`. La lista debe quedar vacía.
+2. Abrir la última **UrlBase** conocida: el navegador debe dar un error de conexión.
+3. Pasar un barrido por lo que suele quedar atrás:
+
+   ```bash
+   aws dynamodb list-tables \
+     --query "TableNames[?contains(@, '$TALLER')]"
+   aws ecr describe-repositories \
+     --query "repositories[?contains(repositoryName, '$TALLER')].repositoryName"
+   aws logs describe-log-groups --log-group-name-prefix "/ecs/$TALLER" \
+     --query "logGroups[].logGroupName"
+   ```
+
+   Tres listas vacías cierran el taller.
 
 :::slide
 ## Del código a la operación

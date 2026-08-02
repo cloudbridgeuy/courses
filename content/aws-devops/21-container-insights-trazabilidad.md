@@ -73,6 +73,43 @@ Cada paso reduce el espacio de búsqueda; el log es donde casi siempre está la 
 final. Esa secuencia —métrica que alerta, métrica que acota, log que explica— es el
 método de troubleshooting operacional que el taller deja como herramienta.
 
+### El hilo tiene nombre: `X-Amzn-Trace-Id`
+
+Ese recorrido une métricas y logs por **tiempo**: se acota una ventana, y se lee lo que
+pasó adentro. Funciona, y es aproximado —en un minuto de tráfico real caben miles de
+peticiones, y solo una es la del síntoma—.
+
+Hay una forma más fina, y ya está puesta desde el primer día. El ALB agrega a cada
+petición que reenvía una cabecera **`X-Amzn-Trace-Id`**, con un identificador único:
+
+```
+X-Amzn-Trace-Id: Root=1-63f4a2b1-3c8e9d7a5b2f1e0c4d6a8b9e
+```
+
+No hace falta instrumentar nada para verla: el servidor de eco de la Semana 2 devuelve
+todas las cabeceras que recibe, incluida esta.
+
+```bash
+curl -s "<UrlBase>/eco/" | grep -i trace
+```
+
+Ese valor es el hilo. Si la aplicación lo lee y lo escribe en cada línea de log, las
+ventanas de tiempo dejan de hacer falta: una consulta por el identificador devuelve todo
+lo que esa petición —y solo esa— produjo, aunque haya cruzado varias tareas.
+
+```
+fields @timestamp, @message
+| filter @message like /1-63f4a2b1-3c8e9d7a5b2f1e0c4d6a8b9e/
+| sort @timestamp asc
+```
+
+El mismo valor aparece en el campo `trace_id` del log de acceso del ALB, si se activa. Y
+el prefijo `Root=` no es casual: es el formato de traza de **AWS X-Ray**, así que ese
+identificador es el que uniría los segmentos del recorrido el día que se active.
+
+Correlacionar por identificador, en vez de por reloj, es el paso que separa la
+observabilidad de mirar gráficas.
+
 ## Práctica guiada: activar y recorrer
 
 ### Activar Container Insights
@@ -84,7 +121,8 @@ método de troubleshooting operacional que el taller deja como herramienta.
 
 ### Recorrer un hilo
 
-1. En Container Insights, observar la CPU **por tarea** del servicio.
+1. En Container Insights, observar la CPU **por tarea** del servicio de la aplicación
+   —la vista lista los dos servicios del clúster por separado—.
 2. Anotar la ventana de tiempo de cualquier pico (o del período reciente).
 3. Abrir [**Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccionar el grupo de logs del contenedor, y consultar las
    líneas de esa ventana:

@@ -113,12 +113,24 @@ decide *cuántas hay y las mantiene vivas*.
 
 ```mermaid
 flowchart TD
-  CL["Clúster ECS"] --> SV["Service<br/>(DesiredCount = 2)"]
+  CL["Clúster ECS"] --> SV["Service de la app<br/>(DesiredCount = 2)"]
+  CL --> SE["Service del eco<br/>(DesiredCount = 1)"]
   TD["Task definition<br/>imagen · CPU · memoria · puertos"] -.->|plantilla| SV
   SV --> T1["Tarea 1 (RUNNING)"]
   SV --> T2["Tarea 2 (RUNNING)"]
-  SV -->|registra| TG["Target Group del ALB"]
+  SE --> T3["Tarea (RUNNING)"]
+  SV -->|registra| TG["Target Group de la app"]
+  SE -->|registra| TGE["Target Group del eco"]
 ```
+
+Un clúster sostiene **varios servicios a la vez**, y desde la sección anterior el del
+taller sostiene dos: la aplicación principal, y el servidor de eco. Cada uno tiene su
+task definition, su target group, y su grupo de logs; lo único que comparten es el
+clúster que los contiene, y el balanceador que los publica.
+
+Por eso, de acá en adelante, en la consola hay que fijarse en **cuál** de los dos se
+está mirando. El clúster es el contexto, no el sujeto: una métrica de CPU, un despliegue,
+o una política de escalado son siempre de un servicio, nunca del clúster.
 
 ::: extra Fargate vs. EC2: ¿quién pone los servidores?
 ECS puede ejecutar tareas de dos formas. Con el tipo de lanzamiento **EC2**, se administra una flota de servidores donde corren los contenedores. Con **Fargate**, AWS
@@ -141,12 +153,13 @@ Una describe; el otro opera.
 ### Abrir el clúster
 
 1. Abrir [**ECS**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
-2. En la pestaña **Services**, aparece el servicio con la cuenta de tareas deseadas y en
-   ejecución (ahora `2`).
+2. En la pestaña **Services**, aparece un servicio por cada stack de aplicación
+   desplegado —el de la aplicación, y el del eco si se creó—, cada uno con su cuenta de
+   tareas deseadas y en ejecución (el de la aplicación, ahora `2`).
 
 ### Inspeccionar el servicio y sus tareas
 
-1. Pulsar sobre el nombre del servicio.
+1. Pulsar sobre el nombre del servicio de la aplicación.
 2. En la pestaña **Tasks**, aparecen las tareas en estado `RUNNING`. Pulsar una de ellas.
 3. En el detalle de la tarea, localizar la **task definition** que la originó (con su
    número de revisión) y el **grupo de logs** al que escribe.
@@ -168,8 +181,8 @@ grupo de CloudWatch Logs al que escribe.
 
 ::: solucion
 1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
-2. Entrar al servicio y abrir la pestaña **Tasks**. Pulsar una tarea en estado
-   `RUNNING`.
+2. Entrar al servicio de la aplicación y abrir la pestaña **Tasks**. Pulsar una tarea en
+   estado `RUNNING`.
 3. En el detalle de la tarea, anotar:
    - La **task definition** y su número de revisión (por ejemplo, `taller:2`).
    - El **grupo de logs** (*Log group*), bajo la sección de logs del contenedor.

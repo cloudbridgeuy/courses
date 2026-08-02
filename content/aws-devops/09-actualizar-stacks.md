@@ -2,6 +2,7 @@
 title = "Actualizar un stack con seguridad"
 +++
 
+:::inline-slide
 ## Cambiar lo que ya está desplegado
 
 Un template no se lanza una sola vez y se olvida: la infraestructura cambia. Se ajusta
@@ -12,6 +13,7 @@ calcule qué modificar.
 
 La pregunta crítica al actualizar es: *¿qué va a hacer exactamente este cambio antes de
 aplicarlo?* Esa pregunta la responde un **change set**.
+:::
 
 ## Change sets: ver antes de aplicar
 
@@ -25,12 +27,36 @@ Este es el ciclo de **reconciliación** de CloudFormation: comparar el estado de
 lo necesario para que coincidan.
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 50}, "themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
 flowchart LR
-  T["Template<br/>(estado deseado)"] --> D{"CloudFormation<br/>compara"}
-  S[("Stack actual<br/>(estado real)")] --> D
-  D -->|change set| P["Plan de cambios:<br/>crear / modificar / eliminar"]
-  P --> A["Aplicar al stack"]
-  A --> S
+    tpl["Template<br/>(estado deseado)"]
+    stack[("Stack actual<br/>(estado real)")]
+    cfn["<img src='/static/aws-cloudformation.svg' width='40' height='40' /><br/>CloudFormation<br/>compara"]
+    plan["Change set:<br/>crear · modificar · eliminar"]
+    rep{"¿Replacement:<br/>True?"}
+    halt["Detenerse:<br/>¿se pierden datos?"]
+    exec["Execute change set:<br/>aplica solo la diferencia"]
+
+    tpl ==> cfn
+    stack --> cfn
+    cfn ==>|"vista previa,<br/>sin tocar nada"| plan
+    plan --> rep
+    rep -->|"sí"| halt
+    rep ==>|"no"| exec
+    exec -.->|"el estado real<br/>converge al deseado"| stack
+
+    classDef desiredNode fill:#fdf2f8,stroke:#e7157b,color:#831843
+    classDef realNode fill:#f1f5f9,stroke:#475569,color:#0f172a
+    classDef cfnNode fill:#fdf2f8,stroke:#e7157b,stroke-width:2px,color:#831843
+    classDef planNode fill:#fef3c7,stroke:#d97706,color:#451a03
+    classDef badNode fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef fastNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    class tpl desiredNode
+    class stack realNode
+    class cfn cfnNode
+    class plan,rep planNode
+    class halt badNode
+    class exec fastNode
 ```
 
 El estado real converge hacia el deseado en cada actualización. La misma idea que
@@ -51,6 +77,18 @@ El reemplazo es el que hay que vigilar: cambiar ciertas propiedades (por ejemplo
 nombre físico de una tabla) obliga a CloudFormation a crear un recurso nuevo y borrar el
 anterior. El change set lo marca explícitamente con `Replacement: True`, dando la
 oportunidad de detenerse antes de perder datos.
+
+Qué propiedades disparan un reemplazo no es adivinable: está en la columna ***Update
+requires*** de la página del recurso, la que se mencionó al leer la referencia oficial.
+Tiene tres valores —*No interruption*, *Some interruption*, y *Replacement*— y vale la
+pena consultarla **antes** de escribir el cambio, no después de verlo en el change set.
+
+::: warning
+Un reemplazo borra el recurso viejo, con sus datos. El atributo
+`UpdateReplacePolicy: Retain` evita esa pérdida: le indica a CloudFormation conservar
+el recurso original en vez de borrarlo. Es distinto de `DeletionPolicy`, que solo
+actúa al borrar el stack. Los dos se ven juntos en la próxima sesión.
+:::
 
 ## Práctica guiada: escalar la aplicación a dos tareas
 
@@ -110,6 +148,47 @@ devuelve el stack al último estado bueno conocido. El estado pasa por
 Esto es una red de seguridad: una actualización fallida no rompe el ambiente, lo
 devuelve a como estaba. La causa del fallo aparece en la pestaña **Events**, en el
 primer evento con estado `..._FAILED`.
+
+### Cuando el rollback también falla
+
+El rollback casi siempre termina bien, pero puede fallar él mismo. Si al deshacer un
+cambio CloudFormation tampoco puede volver al estado anterior —alguien borró a mano el
+recurso original, un permiso desapareció a mitad de camino— el stack queda en
+`UPDATE_ROLLBACK_FAILED`. Es el único estado que **bloquea el stack**: no acepta más
+actualizaciones hasta resolverlo, y a diferencia de un fallo común no se sale de él
+subiendo otro template.
+
+La salida es la acción **Stack actions → Continue update rollback**. Reintenta el
+rollback desde donde se quedó. Si vuelve a trabarse en el mismo recurso, la pantalla
+ofrece una lista de recursos a **saltear** (*Resources to skip*): CloudFormation los da
+por perdidos, termina el rollback, y deja el stack en `UPDATE_ROLLBACK_COMPLETE` con
+esos recursos marcados como `UPDATE_ROLLBACK_FAILED_SKIPPED`. Es una salida de
+emergencia con precio: el template y la realidad quedan desalineados en esos recursos,
+así que después conviene correr **Detect drift** y arreglarlos.
+
+### Investigar un fallo sin perder la evidencia
+
+El rollback tiene un costo cuando lo que se quiere es **entender** el fallo: al
+deshacer los cambios, se lleva puesto el recurso que falló, y con él los logs y la
+configuración que explicaban por qué. La tarea de ECS que no arrancó ya no está para
+mirarla.
+
+Para esos casos, la pantalla de creación ofrece, en **Stack failure options**, la
+opción **Preserve successfully provisioned resources**, y la de actualización acepta
+deshabilitar el rollback. El stack queda en `CREATE_FAILED` o `UPDATE_FAILED` con todo
+lo que sí se creó en pie, listo para inspeccionar. Es una herramienta de diagnóstico,
+no un modo de trabajo: el stack queda a medias, y hay que borrarlo o arreglarlo a mano
+después.
+
+:::slide light
+## Estados de un fallo
+
+| Estado | Qué significa |
+| --- | --- |
+| `UPDATE_ROLLBACK_COMPLETE` | El rollback funcionó. El stack está sano. |
+| `UPDATE_ROLLBACK_FAILED` | El rollback falló. Stack **bloqueado** → *Continue update rollback*. |
+| `UPDATE_FAILED` (sin rollback) | Rollback deshabilitado a propósito, para investigar. |
+:::
 
 ::: extra ¿Qué es el drift?
 El *drift* ocurre cuando alguien modifica a mano, desde la consola, un recurso que un
