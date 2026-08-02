@@ -339,7 +339,11 @@ SSE bus.
   the server embeds the source during rendering rather than exposing a filesystem
   route. It can start collapsed with `toggleable`, and provides content-size and copy
   controls. `full-path` disables truncation of the slide label. The bundle loads when
-  `uses_apps` is set (via `:::app`).
+  `uses_apps` is set (via `:::app`). `<cb-goto>` is a navigation button that jumps
+  to a heading of the same session: the server resolves its `path` (visible heading
+  text, or a raw `#anchor`) at parse time (`courses_core::goto_apps`) and an unknown
+  target fails the build; on slides a click leaves the deck for the guide URL plus
+  the hash. It never locks.
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret

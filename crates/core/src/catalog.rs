@@ -4,6 +4,7 @@ use crate::assets::{
 };
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
+use crate::goto_apps::{collect_ids, expand_goto_apps};
 use crate::manifest::{SessionEntry, parse_manifest};
 use crate::section::{parse_frontmatter, split_frontmatter};
 use crate::solutions::{SlideFragment, render_section_body};
@@ -74,6 +75,10 @@ fn assemble_session(
     let mut uses_apps = false;
     let mut uses_file_apps = false;
     let mut all_slides = Vec::new();
+    // Source file of each section / slide, index-aligned, so a cb-goto error
+    // after the loop can still name the file it came from.
+    let mut section_files = Vec::with_capacity(entry.sections.len());
+    let mut slide_files = Vec::new();
 
     for file in &entry.sections {
         let contents = files
@@ -100,6 +105,11 @@ fn assemble_session(
                 .iter()
                 .any(|slide| slide.html.contains("<cb-file"));
         uses_apps |= rendered.uses_apps;
+        section_files.push(file.as_str());
+        slide_files.extend(std::iter::repeat_n(
+            file.as_str(),
+            rendered.slide_html.len(),
+        ));
         all_slides.extend(rendered.slide_html);
 
         for href in &frontmatter.styles {
@@ -112,6 +122,21 @@ fn assemble_session(
             title: frontmatter.title,
             body_html: rendered.html,
         });
+    }
+
+    // cb-goto targets resolve against every heading id in the session's guide
+    // copy, so a button may point across section files. This has to run after
+    // the section loop: only then is the full id set known.
+    let mut ids = std::collections::HashSet::new();
+    for section in &sections {
+        collect_ids(&section.body_html, &mut ids);
+    }
+    for (section, file) in sections.iter_mut().zip(section_files.iter().copied()) {
+        section.body_html =
+            expand_goto_apps(&section.body_html, &ids).map_err(|e| in_file(file, &e))?;
+    }
+    for (slide, file) in all_slides.iter_mut().zip(slide_files.iter().copied()) {
+        slide.html = expand_goto_apps(&slide.html, &ids).map_err(|e| in_file(file, &e))?;
     }
 
     if uses_solutions || uses_file_apps {
@@ -489,6 +514,44 @@ mod tests {
                 .scripts
                 .contains(&SHIKI_INIT_JS_PATH.to_owned())
         );
+    }
+
+    #[test]
+    fn goto_app_resolves_across_sections_in_guide_and_slide_copies() {
+        let sec1 = make_section(
+            "S1",
+            ":::inline-slide\n## Destino final\n:::app\n\
+             <cb-goto path=\"Práctica guiada\"></cb-goto>\n:::\n:::\n",
+        );
+        let sec2 = make_section("S2", "## Práctica guiada\n\nPasos.\n");
+        let files = make_files(&[("01.md", sec1), ("02.md", sec2)]);
+        let input = CourseInput {
+            slug: "course-goto",
+            manifest: &make_manifest_one_session("Goto", &["01.md", "02.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        let guide = &loaded.course.sessions[0].sections[0].body_html;
+        assert!(guide.contains("data-target=\"practica-guiada\""));
+        let slide = &loaded.session_slides[0][0].html;
+        assert!(slide.contains("data-target=\"practica-guiada\""));
+    }
+
+    #[test]
+    fn goto_app_with_unknown_target_names_the_file() {
+        let body = ":::app\n<cb-goto path=\"No existe\"></cb-goto>\n:::\n";
+        let files = make_files(&[("01-goto.md", make_section("S1", body))]);
+        let input = CourseInput {
+            slug: "course-goto-bad",
+            manifest: &make_manifest_one_session("Goto Bad", &["01-goto.md"]),
+            files: &files,
+        };
+        let err = parse_course(&input).unwrap_err();
+        assert!(matches!(
+            err,
+            Error::InvalidSection { ref file, ref message }
+                if file == "01-goto.md" && message.contains("No existe")
+        ));
     }
 
     #[test]

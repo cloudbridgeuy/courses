@@ -185,6 +185,14 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   increase, and copy controls. The decrease and increase controls only change the
   file content size. Their own size stays fixed. `full-path` disables slide-label
   truncation for a file that must show its complete path.
+- `<cb-goto path="…">` is a navigation app: a button that jumps to a heading on
+  the session's guide page (`label` overrides the button text; default
+  `Ir a: <path>`). The server resolves `path` — visible heading text, or a raw
+  `#anchor` — to a heading id at parse time (`courses_core::goto_apps`, wired in
+  `assemble_session`) and stamps it as `data-target`; an unknown target fails
+  the build naming the section file. The target may live in any section of the
+  same session. On a slides page a click leaves the deck for the guide URL plus
+  the hash; on the guide it scrolls in place. Pure navigation — it never locks.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

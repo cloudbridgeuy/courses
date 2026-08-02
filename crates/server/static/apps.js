@@ -759,4 +759,49 @@
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Custom element: <cb-goto>
+  // Attributes: path, label, data-target
+  //
+  // Navigation button to a heading on the session's guide page. The server
+  // resolves the authored path (heading text, or "#anchor") to a heading id at
+  // render time and stamps it as data-target — unknown targets fail the build,
+  // so the element never has to guess. On a slides page the click leaves the
+  // deck for the guide; on the guide it scrolls in place. Pure navigation, so
+  // it never locks.
+  // ---------------------------------------------------------------------------
+
+  customElements.define(
+    "cb-goto",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this._rendered) return;
+        this._rendered = true;
+
+        var target = this.getAttribute("data-target") || "";
+        var label =
+          this.getAttribute("label") ||
+          "Ir a: " + (this.getAttribute("path") || "");
+
+        var btn = makeAppBtn(label);
+        btn.classList.add("cb-goto-btn");
+        btn.addEventListener("click", function () {
+          // Slide headings carry the same ids as their guide copies, so the
+          // page decides the behavior — not getElementById.
+          var onSlides = /\/slides$/.test(location.pathname);
+          var el = onSlides ? null : document.getElementById(target);
+          if (el) {
+            // Already on the guide: scroll in place, keep the hash honest.
+            el.scrollIntoView({ behavior: "smooth" });
+            history.replaceState(null, "", "#" + target);
+          } else {
+            var guidePath = location.pathname.replace(/\/slides$/, "");
+            window.location.href = guidePath + "#" + target;
+          }
+        });
+        this.appendChild(btn);
+      }
+    }
+  );
 })();

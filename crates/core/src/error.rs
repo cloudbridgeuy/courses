@@ -81,6 +81,12 @@ pub enum Error {
     #[error("slide references unknown anchor: {0}")]
     UnknownSlideRef(String),
 
+    #[error("malformed <cb-goto>: {0}")]
+    MalformedGoto(String),
+
+    #[error("cb-goto references an unknown heading: {0}")]
+    UnknownGotoTarget(String),
+
     #[error("in section {file}: {message}")]
     InvalidSection { file: String, message: String },
 

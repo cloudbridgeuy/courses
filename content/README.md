@@ -215,3 +215,21 @@ rechazan. El bloque muestra la ruta escrita en una etiqueta superpuesta en su es
 superior izquierda. A `toggleable` block keeps this label and shows a handle to open
 or close the code. Rendered files also provide decrease, increase, and copy controls.
 The first two change only the code size.
+
+## Saltar a una sección de la guía
+
+`cb-goto` renderiza un botón que navega a un encabezado de la misma sesión. El
+atributo `path` nombra el destino por su texto visible, o por un ancla directa
+con `#` inicial:
+
+```md
+:::app
+<cb-goto path="Práctica guiada: escalar la aplicación a dos tareas"></cb-goto>
+:::
+```
+
+En la guía el botón desplaza la página hasta el encabezado; en las diapositivas
+cierra la presentación y abre la guía en ese punto. `label` reemplaza el texto
+del botón (por defecto «Ir a: `<path>`»). El destino puede estar en cualquier
+sección de la misma sesión y se valida durante el build: un encabezado
+inexistente rompe el contenido con un error que nombra el archivo.

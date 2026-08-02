@@ -128,7 +128,7 @@ fn is_external(dest_url: &str) -> bool {
 
 /// Lowercases, strips Spanish diacritics, and maps runs of non-alphanumerics
 /// to single hyphens. Empty input slugs to `"titulo"`.
-fn slugify(text: &str) -> String {
+pub(crate) fn slugify(text: &str) -> String {
     let mut slug = String::with_capacity(text.len());
     for c in text.chars() {
         let c = match c {

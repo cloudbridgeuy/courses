@@ -12,6 +12,7 @@ mod dev;
 mod echo;
 mod error;
 mod events;
+mod goto_apps;
 mod manifest;
 mod markdown;
 mod notifications;
