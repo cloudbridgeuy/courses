@@ -25,7 +25,7 @@ se lo cambiara a mano desde la consola de ECS? ¿Qué pensaría CloudFormation d
 stack?
 
 ::: solucion
-El cambio surtiría efecto —ECS pondría a correr el número de tareas indicado— pero el
+El cambio surtiría efecto. ECS pondría a correr el número de tareas indicado, pero el
 **template y la realidad dejarían de coincidir**. Eso es *drift*. CloudFormation seguiría
 creyendo que `DesiredCount` es el valor de la última actualización aplicada por el stack,
 porque no se entera de los cambios hechos por fuera.
