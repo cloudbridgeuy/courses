@@ -12,3 +12,5 @@
 .playwright-mcp/
 /*.png
 /assets/
+
+*.bak
