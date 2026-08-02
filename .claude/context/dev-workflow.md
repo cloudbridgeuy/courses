@@ -6,7 +6,26 @@
   `PORT=8090 ./target/debug/courses_server`
 - Kill the server after manual tests: `pkill -f courses_server`.
 - Session URLs use title slugs, not filenames: discover them with
-  `curl -s localhost:8090/ | grep -o 'href="/courses/[^"]*"'`.
+  `curl -s localhost:8090/ | grep -o 'href="/courses/[^"]*"'`. A file such as
+  `12-separar-stacks.md` is one *section* of a session — look up which
+  `[[session]]` lists it in `content/aws-devops/course.toml`.
+
+## Subcommands
+
+`courses_server` takes an optional subcommand. No subcommand means `serve`, so
+the `Dockerfile` `CMD` and existing ECS task definitions are unaffected.
+
+- `courses_server serve` — the courses platform. The default.
+- `courses_server echo [--port <n>] [--name <dns-name>]` — the workshop's second
+  app: answers every request with a JSON description of it. `--port` also reads
+  `PORT` (default 8080), `--name` also reads `CB_ECHO_NAME`. Try it with
+  `./target/debug/courses_server echo --port 8099 --name echo.example.com` and a
+  `curl -s localhost:8099/a/b?x=1`. The shaping lives in `courses_core::echo`;
+  `crates/server/src/echo.rs` only copies out of axum's types.
+- The `network.ecs` block needs the ECS task metadata endpoint. To exercise it
+  off ECS, serve a static `/task` document and point
+  `ECS_CONTAINER_METADATA_URI_V4` at it — the server reads it once at startup
+  and answers `null` if anything fails.
 
 ## Hot reload (dev mode)
 

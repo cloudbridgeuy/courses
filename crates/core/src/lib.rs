@@ -9,6 +9,7 @@ mod assets;
 mod catalog;
 mod course;
 mod dev;
+mod echo;
 mod error;
 mod events;
 mod manifest;
@@ -26,6 +27,10 @@ pub use assets::{
 pub use catalog::{CourseInput, LoadedCourse, parse_course};
 pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 pub use dev::{DEV_RELOAD_SCRIPT_TAG, TextAsset, is_reload_trigger, text_asset, with_dev_script};
+pub use echo::{
+    EchoRequest, EchoServer, EcsNetwork, MAX_ECHOED_BODY, echo_json, format_rfc3339_utc,
+    parse_ecs_task_metadata,
+};
 pub use error::{Error, Result};
 pub use events::{
     CpuBurstConfig, Decision, Event, EventId, Gate, GateConfig, HandlerKind, Intensity,

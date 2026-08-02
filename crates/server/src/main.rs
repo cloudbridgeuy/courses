@@ -4,6 +4,7 @@
 
 mod content;
 mod dev;
+mod echo;
 mod file_apps;
 mod routes;
 mod site;
@@ -11,13 +12,15 @@ mod site;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
+use clap::{Args, Parser, Subcommand};
 use color_eyre::eyre::{Result, WrapErr};
 use tokio::sync::broadcast;
 
+use crate::echo::EchoConfig;
 use crate::routes::DevCtx;
 use crate::site::{SiteHandle, SiteState};
 
-const DEFAULT_PORT: u16 = 8080;
+pub const DEFAULT_PORT: u16 = 8080;
 
 /// Environment variable holding the repository root. Its presence turns on dev
 /// mode: content and text assets come from disk, and a watcher hot reloads them.
@@ -25,6 +28,39 @@ const DEV_ROOT_ENV: &str = "CB_DEV_ROOT";
 
 /// Buffer of pending reload signals per browser before a slow client lags.
 const RELOAD_CHANNEL_CAPACITY: usize = 16;
+
+/// Command line of the binary.
+///
+/// The subcommand is optional, and no subcommand means `serve`: the container
+/// image starts the courses platform with a bare `courses_server`, and any
+/// other mode is selected by overriding the command.
+#[derive(Debug, Parser)]
+#[command(name = "courses_server", version, about = "Courses platform server")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Serve the course guides, and the scenario console. This is the default.
+    Serve,
+    /// Serve an echo server that answers every request with a JSON description
+    /// of that request.
+    Echo(EchoArgs),
+}
+
+#[derive(Debug, Args)]
+struct EchoArgs {
+    /// Port to listen on.
+    #[arg(long, env = "PORT", default_value_t = DEFAULT_PORT)]
+    port: u16,
+    /// Public DNS name this server answers to, for example
+    /// `echo.server.cloudbridge.com.uy`. The answer reports whether the request
+    /// arrived under this name, or by some other route.
+    #[arg(long, env = "CB_ECHO_NAME")]
+    name: Option<String>,
+}
 
 /// Runtime configuration, parsed once at the process boundary.
 #[derive(Debug, Clone)]
@@ -65,8 +101,29 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config = Config::from_env()?;
+    match Cli::parse().command {
+        None | Some(Command::Serve) => serve_site(Config::from_env()?).await,
+        Some(Command::Echo(args)) => {
+            echo::serve(EchoConfig {
+                port: args.port,
+                public_name: args.name,
+            })
+            .await
+        }
+    }
+}
 
+/// Binds every interface on `port`, and reports where the server listens.
+pub async fn bind(port: u16) -> Result<tokio::net::TcpListener> {
+    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .wrap_err_with(|| format!("failed to bind {addr}"))?;
+    tracing::info!("listening on http://{addr}");
+    Ok(listener)
+}
+
+async fn serve_site(config: Config) -> Result<()> {
     // `_watcher` must outlive the server: dropping the notify watcher ends the
     // watch, and hot reload stops silently.
     let (site, dev_ctx, _watcher) = match config.dev_root.as_deref() {
@@ -107,24 +164,20 @@ async fn main() -> Result<()> {
         ),
     };
 
-    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .wrap_err_with(|| format!("failed to bind {addr}"))?;
-    tracing::info!("listening on http://{addr}");
-
-    axum::serve(listener, routes::router(site, dev_ctx).await)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .wrap_err("server error")?;
-    Ok(())
+    axum::serve(
+        bind(config.port).await?,
+        routes::router(site, dev_ctx).await,
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .wrap_err("server error")
 }
 
 /// Resolves on SIGINT (ctrl-c), or SIGTERM (what ECS sends on task stop).
 ///
 /// If a handler fails to register, that arm logs, and then stays pending, so a
 /// registration failure never triggers shutdown by itself.
-async fn shutdown_signal() {
+pub async fn shutdown_signal() {
     let ctrl_c = async {
         if let Err(e) = tokio::signal::ctrl_c().await {
             tracing::error!("failed to listen for ctrl-c: {e}");

@@ -808,6 +808,7 @@ dependencies = [
  "aws-sdk-cloudwatch",
  "aws-sdk-dynamodb",
  "axum",
+ "clap",
  "color-eyre",
  "courses_apps",
  "courses_core",
