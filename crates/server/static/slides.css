@@ -66,6 +66,16 @@
    h2 starts a major section, h3 introduces a subsection, and h4 works as a
    compact label. Title-only slides retain their dedicated hero treatment. */
 
+/* Slides start flush with the canvas top. Without this, whatever opens the
+   slide (usually an h2, whose UA top margin nothing else resets) pushes the
+   whole slide down and wastes canvas height that dense slides need. The
+   title-slide hero keeps its margin: it has nothing under it, so flush-top
+   only unbalances it. */
+
+.reveal .slides > section > :first-child:not(.cb-title-slide) {
+  margin-top: 0;
+}
+
 .reveal .slides > section > h1:not(.cb-title-slide) {
   margin: 0 0 0.55em;
   padding-bottom: 0.28em;

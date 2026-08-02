@@ -64,6 +64,9 @@
   teal→blue divider, `h2` a tapered underline, `h3` a teal marker and rule, and `h4`
   a compact uppercase label. `.cb-title-slide` and exercise-card headings retain
   their specialized styles.
+- A slide's first child gets `margin-top: 0` so content starts flush with the
+  canvas top (the UA h2 margin otherwise pushes the slide down and eats canvas
+  height). `.cb-title-slide` is exempt — the hero has nothing below it.
 - Heading self-links come from the shared Markdown renderer; on slides they're inert
   (`pointer-events: none`) — hash clicks would fight reveal.js `#/n` navigation.
 - Last viewed slide persists in `sessionStorage` key `'cb-slide:' + location.pathname`.
