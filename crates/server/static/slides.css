@@ -305,6 +305,12 @@
   white-space: nowrap;
 }
 
+.reveal .cb-file-path.cb-file-path-full {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .reveal .cb-file-toggle {
   min-width: 1.7em;
 }

@@ -47,6 +47,9 @@ pub fn expand_file_apps(
         if has_boolean_attribute(tag, "open") {
             rendered.push_str(" open");
         }
+        if has_boolean_attribute(tag, "full-path") {
+            rendered.push_str(" full-path");
+        }
         rendered.push_str(" data-content=\"");
         rendered.push_str(&escape_html(&source));
         rendered.push_str("\"></cb-file>");
@@ -178,12 +181,12 @@ mod tests {
     }
 
     #[test]
-    fn preserves_toggleable_attributes() {
+    fn preserves_file_viewer_boolean_attributes() {
         let expanded = expand_file_apps(
-            "<cb-file toggleable path=\"Dockerfile\" type=\"dockerfile\" open></cb-file>",
+            "<cb-file toggleable path=\"Dockerfile\" type=\"dockerfile\" open full-path></cb-file>",
             |path| (path == "Dockerfile").then(|| "FROM scratch".to_owned()),
         )
         .unwrap();
-        assert!(expanded.contains("type=\"dockerfile\" toggleable open"));
+        assert!(expanded.contains("type=\"dockerfile\" toggleable open full-path"));
     }
 }

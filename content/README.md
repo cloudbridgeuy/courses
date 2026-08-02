@@ -200,6 +200,14 @@ Add `toggleable` to hide the code at first. Add `open` when it must start open:
 :::
 ```
 
+Add `full-path` when a slide must show the whole path instead of shortening it:
+
+```md
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana1-vpc-existente.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+```
+
 El archivo se incorpora al sitio durante el build, por lo que la versión publicada
 queda sincronizada con el contenido del repositorio. Solo se permiten archivos de
 texto UTF-8 dentro del repositorio; rutas absolutas y recorridos como `../` se

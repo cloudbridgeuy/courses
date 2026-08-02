@@ -697,7 +697,7 @@
 
   // ---------------------------------------------------------------------------
   // Custom element: <cb-file>
-  // Attributes: path, type, data-content, toggleable, open
+  // Attributes: path, type, data-content, toggleable, open, full-path
   //
   // The server fills data-content from a repository file while rendering the
   // course. The component deliberately has no fetch URL: published courses do
@@ -720,6 +720,9 @@
         header.className = "cb-file-header";
         var label = document.createElement("span");
         label.className = "cb-file-path";
+        if (this.hasAttribute("full-path")) {
+          label.classList.add("cb-file-path-full");
+        }
         label.textContent = path;
         header.appendChild(label);
         var pre = document.createElement("pre");
