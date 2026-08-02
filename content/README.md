@@ -104,8 +104,11 @@ Pasos exactos de la solución.
 
 Rules:
 - Each fence must sit alone on its line (no leading or trailing characters).
-- Blocks may not nest.
-- Every `::: solucion` must have a matching `:::`.
+- Blocks nest freely; a bare `:::` closes the innermost open block. A closer may
+  carry a `#` comment (`::: # </solucion>`) to label deep nesting.
+- Every `::: solucion` must have a matching closer.
+- The full directive catalog (admonitions, slides, `:::skip`/`:::add` visibility
+  control) lives in `.claude/context/content-authoring.md`.
 
 The block renders as a «Ver solución» / «Ocultar solución» toggle. The
 `/static/toggle.js` script is injected automatically when any section in the

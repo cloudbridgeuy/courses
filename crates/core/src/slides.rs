@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
 use crate::solutions::{
-    Segment, render_app, render_extra, render_info, render_solution, render_warning,
+    Segment, Visibility, render_app, render_extra, render_info, render_solution, render_warning,
     split_solutions,
 };
 
@@ -172,8 +172,11 @@ fn is_valid_anchor_name(name: &str) -> bool {
 /// Renders a slide's raw payload to HTML. Nested directives are expanded with
 /// slide semantics: `::: solucion`, `::: warning`, `::: info`, and `::: extra` produce
 /// their usual markup (the slide stylesheet has matching rules), and `{{name}}`
-/// references inside them still resolve. Nested slide-family directives are an
-/// error — slides live only at the top level.
+/// references inside them still resolve. `:::skip` blocks are guide-only and
+/// render nothing here — except `:::add` blocks nested inside them with
+/// `visibility` `both` or `slide`, which escape the skip. A direct `:::add`
+/// renders unless its visibility is `guide`. Nested slide-family directives
+/// are an error — slides live only at the top level.
 pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
     let mut html = String::new();
     for segment in split_solutions(md)? {
@@ -194,9 +197,37 @@ pub(crate) fn render_slide_content(md: &str, anchors: &HashMap<String, Anchor>) 
             Segment::App(inner) => {
                 html.push_str(&render_app(&inner));
             }
+            Segment::Skip(inner) => {
+                html.push_str(&render_skip_escapes(&inner, anchors)?);
+            }
+            Segment::Add { md, visibility } => {
+                if visibility != Visibility::Guide {
+                    html.push_str(&render_slide_content(&md, anchors)?);
+                }
+            }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
             Segment::TitleSlide { .. } => return Err(Error::NestedTitleSlide),
+        }
+    }
+    Ok(html)
+}
+
+/// Renders the parts of a `:::skip` payload that escape it in slide context:
+/// only `:::add` blocks with visibility `both` or `slide` render (nested
+/// `:::skip` blocks are searched recursively); everything else stays
+/// guide-only.
+fn render_skip_escapes(md: &str, anchors: &HashMap<String, Anchor>) -> Result<String> {
+    let mut html = String::new();
+    for segment in split_solutions(md)? {
+        match segment {
+            Segment::Add { md, visibility } if visibility != Visibility::Guide => {
+                html.push_str(&render_slide_content(&md, anchors)?);
+            }
+            Segment::Skip(inner) => {
+                html.push_str(&render_skip_escapes(&inner, anchors)?);
+            }
+            _ => {}
         }
     }
     Ok(html)

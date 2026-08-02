@@ -1,4 +1,4 @@
-use super::directives::{Segment, SlideFragment, split_solutions};
+use super::directives::{Segment, SlideFragment, Visibility, split_solutions};
 use crate::error::{Error, Result};
 use crate::markdown::render_markdown;
 use crate::render::escape_html;
@@ -20,9 +20,17 @@ pub struct RenderedBody {
 /// `::: solucion`, `::: warning`, `::: info`, and `::: extra` produce their guide markup
 /// and nest freely (an info block inside a solution, an extra inside a warning,
 /// etc.). `:::slide` blocks are collected separately and omitted from the
-/// guide HTML. `:::inline-slide` renders in BOTH places. `:::title-slide`
+/// guide HTML. `:::inline-slide` renders in BOTH places; with the
+/// `with-title` modifier its slide copy is prefixed with the nearest heading
+/// found in the top-level Markdown above it (falling back to the section
+/// `title`) — the guide copy is untouched, since that heading already sits
+/// above it in the document. `:::title-slide`
 /// produces a slide showing only `title` (the section heading); its body must
-/// be empty. Slide-family directives are top-level only — nesting one inside
+/// be empty. `:::skip` renders its content in the guide only — inside a slide
+/// (including an inline slide's slide copy) it is dropped. `:::add` filters
+/// by `visibility` (`both` default, `guide`, `slide`); with `both` or `slide`
+/// it escapes an enclosing `:::skip` and still reaches the slide. Slide-family
+/// directives are top-level only — nesting one inside
 /// another block is an error.
 ///
 /// A line `{#name}` in top-level Markdown anchors the block that follows; a
@@ -35,9 +43,15 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
     let mut slide_html = Vec::new();
     let mut uses_solutions = false;
     let mut uses_slides = false;
+    let mut last_heading: Option<String> = None;
     for segment in segments {
         match segment {
-            Segment::Markdown(md) => html.push_str(&render_markdown(&md)),
+            Segment::Markdown(md) => {
+                if let Some(heading) = last_heading_line(&md) {
+                    last_heading = Some(heading);
+                }
+                html.push_str(&render_markdown(&md));
+            }
             Segment::Solution(md) => {
                 uses_solutions = true;
                 let inner = render_guide_segments(&md, &mut uses_solutions)?;
@@ -50,10 +64,22 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
                     light,
                 });
             }
-            Segment::InlineSlide { md, light } => {
+            Segment::InlineSlide {
+                md,
+                light,
+                with_title,
+            } => {
                 uses_slides = true;
+                let slide_md = if with_title {
+                    let heading = last_heading
+                        .clone()
+                        .unwrap_or_else(|| format!("## {title}"));
+                    format!("{heading}\n\n{md}")
+                } else {
+                    md.clone()
+                };
                 slide_html.push(SlideFragment {
-                    html: render_slide_content(&md, &anchors)?,
+                    html: render_slide_content(&slide_md, &anchors)?,
                     light,
                 });
                 html.push_str(&render_guide_segments(&md, &mut uses_solutions)?);
@@ -80,6 +106,14 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
             }
             Segment::App(md) => {
                 html.push_str(&render_app(&md));
+            }
+            Segment::Skip(md) => {
+                html.push_str(&render_guide_segments(&md, &mut uses_solutions)?);
+            }
+            Segment::Add { md, visibility } => {
+                if visibility != Visibility::Slide {
+                    html.push_str(&render_guide_segments(&md, &mut uses_solutions)?);
+                }
             }
         }
     }
@@ -137,12 +171,43 @@ fn render_guide_segments(md: &str, uses_solutions: &mut bool) -> Result<String> 
             Segment::App(md) => {
                 html.push_str(&render_app(&md));
             }
+            Segment::Skip(inner) => {
+                html.push_str(&render_guide_segments(&inner, uses_solutions)?);
+            }
+            Segment::Add { md, visibility } => {
+                if visibility != Visibility::Slide {
+                    html.push_str(&render_guide_segments(&md, uses_solutions)?);
+                }
+            }
             Segment::Slide { .. } => return Err(Error::NestedSlide),
             Segment::InlineSlide { .. } => return Err(Error::NestedInlineSlide),
             Segment::TitleSlide { .. } => return Err(Error::NestedTitleSlide),
         }
     }
     Ok(html)
+}
+
+/// Returns the last ATX heading line in `md` (trimmed, Markdown kept
+/// verbatim), skipping lines inside fenced code blocks. Used by
+/// `:::inline-slide with-title` to pick up the heading that precedes it.
+fn last_heading_line(md: &str) -> Option<String> {
+    let mut in_fence = false;
+    let mut last = None;
+    for line in md.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        let hashes = trimmed.chars().take_while(|&c| c == '#').count();
+        if (1..=6).contains(&hashes) && trimmed[hashes..].starts_with(' ') {
+            last = Some(trimmed.to_owned());
+        }
+    }
+    last
 }
 
 /// Renders a title-only slide: the section heading as a hero, centered by the
@@ -288,6 +353,184 @@ mod tests {
         assert!(result.html.contains("<strong>Bold</strong>"));
         assert!(result.html.contains("Before."));
         assert!(result.html.contains("After."));
+    }
+
+    // ── skip fence rendering ──────────────────────────────────────────────
+
+    #[test]
+    fn skip_inside_inline_slide_renders_in_guide_but_not_slide() {
+        let body = ":::inline-slide\nVisible.\n:::skip\n```yaml\nClave: valor\n```\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Visible."));
+        assert!(result.html.contains("Clave"));
+        assert!(result.slide_html[0].html.contains("Visible."));
+        assert!(!result.slide_html[0].html.contains("Clave"));
+    }
+
+    #[test]
+    fn skip_at_top_level_renders_in_guide_only() {
+        let body = ":::skip\nSolo guía.\n:::\n:::slide\nDiapositiva.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Solo guía."));
+        assert!(!result.slide_html[0].html.contains("Solo guía."));
+    }
+
+    #[test]
+    fn skip_inside_slide_renders_nothing() {
+        let body = ":::slide\nVisible.\n:::skip\nOculto.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.slide_html[0].html.contains("Visible."));
+        assert!(!result.slide_html[0].html.contains("Oculto."));
+        assert!(!result.html.contains("Oculto."));
+    }
+
+    #[test]
+    fn solution_inside_skip_still_sets_uses_solutions() {
+        let body = ":::skip\n::: solucion\nRespuesta.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_solutions);
+        assert!(result.html.contains("Respuesta."));
+    }
+
+    // ── add fence rendering ───────────────────────────────────────────────
+
+    #[test]
+    fn add_default_renders_in_guide_and_slide() {
+        let body = ":::inline-slide\nVisible.\n:::add\nExtra.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Extra."));
+        assert!(result.slide_html[0].html.contains("Extra."));
+    }
+
+    #[test]
+    fn add_visibility_slide_renders_in_slide_only() {
+        let body =
+            ":::inline-slide\nVisible.\n:::add visibility=slide\nSolo diapositiva.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(!result.html.contains("Solo diapositiva."));
+        assert!(result.slide_html[0].html.contains("Solo diapositiva."));
+    }
+
+    #[test]
+    fn add_visibility_guide_renders_in_guide_only() {
+        let body = ":::inline-slide\nVisible.\n:::add visibility=guide\nSolo guía.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Solo guía."));
+        assert!(!result.slide_html[0].html.contains("Solo guía."));
+    }
+
+    #[test]
+    fn add_inside_skip_overrides_skip_for_slide() {
+        let body = ":::inline-slide\n:::skip\nOculto.\n:::add\nRescatado.\n:::\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Oculto."));
+        assert!(result.html.contains("Rescatado."));
+        assert!(!result.slide_html[0].html.contains("Oculto."));
+        assert!(result.slide_html[0].html.contains("Rescatado."));
+    }
+
+    #[test]
+    fn add_visibility_slide_inside_skip_renders_in_slide_only() {
+        let body = ":::inline-slide\n:::skip\nOculto.\n:::add visibility=slide\nRescatado.\n:::\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(!result.html.contains("Rescatado."));
+        assert!(result.slide_html[0].html.contains("Rescatado."));
+    }
+
+    #[test]
+    fn add_visibility_guide_inside_skip_stays_out_of_slide() {
+        let body = ":::inline-slide\n:::skip\n:::add visibility=guide\nSolo guía.\n:::\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Solo guía."));
+        assert!(!result.slide_html[0].html.contains("Solo guía."));
+    }
+
+    #[test]
+    fn add_inside_nested_skip_still_escapes_to_slide() {
+        let body = ":::inline-slide\n:::skip\n:::skip\n:::add\nProfundo.\n:::\n:::\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.html.contains("Profundo."));
+        assert!(result.slide_html[0].html.contains("Profundo."));
+    }
+
+    #[test]
+    fn add_at_top_level_visibility_slide_renders_nowhere() {
+        // Top-level content only reaches slides through slide directives, so
+        // a slide-only :::add outside one has no slide to land in.
+        let body = ":::add visibility=slide\nX.\n:::\n:::slide\nDiapositiva.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(!result.html.contains("X."));
+        assert!(!result.slide_html[0].html.contains("X."));
+    }
+
+    #[test]
+    fn solution_inside_add_sets_uses_solutions() {
+        let body = ":::add\n::: solucion\nRespuesta.\n:::\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.uses_solutions);
+        assert!(result.html.contains("Respuesta."));
+    }
+
+    // ── inline-slide with-title ───────────────────────────────────────────
+
+    #[test]
+    fn inline_slide_with_title_prepends_nearest_heading_to_slide_only() {
+        let body = "## Funciones\n\nProsa.\n:::inline-slide with-title\n- **`!Ref`**\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert_eq!(result.slide_html.len(), 1);
+        assert!(result.slide_html[0].html.contains("Funciones"));
+        // Guide keeps the heading once (from the flowing Markdown, not the copy).
+        assert_eq!(result.html.matches("Funciones").count(), 1);
+    }
+
+    #[test]
+    fn inline_slide_with_title_uses_nearest_of_several_headings() {
+        let body = "## Primero\nA.\n### Segundo\nB.\n:::inline-slide with-title\nX.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.slide_html[0].html.contains("Segundo"));
+        assert!(!result.slide_html[0].html.contains("Primero"));
+    }
+
+    #[test]
+    fn inline_slide_with_title_ignores_headings_in_code_fences() {
+        let body = "## Real\n\n```\n# comentario\n```\n:::inline-slide with-title\nX.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.slide_html[0].html.contains("Real"));
+        assert!(!result.slide_html[0].html.contains("comentario</h1>"));
+    }
+
+    #[test]
+    fn inline_slide_with_title_falls_back_to_section_title() {
+        let body = "Prosa sin encabezado.\n:::inline-slide with-title\nX.\n:::\n";
+        let result = render_section_body("Mi sección", body).unwrap();
+        assert!(result.slide_html[0].html.contains("Mi sección"));
+        assert!(!result.html.contains("Mi sección"));
+    }
+
+    #[test]
+    fn inline_slide_without_with_title_gets_no_heading() {
+        let body = "## Funciones\nProsa.\n:::inline-slide\nX.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(!result.slide_html[0].html.contains("Funciones"));
+    }
+
+    #[test]
+    fn inline_slide_with_title_light_keeps_light_variant() {
+        let body = "## T\n:::inline-slide light with-title\nX.\n:::\n";
+        let result = render_section_body("Sección", body).unwrap();
+        assert!(result.slide_html[0].light);
+        assert!(result.slide_html[0].html.contains("<h2 id=\"t\">"));
+    }
+
+    #[test]
+    fn last_heading_line_picks_last_and_skips_fences() {
+        assert_eq!(
+            last_heading_line("## A\ntext\n### B\n"),
+            Some("### B".to_owned())
+        );
+        assert_eq!(last_heading_line("```\n# in fence\n```\n"), None);
+        assert_eq!(last_heading_line("#not-a-heading\ntext\n"), None);
+        assert_eq!(last_heading_line("plain text\n"), None);
     }
 
     #[test]

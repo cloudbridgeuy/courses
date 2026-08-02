@@ -2,7 +2,8 @@ use crate::error::{Error, Result};
 
 /// One top-level segment of a section body: plain Markdown, a hidden solution,
 /// a slides-only block, an inline slide (rendered in both guide and slides), a
-/// title-only slide, an always-visible admonition, or a collapsible extra block.
+/// title-only slide, an always-visible admonition, a collapsible extra block,
+/// or a guide-only skip block (omitted from slides).
 ///
 /// A directive's payload (`md`) is captured verbatim — it may itself contain
 /// nested directives, which the recursive renderers expand.
@@ -10,13 +11,39 @@ use crate::error::{Error, Result};
 pub enum Segment {
     Markdown(String),
     Solution(String),
-    Slide { md: String, light: bool },
-    InlineSlide { md: String, light: bool },
-    TitleSlide { text: String },
+    Slide {
+        md: String,
+        light: bool,
+    },
+    InlineSlide {
+        md: String,
+        light: bool,
+        with_title: bool,
+    },
+    TitleSlide {
+        text: String,
+    },
     Warning(String),
     Info(String),
-    Extra { title: String, md: String },
+    Extra {
+        title: String,
+        md: String,
+    },
     App(String),
+    Skip(String),
+    Add {
+        md: String,
+        visibility: Visibility,
+    },
+}
+
+/// Where an `:::add` block renders. `Both` is the default; `Slide` and `Both`
+/// override an enclosing `:::skip` (the content still reaches the slide).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    Both,
+    Guide,
+    Slide,
 }
 
 /// A rendered slide HTML fragment with its display variant.
@@ -30,20 +57,26 @@ pub struct SlideFragment {
 enum Opener {
     Solution,
     Slide { light: bool },
-    InlineSlide { light: bool },
+    InlineSlide { light: bool, with_title: bool },
     TitleSlide { text: String },
     Warning,
     Info,
     Extra { title: String },
     App,
+    Skip,
+    Add { visibility: Visibility },
 }
 
 /// Recognizes a directive opener on its own line. The slide fences
 /// (`:::slide`, `:::inline-slide`, `:::title-slide`) take no space and accept
-/// an optional `light` modifier (except title-slide). `::: warning` takes no
+/// an optional `light` modifier (except title-slide); `:::inline-slide` also
+/// accepts `with-title`, in any order. Unrecognized modifiers make the line
+/// plain Markdown. `::: warning` takes no
 /// arguments — with trailing text it is plain Markdown; the same applies to
 /// `::: info`. `::: extra` takes an
-/// optional title after the keyword.
+/// optional title after the keyword. `:::add` takes an optional
+/// `visibility=both|guide|slide` argument (default `both`); any other
+/// argument makes it plain Markdown.
 fn opener(fence: &str) -> Option<Opener> {
     if fence == "::: solucion" {
         Some(Opener::Solution)
@@ -51,10 +84,20 @@ fn opener(fence: &str) -> Option<Opener> {
         Some(Opener::Slide {
             light: fence == ":::slide light",
         })
-    } else if fence == ":::inline-slide" || fence == ":::inline-slide light" {
-        Some(Opener::InlineSlide {
-            light: fence == ":::inline-slide light",
-        })
+    } else if let Some(rest) = fence.strip_prefix(":::inline-slide") {
+        if !(rest.is_empty() || rest.starts_with(' ')) {
+            return None;
+        }
+        let mut light = false;
+        let mut with_title = false;
+        for token in rest.split_whitespace() {
+            match token {
+                "light" if !light => light = true,
+                "with-title" if !with_title => with_title = true,
+                _ => return None,
+            }
+        }
+        Some(Opener::InlineSlide { light, with_title })
     } else if let Some(rest) = fence.strip_prefix(":::title-slide") {
         (rest.is_empty() || rest.starts_with(' ')).then(|| Opener::TitleSlide {
             text: rest.trim().to_owned(),
@@ -69,9 +112,43 @@ fn opener(fence: &str) -> Option<Opener> {
         })
     } else if fence == ":::app" {
         Some(Opener::App)
+    } else if fence == ":::skip" {
+        Some(Opener::Skip)
+    } else if let Some(rest) = fence.strip_prefix(":::add") {
+        if !(rest.is_empty() || rest.starts_with(' ')) {
+            return None;
+        }
+        let mut visibility = None;
+        for token in rest.split_whitespace() {
+            let value = token.strip_prefix("visibility=")?;
+            if visibility.is_some() {
+                return None;
+            }
+            visibility = Some(match value {
+                "both" => Visibility::Both,
+                "guide" => Visibility::Guide,
+                "slide" => Visibility::Slide,
+                _ => return None,
+            });
+        }
+        Some(Opener::Add {
+            visibility: visibility.unwrap_or(Visibility::Both),
+        })
     } else {
         None
     }
+}
+
+/// Recognizes a closing fence on its own line: a bare `:::`, optionally
+/// followed by a `#` comment that runs to the end of the line. The comment
+/// lets authors label what a closer closes (e.g. `::: # </extra>`); it is
+/// ignored entirely.
+fn is_closer(fence: &str) -> bool {
+    let Some(rest) = fence.strip_prefix(":::") else {
+        return false;
+    };
+    let rest = rest.trim_start();
+    rest.is_empty() || rest.starts_with('#')
 }
 
 impl Opener {
@@ -79,7 +156,11 @@ impl Opener {
         Ok(match self {
             Opener::Solution => Segment::Solution(md),
             Opener::Slide { light } => Segment::Slide { md, light },
-            Opener::InlineSlide { light } => Segment::InlineSlide { md, light },
+            Opener::InlineSlide { light, with_title } => Segment::InlineSlide {
+                md,
+                light,
+                with_title,
+            },
             Opener::TitleSlide { text } => {
                 if !md.trim().is_empty() {
                     return Err(Error::TitleSlideNotEmpty);
@@ -90,6 +171,8 @@ impl Opener {
             Opener::Info => Segment::Info(md),
             Opener::Extra { title } => Segment::Extra { title, md },
             Opener::App => Segment::App(md),
+            Opener::Skip => Segment::Skip(md),
+            Opener::Add { visibility } => Segment::Add { md, visibility },
         })
     }
 
@@ -103,16 +186,19 @@ impl Opener {
             Opener::Info => Error::UnclosedInfo,
             Opener::Extra { .. } => Error::UnclosedExtra,
             Opener::App => Error::UnclosedApp,
+            Opener::Skip => Error::UnclosedSkip,
+            Opener::Add { .. } => Error::UnclosedAdd,
         }
     }
 }
 
 /// Splits a Markdown body into top-level [`Segment`]s. Directive blocks open
 /// with their fence (`::: solucion`, `:::slide`, …) and close with a bare
-/// `:::`. Blocks nest: an opener seen inside a block increments the depth and
-/// its line is captured verbatim for the recursive renderer; the matching
-/// `:::` closes the innermost block (depth returns to zero). Fences must sit
-/// alone on their line. An unclosed block at end of input is an error.
+/// `:::`, optionally followed by a `#` comment (`::: # </extra>`). Blocks
+/// nest: an opener seen inside a block increments the depth and its line is
+/// captured verbatim for the recursive renderer; the matching closer closes
+/// the innermost block (depth returns to zero). Fences must sit alone on
+/// their line. An unclosed block at end of input is an error.
 pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
     let mut segments = Vec::new();
     let mut buf = String::new();
@@ -138,7 +224,7 @@ pub fn split_solutions(body: &str) -> Result<Vec<Segment>> {
             depth += 1;
             buf.push_str(line);
             buf.push('\n');
-        } else if fence == ":::" {
+        } else if is_closer(fence) {
             depth -= 1;
             if depth == 0 {
                 let md = std::mem::take(&mut buf);
@@ -392,6 +478,155 @@ mod tests {
         );
     }
 
+    // ── skip fence ────────────────────────────────────────────────────────
+
+    #[test]
+    fn skip_block_produces_skip_segment() {
+        let body = ":::skip\n  ```yaml\n  Clave: valor\n  ```\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Skip(
+                "  ```yaml\n  Clave: valor\n  ```\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn skip_with_arguments_is_plain_markdown() {
+        let body = ":::skip extra\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(":::skip extra\nX.\n:::\n".to_owned())]
+        );
+    }
+
+    #[test]
+    fn unclosed_skip_errors() {
+        assert!(matches!(
+            split_solutions(":::skip\nX.\n"),
+            Err(Error::UnclosedSkip)
+        ));
+    }
+
+    // ── add fence ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn add_without_argument_defaults_to_both() {
+        let body = ":::add\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Add {
+                md: "X.\n".to_owned(),
+                visibility: Visibility::Both,
+            }]
+        );
+    }
+
+    #[test]
+    fn add_visibility_values_parse() {
+        for (value, visibility) in [
+            ("both", Visibility::Both),
+            ("guide", Visibility::Guide),
+            ("slide", Visibility::Slide),
+        ] {
+            let body = format!(":::add visibility={value}\nX.\n:::\n");
+            let segs = split_solutions(&body).unwrap();
+            assert_eq!(
+                segs,
+                vec![Segment::Add {
+                    md: "X.\n".to_owned(),
+                    visibility,
+                }]
+            );
+        }
+    }
+
+    #[test]
+    fn add_unknown_visibility_is_plain_markdown() {
+        let body = ":::add visibility=none\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(
+                ":::add visibility=none\nX.\n:::\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn add_unknown_argument_is_plain_markdown() {
+        let body = ":::add slide\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(":::add slide\nX.\n:::\n".to_owned())]
+        );
+    }
+
+    #[test]
+    fn add_duplicate_visibility_is_plain_markdown() {
+        let body = ":::add visibility=slide visibility=guide\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert!(matches!(segs[0], Segment::Markdown(_)));
+    }
+
+    #[test]
+    fn unclosed_add_errors() {
+        assert!(matches!(
+            split_solutions(":::add\nX.\n"),
+            Err(Error::UnclosedAdd)
+        ));
+    }
+
+    // ── closer comments ───────────────────────────────────────────────────
+
+    #[test]
+    fn closer_with_comment_closes_block() {
+        let body = "::: solucion\nAnswer.\n::: # </solucion>\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(segs, vec![Segment::Solution("Answer.\n".to_owned())]);
+    }
+
+    #[test]
+    fn closer_comment_without_space_also_closes() {
+        let body = "::: warning\nX.\n:::# cierre\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(segs, vec![Segment::Warning("X.\n".to_owned())]);
+    }
+
+    #[test]
+    fn nested_closers_with_comments_close_innermost_first() {
+        let body = ":::skip\nA.\n::: extra T\nB.\n::: # </extra>\n::: # </skip>\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Skip(
+                "A.\n::: extra T\nB.\n::: # </extra>\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn closer_comment_outside_block_is_plain_markdown() {
+        let body = "Text\n::: # suelto\nMore\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown("Text\n::: # suelto\nMore\n".to_owned())]
+        );
+    }
+
+    #[test]
+    fn closer_with_non_comment_text_does_not_close() {
+        assert!(matches!(
+            split_solutions("::: warning\nX.\n::: texto\n"),
+            Err(Error::UnclosedWarning)
+        ));
+    }
+
     #[test]
     fn unclosed_app_errors() {
         assert!(matches!(
@@ -446,7 +681,8 @@ mod tests {
             segs,
             vec![Segment::InlineSlide {
                 md: "## Resumen\nTexto.\n".to_owned(),
-                light: false
+                light: false,
+                with_title: false,
             }]
         );
     }
@@ -459,8 +695,66 @@ mod tests {
             segs,
             vec![Segment::InlineSlide {
                 md: "## Resumen\n".to_owned(),
-                light: true
+                light: true,
+                with_title: false,
             }]
+        );
+    }
+
+    #[test]
+    fn inline_slide_with_title_modifier_sets_flag() {
+        let body = ":::inline-slide with-title\nTexto.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::InlineSlide {
+                md: "Texto.\n".to_owned(),
+                light: false,
+                with_title: true,
+            }]
+        );
+    }
+
+    #[test]
+    fn inline_slide_modifiers_combine_in_any_order() {
+        for fence in [
+            ":::inline-slide light with-title",
+            ":::inline-slide with-title light",
+        ] {
+            let body = format!("{fence}\nTexto.\n:::\n");
+            let segs = split_solutions(&body).unwrap();
+            assert_eq!(
+                segs,
+                vec![Segment::InlineSlide {
+                    md: "Texto.\n".to_owned(),
+                    light: true,
+                    with_title: true,
+                }]
+            );
+        }
+    }
+
+    #[test]
+    fn inline_slide_unknown_modifier_is_plain_markdown() {
+        let body = ":::inline-slide dark\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(
+                ":::inline-slide dark\nX.\n:::\n".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn inline_slide_duplicate_modifier_is_plain_markdown() {
+        let body = ":::inline-slide light light\nX.\n:::\n";
+        let segs = split_solutions(body).unwrap();
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown(
+                ":::inline-slide light light\nX.\n:::\n".to_owned()
+            )]
         );
     }
 

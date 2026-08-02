@@ -63,6 +63,12 @@ pub enum Error {
     #[error("unclosed `:::app` block")]
     UnclosedApp,
 
+    #[error("unclosed `:::skip` block")]
+    UnclosedSkip,
+
+    #[error("unclosed `:::add` block")]
+    UnclosedAdd,
+
     #[error("nested `:::app` block")]
     NestedApp,
 
@@ -232,6 +238,16 @@ mod tests {
     #[test]
     fn display_nested_app() {
         assert_eq!(Error::NestedApp.to_string(), "nested `:::app` block");
+    }
+
+    #[test]
+    fn display_unclosed_skip() {
+        assert_eq!(Error::UnclosedSkip.to_string(), "unclosed `:::skip` block");
+    }
+
+    #[test]
+    fn display_unclosed_add() {
+        assert_eq!(Error::UnclosedAdd.to_string(), "unclosed `:::add` block");
     }
 
     #[test]

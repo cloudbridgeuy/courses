@@ -42,8 +42,10 @@ directive fences and anchors.
 | `::: extra <title>` … `:::` | Collapsible deep-dive `<details>` block, closed by default (guide only). Title optional; empty falls back to "Contenido adicional" |
 | `:::slide` … `:::` | reveal.js slide (dark, default theme); slides only |
 | `:::slide light` … `:::` | Light slide variant (`<section class="cb-light">`) |
-| `:::inline-slide` … `:::` | Like `:::slide`, but the content ALSO renders inline in the guide as document content (dark slide). Accepts `light`. Keep content self-contained — `{{name}}` references are NOT expanded in the guide copy |
+| `:::inline-slide` … `:::` | Like `:::slide`, but the content ALSO renders inline in the guide as document content (dark slide). Accepts `light` and `with-title` (any order); unknown modifiers make it plain Markdown. `with-title` prepends the nearest heading above the block (fallback: the section title) to the SLIDE copy only — the guide copy is untouched. Keep content self-contained — `{{name}}` references are NOT expanded in the guide copy |
 | `:::title-slide` … `:::` | Title-only slide. Shows the section heading (frontmatter `title`) by default, or a custom label: `:::title-slide Semana 1`. Body MUST be empty; non-empty body is an error |
+| `:::skip` … `:::` | Guide-only content: renders transparently in the guide (no wrapper markup), dropped from every slide — except `:::add` blocks nested inside it with visibility `both`/`slide`, which still reach the slide. Main use: inside `:::inline-slide`, to keep detail out of the slide copy. Takes NO arguments — `:::skip anything` is plain Markdown |
+| `:::add` … `:::` / `:::add visibility=slide` | Visibility filter, transparent (no wrapper markup). `visibility=both` (default): guide AND slide, overriding any enclosing `:::skip`. `visibility=guide`: guide only (like `:::skip`). `visibility=slide`: slide only, also overriding `:::skip`. Any other argument makes it plain Markdown. Top-level content only reaches slides through slide directives, so a top-level `visibility=slide` block renders nowhere |
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
 | `{{name}}` inside a `:::slide` | Embeds the anchored subsection as an exercise hero card |
 | ```` ```mermaid ```` fenced block | Renders a mermaid.js diagram (`<pre class="mermaid">`). Works in guide and slides; mermaid.js loads only on pages that use it |
@@ -64,17 +66,18 @@ a visible slide), so diagrams off the first slide appear on navigation, not befo
 
 ### Nesting
 
-`::: solucion`, `::: warning`, `::: info`, and `::: extra` nest freely — inside each other and
-inside `:::slide`/`:::inline-slide` (slides carry matching reveal.js CSS). A bare
-`:::` closes the innermost open block, so balance fences carefully:
+`::: solucion`, `::: warning`, `::: info`, `::: extra`, `:::skip`, and `:::add` nest freely — inside
+each other and inside `:::slide`/`:::inline-slide` (slides carry matching reveal.js
+CSS). A bare `:::` closes the innermost open block, so balance fences carefully. A
+closer may carry a `#` comment (ignored; runs to end of line) to label deep nesting:
 
 ```
 :::slide
 ## Título
 ::: warning
 Cuidado.
-:::      <- closes the warning
-:::      <- closes the slide
+::: # </warning>    <- closes the warning
+::: # </slide>      <- closes the slide
 ```
 
 Slide-family directives (`:::slide`, `:::inline-slide`, `:::title-slide`) are
