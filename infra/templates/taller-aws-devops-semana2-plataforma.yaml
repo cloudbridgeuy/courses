@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Plataforma compartida (clúster ECS y balanceador)
+
+# Capa de plataforma del taller: el sustrato de ejecución que todas las
+# aplicaciones comparten. Contiene el clúster de ECS, el balanceador, y sus
+# listeners. Cambia poco —al ritmo de la red, no al de la aplicación— y una
+# sola instancia de este stack alcanza para varias aplicaciones: cada una
+# agrega su propio ListenerRule al listener compartido.
+#
+# Los listeners no enrutan nada por sí mismos: su acción por defecto es un 404.
+# Todo el tráfico útil lo colocan las reglas que publican los stacks de
+# aplicación. Así el stack de plataforma no conoce a ninguna aplicación, y la
+# dependencia apunta siempre de la aplicación hacia la plataforma.
+#
+# HTTPS es opcional. Si se indican NombreDominio y HostedZoneId, el stack
+# agrega el certificado de ACM —con comodín, para que cada aplicación pueda
+# tener su propio subdominio—, los dos registros alias en Route 53, el listener
+# 443, y la regla de entrada del puerto 443 en el grupo de seguridad del ALB. Si
+# se dejan vacíos, el stack se despliega solo con HTTP y esos cinco recursos no
+# se crean.
+
+Parameters:
+  RedStackName:
+    Type: String
+    Description: Nombre del stack de red del que se importan subredes y grupo de seguridad.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+
+  NombreDominio:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. Dominio completo para el balanceador, dentro de la hosted zone,
+      por ejemplo maria.courses.cloudbridge.com.uy. Vacío deja el stack en HTTP.
+    AllowedPattern: '^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    ConstraintDescription: Debe quedar vacío, o ser un nombre de dominio en minúsculas.
+
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. ID de la hosted zone de Route 53 que contiene el dominio.
+      Obligatorio si se indica NombreDominio.
+    AllowedPattern: '^$|^Z[A-Z0-9]+$'
+    ConstraintDescription: Debe quedar vacío, o ser un ID de hosted zone (empieza con Z).
+
+Conditions:
+  # HTTPS se activa solo cuando llegan los dos valores. Con uno solo, el stack
+  # se despliega en HTTP: es preferible a fallar a mitad de la creación.
+  ConHttps: !And
+    - !Not [!Equals [!Ref NombreDominio, ""]]
+    - !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+  # --- Clúster compartido ---
+
+  # Con Fargate el clúster no reserva capacidad: es una agrupación lógica de
+  # servicios y tareas. Por eso puede vivir aquí sin costo, y por eso varias
+  # aplicaciones pueden compartirlo sin estorbarse.
+  ClusterCompartido:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref AWS::StackName
+
+  # --- Balanceador compartido ---
+
+  BalanceadorCompartido:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - Fn::ImportValue: !Sub "${RedStackName}-subred-a-id"
+        - Fn::ImportValue: !Sub "${RedStackName}-subred-b-id"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${RedStackName}-sg-alb-id"
+      LoadBalancerAttributes:
+        # Las notificaciones en vivo de la guía usan SSE: la conexión queda
+        # abierta y sin tráfico, así que el timeout por defecto (60 s) la corta.
+        - Key: idle_timeout.timeout_seconds
+          Value: "3600"
+
+  # La acción por defecto es un 404: este stack no sabe qué aplicaciones
+  # existen. Cada stack de aplicación agrega su ListenerRule sobre este
+  # listener, con su patrón de ruta y su prioridad.
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BalanceadorCompartido
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: "404"
+            ContentType: text/plain
+            MessageBody: Ninguna aplicacion responde en esta ruta.
+
+  # --- HTTPS opcional ---
+
+  # CloudFormation crea el registro de validación en la hosted zone y espera a
+  # que ACM emita el certificado. Si la zona no es la correcta, el stack queda
+  # en CREATE_IN_PROGRESS hasta agotar el tiempo: conviene verificar el ID.
+  #
+  # El certificado cubre el dominio y todo lo que cuelga de él: con el comodín,
+  # una segunda aplicación puede publicarse como echo.<dominio> sin tocar este
+  # stack. ACM valida ambos nombres con el mismo registro CNAME, así que el
+  # comodín no agrega ni un paso más a la validación.
+  Certificado:
+    Condition: ConHttps
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref NombreDominio
+      SubjectAlternativeNames:
+        - !Sub "*.${NombreDominio}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref NombreDominio
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub "*.${NombreDominio}"
+          HostedZoneId: !Ref HostedZoneId
+
+  ListenerHTTPS:
+    Condition: ConHttps
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BalanceadorCompartido
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref Certificado
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: "404"
+            ContentType: text/plain
+            MessageBody: Ninguna aplicacion responde en esta ruta.
+
+  # El grupo de seguridad del ALB vive en el stack de red y solo abre el puerto
+  # 80. La regla de entrada del 443 se agrega desde aquí, sin modificar aquel
+  # stack, porque solo hace falta cuando HTTPS está activo.
+  IngresoHttps:
+    Condition: ConHttps
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Fn::ImportValue: !Sub "${RedStackName}-sg-alb-id"
+      Description: Trafico HTTPS publico hacia el balanceador
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  # El ALB no tiene IPs estables: el dominio apunta a su nombre DNS con un
+  # registro alias, usando la zona canónica del balanceador.
+  RegistroDns:
+    Condition: ConHttps
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref NombreDominio
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt BalanceadorCompartido.DNSName
+        HostedZoneId: !GetAtt BalanceadorCompartido.CanonicalHostedZoneID
+
+  # Un registro comodín, en vez de uno por aplicación: cualquier subdominio
+  # resuelve al mismo balanceador, y quién atiende cada nombre lo decide la
+  # regla de listener que publica cada aplicación. Sin esto, agregar una
+  # aplicación con nombre propio obligaría a modificar este stack.
+  RegistroDnsComodin:
+    Condition: ConHttps
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "*.${NombreDominio}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt BalanceadorCompartido.DNSName
+        HostedZoneId: !GetAtt BalanceadorCompartido.CanonicalHostedZoneID
+
+# Contrato público de la plataforma. Los stacks de aplicación importan el
+# clúster donde correr y el listener donde publicar su regla; el resto existe
+# para los add-ons y para el DNS.
+Outputs:
+  ClusterNombre:
+    Description: Nombre del clúster de ECS compartido
+    Value: !Ref ClusterCompartido
+    Export:
+      Name: !Sub "${AWS::StackName}-cluster-nombre"
+
+  ListenerHttpArn:
+    Description: ARN del listener HTTP, donde cada aplicación publica su regla
+    Value: !Ref ListenerHTTP
+    Export:
+      Name: !Sub "${AWS::StackName}-listener-http-arn"
+
+  ListenerHttpsArn:
+    Condition: ConHttps
+    Description: ARN del listener HTTPS, donde cada aplicación publica su regla
+    Value: !Ref ListenerHTTPS
+    Export:
+      Name: !Sub "${AWS::StackName}-listener-https-arn"
+
+  AlbArn:
+    Description: ARN del balanceador compartido
+    Value: !Ref BalanceadorCompartido
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-arn"
+
+  AlbDnsName:
+    Description: Nombre DNS del balanceador, para configurar el DNS externo
+    Value: !GetAtt BalanceadorCompartido.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-dns"
+
+  AlbZona:
+    Description: Zona canónica del balanceador, para registros alias en Route 53
+    Value: !GetAtt BalanceadorCompartido.CanonicalHostedZoneID
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-zona"
+
+  UrlBase:
+    Description: URL base del balanceador compartido
+    Value: !If
+      - ConHttps
+      - !Sub "https://${NombreDominio}"
+      - !Sub "http://${BalanceadorCompartido.DNSName}"

@@ -1,10 +1,37 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Taller AWS DevOps — Semana 2 · Aplicación
 
-# Capa de aplicación del taller: todo lo que ejecuta la imagen y recibe el
-# tráfico. Es la capa que más cambia y la más descartable. Se puede borrar y
-# recrear en minutos sin perder nada, porque la red vive en el stack de red y
-# los datos en el stack de datos. Se conecta a ambos vía Fn::ImportValue.
+# Capa de aplicación del taller: todo lo que ejecuta la imagen y nada más. Es
+# la capa que más cambia y la más descartable. Se puede borrar y recrear en
+# minutos sin perder nada, porque la red vive en el stack de red, los datos en
+# el stack de datos, y el clúster y el balanceador en el de plataforma. Se
+# conecta a los tres vía Fn::ImportValue.
+#
+# Este template es reutilizable: lanzarlo otra vez, con otra imagen, otra ruta,
+# y otra prioridad, agrega una segunda aplicación sobre la misma plataforma.
+# No hay nada que copiar ni que editar — solo parámetros distintos.
+
+# Solo lo lee el formulario de la consola: agrupa los nueve parámetros y les
+# pone etiquetas legibles. El CLI y las APIs lo ignoran.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Imagen de la aplicación" }
+        Parameters: [ImageUri, ComandoContenedor]
+      - Label: { default: "Stacks de los que depende" }
+        Parameters: [RedStackName, DatosStackName, PlataformaStackName]
+      - Label: { default: "Lugar en el balanceador compartido" }
+        Parameters: [NombreHost, RutaPath, Prioridad, UsarHttps]
+    ParameterLabels:
+      ImageUri: { default: "URI de la imagen en ECR" }
+      ComandoContenedor: { default: "Comando del contenedor" }
+      RedStackName: { default: "Stack de red" }
+      DatosStackName: { default: "Stack de datos" }
+      PlataformaStackName: { default: "Stack de plataforma" }
+      NombreHost: { default: "Nombre DNS propio" }
+      RutaPath: { default: "Patrón de ruta" }
+      Prioridad: { default: "Prioridad de la regla" }
+      UsarHttps: { default: "¿Publicar también en HTTPS?" }
 
 Parameters:
   ImageUri:
@@ -15,9 +42,17 @@ Parameters:
       Debe ser un URI de ECR con etiqueta, por ejemplo
       123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
 
+  ComandoContenedor:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: >-
+      Opcional. Comando que ejecuta el contenedor, separado por comas. Vacío
+      deja el comando de la imagen, que sirve la plataforma de cursos. Para el
+      servidor de eco: courses_server,echo,--name,echo.midominio.com
+
   RedStackName:
     Type: String
-    Description: Nombre del stack de red del que se importan VPC, subredes, y grupos de seguridad.
+    Description: Nombre del stack de red del que se importan VPC y grupo de seguridad.
     AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
 
   DatosStackName:
@@ -25,20 +60,71 @@ Parameters:
     Description: Nombre del stack de datos del que se importa la tabla de DynamoDB.
     AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
 
+  PlataformaStackName:
+    Type: String
+    Description: Nombre del stack de plataforma del que se importan el clúster y el listener.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+
+  NombreHost:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. Nombre DNS propio de esta aplicación, por ejemplo
+      echo.midominio.com. Si se indica, la regla enruta por host y se ignora
+      RutaPath. Requiere que el stack de plataforma tenga HTTPS activo, porque
+      de ahí salen el comodín en DNS y el certificado.
+    AllowedPattern: '^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    ConstraintDescription: Debe quedar vacío, o ser un nombre de dominio en minúsculas.
+
+  RutaPath:
+    Type: String
+    Default: "/*"
+    Description: >-
+      Patrón de ruta que esta aplicación atiende en el balanceador compartido.
+      "/*" atiende todo; una segunda aplicación usa un prefijo propio. Se ignora
+      si se indica NombreHost.
+
+  Prioridad:
+    Type: Number
+    Default: 100
+    MinValue: 1
+    MaxValue: 50000
+    Description: >-
+      Orden de evaluación de la regla en el listener. Se evalúan de menor a
+      mayor y gana la primera que coincide, así que la ruta más específica
+      lleva el número más bajo. Debe ser única por listener.
+
+  UsarHttps:
+    Type: String
+    Default: "no"
+    AllowedValues: ["si", "no"]
+    Description: >-
+      Publicar también la regla en el listener 443. Solo si el stack de
+      plataforma se desplegó con dominio y hosted zone.
+
+Conditions:
+  ConHttps: !Equals [!Ref UsarHttps, "si"]
+
+  # Una lista vacía no se compara con "" directamente: Fn::Join la convierte en
+  # la cadena vacía, y ahí sí.
+  ConComando: !Not [!Equals [!Join ["", !Ref ComandoContenedor], ""]]
+
+  ConHost: !Not [!Equals [!Ref NombreHost, ""]]
+
 Resources:
-  # --- ECS: clúster, servicio, y task definition ---
+  # --- ECS: servicio y task definition ---
 
-  # El clúster en una aplicación más grande posiblemente también sea definido en un
-  # template distinto, referenciado por las apps.
-
-  ClusterApp:
-    Type: AWS::ECS::Cluster
-
+  # El clúster no está aquí: lo comparten todas las aplicaciones, y por eso
+  # vive en el stack de plataforma.
   ServicioApp:
     Type: AWS::ECS::Service
-    DependsOn: ListenerHTTP
+    # El target group debe estar asociado al balanceador antes de que ECS cree
+    # el servicio, y quien lo asocia es la regla del listener. Sin esto, el
+    # stack falla de manera intermitente.
+    DependsOn: ReglaHTTP
     Properties:
-      Cluster: !Ref ClusterApp
+      Cluster:
+        Fn::ImportValue: !Sub "${PlataformaStackName}-cluster-nombre"
       DesiredCount: 1
       LaunchType: FARGATE
       TaskDefinition: !Ref TareaApp
@@ -68,6 +154,13 @@ Resources:
       ContainerDefinitions:
         - Name: app
           Image: !Ref ImageUri
+          # Una imagen, varias aplicaciones: el comando decide cuál. Vacío deja
+          # el CMD del Dockerfile, y AWS::NoValue borra la propiedad entera en
+          # vez de mandar una lista vacía, que ECS rechazaría.
+          Command: !If
+            - ConComando
+            - !Ref ComandoContenedor
+            - !Ref AWS::NoValue
           PortMappings:
             - ContainerPort: 8080
           # Configuración de la aplicación. Dos variables están ausentes a
@@ -156,24 +249,10 @@ Resources:
                   StringEquals:
                     cloudwatch:namespace: Taller/Custom
 
-  # --- Balanceador de carga ---
+  # --- Lugar de esta aplicación en el balanceador compartido ---
 
-  BalanceadorApp:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Type: application
-      Scheme: internet-facing
-      Subnets:
-        - Fn::ImportValue: !Sub "${RedStackName}-subred-a-id"
-        - Fn::ImportValue: !Sub "${RedStackName}-subred-b-id"
-      SecurityGroups:
-        - Fn::ImportValue: !Sub "${RedStackName}-sg-alb-id"
-      LoadBalancerAttributes:
-        # Las notificaciones en vivo de la guía usan SSE: la conexión queda
-        # abierta y sin tráfico, así que el timeout por defecto (60 s) la corta.
-        - Key: idle_timeout.timeout_seconds
-          Value: "3600"
-
+  # El balanceador no está aquí, pero el target group sí: describe a *esta*
+  # aplicación —su puerto, su health check— y se borra con ella.
   GrupoDestino:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -187,28 +266,67 @@ Resources:
         - Key: deregistration_delay.timeout_seconds
           Value: "15"
 
-  ListenerHTTP:
-    Type: AWS::ElasticLoadBalancingV2::Listener
+  # La regla es el contrato inverso: en vez de importar un valor, esta
+  # aplicación *agrega* algo al listener de la plataforma. Es lo que permite
+  # que varias aplicaciones compartan un solo ALB.
+  #
+  # Enruta de una de dos formas, según los parámetros: por nombre de host, si la
+  # aplicación tiene subdominio propio, o por prefijo de ruta. Son excluyentes a
+  # propósito — mezclarlas en una misma regla exige que se cumplan las dos.
+  ReglaHTTP:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
-      LoadBalancerArn: !Ref BalanceadorApp
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
+      ListenerArn:
+        Fn::ImportValue: !Sub "${PlataformaStackName}-listener-http-arn"
+      Priority: !Ref Prioridad
+      Conditions:
+        - !If
+          - ConHost
+          - Field: host-header
+            HostHeaderConfig:
+              Values: [!Ref NombreHost]
+          - Field: path-pattern
+            PathPatternConfig:
+              Values: [!Ref RutaPath]
+      Actions:
         - Type: forward
           TargetGroupArn: !Ref GrupoDestino
 
+  ReglaHTTPS:
+    Condition: ConHttps
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn:
+        Fn::ImportValue: !Sub "${PlataformaStackName}-listener-https-arn"
+      Priority: !Ref Prioridad
+      Conditions:
+        - !If
+          - ConHost
+          - Field: host-header
+            HostHeaderConfig:
+              Values: [!Ref NombreHost]
+          - Field: path-pattern
+            PathPatternConfig:
+              Values: [!Ref RutaPath]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref GrupoDestino
+
+# La URL ya no sale de aquí: el nombre DNS pertenece al balanceador compartido,
+# y se lee en el output UrlBase del stack de plataforma. Este stack solo publica
+# qué ruta atiende, y su target group, para que un add-on pueda enviarle tráfico
+# sin modificarlo — el mismo motivo por el que el stack monolítico de la Semana 1
+# exportaba el suyo.
 Outputs:
-  ALBUrl:
-    Description: URL pública de la aplicación
-    Value: !Sub "http://${BalanceadorApp.DNSName}"
+  RutaAtendida:
+    Description: Cómo llega el tráfico a esta aplicación en el balanceador compartido
+    Value: !If
+      - ConHost
+      - !Sub "host ${NombreHost}"
+      - !Sub "ruta ${RutaPath}"
 
-  # El ALB no tiene IPs públicas estables; el DNS externo se configura contra su
-  # nombre DNS (CNAME) o, en Route 53, con un registro alias usando la zona
-  # canónica del balanceador.
-  ALBDnsName:
-    Description: Nombre DNS del balanceador, para configurar el DNS externo
-    Value: !GetAtt BalanceadorApp.DNSName
-
-  ALBHostedZoneId:
-    Description: Zona canónica del balanceador, para registros alias en Route 53
-    Value: !GetAtt BalanceadorApp.CanonicalHostedZoneID
+  GrupoDestinoArn:
+    Description: ARN del grupo de destino de esta aplicación
+    Value: !Ref GrupoDestino
+    Export:
+      Name: !Sub "${AWS::StackName}-grupo-destino-arn"
