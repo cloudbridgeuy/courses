@@ -526,11 +526,14 @@ permiso de IAM que necesita ECS para leer el secreto.
 ::: # skip
 ::: # inline-slide
 
+:::inline-slide
 ## Outputs: publicar valores, conectar templates
 
+:::skip
 La sección `Outputs` declara los valores que el stack expone al terminar. Es lo que
 llena la pestaña **Outputs** de la consola, de donde se copió la URL del ALB en la
 Semana 1:
+:::
 
 ```yaml
 Outputs:
@@ -541,7 +544,9 @@ Outputs:
 
 Cada output tiene un nombre lógico, un `Value` (casi siempre construido con `!Ref`,
 `!GetAtt`, o `!Sub`), y una `Description` opcional que la consola muestra al lado.
+:::
 
+:::inline-slide
 ### Exports: el contrato entre stacks
 
 Un output puede además **exportarse**: publicarse con un nombre único en la región,
@@ -564,6 +569,7 @@ Otro template consume ese valor con la función `Fn::ImportValue`:
       LoadBalancerArn:
         Fn::ImportValue: !Sub "${AppStackName}-alb-arn"
 ```
+:::
 
 Así funciona el stack opcional de HTTPS de la Semana 1: agrega un listener 443 al
 balanceador de otro stack **sin modificarlo**, leyendo sus exports. Quien lo desplegó
@@ -574,14 +580,3 @@ dato suelto: es un contrato entre stacks, y el contrato se hace cumplir.
 Este mecanismo es la base de la última parte de la semana: separar el ambiente en
 stacks de **red**, **datos**, y **aplicación**, conectados exclusivamente por exports
 e imports.
-
-:::slide
-## Outputs: publicar valores, conectar templates
-
-- **`Outputs`** — valores que el stack expone: la pestaña **Outputs** de la consola.
-- **`Export: Name`** — publica el valor con nombre único en la región.
-- **`Fn::ImportValue`** — otro stack lo consume.
-
-Mientras alguien importa un export, el stack que lo publica **no se puede borrar**:
-es un contrato.
-:::

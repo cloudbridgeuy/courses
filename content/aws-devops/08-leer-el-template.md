@@ -2,14 +2,12 @@
 title = "Leer el template paso a paso"
 +++
 
-## El template de la Semana 1, por dentro
-
-Ya se conocen las secciones de un template. Ahora se recorre el archivo real que desplegó
-la aplicación, `taller-aws-devops-semana1.yaml`, recurso por recurso, conectando cada bloque con lo
-que se vio en la consola la semana pasada.
-
 :::inline-slide light
-## Analizando un template
+## El template de la Semana 1
+
+Ya se conocen las secciones de un template. Ahora se recorre el archivo real
+que desplegó la aplicación, recurso por recurso, conectando cada bloque con lo
+que se vio en la consola la semana pasada.
 
 :::app
 <cb-file path="./infra/templates/taller-aws-devops-semana1-vpc-existente.yaml" type="yaml" toggleable full-path></cb-file>
@@ -20,7 +18,6 @@ que se vio en la consola la semana pasada.
 :::
 
 :::
-
 
 ## El encabezado y los parámetros
 
@@ -63,6 +60,7 @@ empezar: CloudFormation lo rechaza como propiedad inválida del recurso.
 | `DeletionPolicy` | Qué hacer con el recurso al borrar el stack: borrarlo, conservarlo, o copiarlo. |
 | `UpdateReplacePolicy` | Lo mismo, pero cuando una actualización obliga a reemplazarlo. |
 | `Metadata` | Datos libres para herramientas y para quien lee. CloudFormation los ignora. |
+
 
 ```yaml
   ServicioApp:
@@ -151,11 +149,14 @@ listener en ninguna propiedad: se conecta al *target group* (`TargetGroupArn: !R
 GrupoDestino`), y el listener es un tercero que también apunta a ese target group.
 Para CloudFormation son dos recursos sin relación, y los crearía en paralelo.
 
-Pero ECS se niega a crear un servicio cuyo target group todavía no esté asociado a un
+Pero ECS se niega a crear un servicio cuyo `Target Group` todavía no esté asociado a un
 balanceador, y quien hace esa asociación es justamente el listener. Sin `DependsOn`, el
-stack falla de manera intermitente —a veces gana la carrera, a veces no— con un error
-del tipo *"The target group ... does not have an associated load balancer"*. El
-atributo elimina la carrera.
+stack falla de manera intermitente (a veces gana la carrera, a veces no) con un error
+del tipo *"The target group ... does not have an associated load balancer"*.
+
+:::info
+`DependOn` elimina las condiciones de carrera entre recursos.
+:::
 
 El template usa el mismo atributo una segunda vez, en el recurso de red:
 
@@ -187,9 +188,14 @@ diciendo cuál es, porque no se deduce del código.
 Lo que no depende de nada se crea **en paralelo**: por eso **Events** no sigue el
 orden del archivo.
 
-`DependsOn` de más serializa el despliegue.
-:::
+::: warning
+Es importante evitar agregar `DependsOn` *por las dudas*.
 
+`DependsOn` de más serializa el despliegue.
+::: # warning
+::: # inline-slide
+
+:::inline-slide
 ## La red: subredes, zonas, y etiquetas
 
 El bloque de red usa las funciones sobre listas de la sección anterior:
@@ -207,6 +213,7 @@ El bloque de red usa las funciones sobre listas de la sección anterior:
           Value: !Sub "${AWS::StackName}-publica-a"
 ```
 
+:::skip
 `!Select [0, !GetAZs ""]` toma la primera zona de disponibilidad de la región actual,
 y la subred B toma la segunda con el índice `1`. Dos subredes en dos zonas distintas
 es lo que le permite al balanceador sobrevivir a la caída de una zona: es el mínimo
@@ -214,19 +221,21 @@ que exige un ALB.
 
 Y aquí aparecen las **etiquetas**. `Tags` es una lista de pares `Key`/`Value` que se
 adjunta al recurso. La etiqueta `Name` es la que la consola de EC2 muestra como
-nombre en sus listados —sin ella, la subred aparece con su ID (`subnet-0a1b2c…`) y
+nombre en sus listados. Sin ella, la subred aparece con su ID (`subnet-0a1b2c…`) y
 nada más. Construirla con `!Sub "${AWS::StackName}-publica-a"` hace que el nombre
 diga a qué stack pertenece, lo que importa cuando varios participantes comparten la
 cuenta.
+:::
 
 ::: info
 Las etiquetas no son decoración. AWS las usa para **repartir costos** (Cost
 Explorer agrupa por etiqueta), para **filtrar** recursos en la consola y en el CLI, y
 para dar o negar permisos en IAM según el valor de una etiqueta. La sección de buenas
 prácticas retoma el tema con las etiquetas a nivel de stack.
-:::
+::: # info
+::: # inlines-slide
 
-## La task definition y la imagen
+## La Task Definition y la imagen
 
 ```yaml
   TareaApp:
@@ -272,10 +281,14 @@ aparece como un recurso más en `Resources`, conectado a los demás con `!Ref` y
 sin perderse.
 :::
 
-::: extra Ordenar el formulario de la consola con Metadata
+:::inline-slide light
+## Ordenar el formulario de la consola con Metadata
+
+:::skip
 El stack de aplicación de la próxima sesión pide nueve parámetros, y la consola los
 muestra en el orden en que aparecen en el template, con el nombre lógico como
 etiqueta. La sección `Metadata` permite mejorar eso sin tocar ningún recurso:
+:::
 
 ```yaml
 Metadata:
@@ -291,8 +304,18 @@ Metadata:
       ImageUri: { default: "URI de la imagen en ECR" }
 ```
 
+:::skip
 `ParameterGroups` agrupa los parámetros en secciones con título, y `ParameterLabels`
 reemplaza el nombre lógico por un texto legible. Solo lo lee la consola de
 CloudFormation: el CLI y las APIs lo ignoran, y el stack se comporta igual sin él. Es
 puro cuidado por quien va a completar el formulario.
-:::
+::: # skip
+
+:::add visibility=slide
+::: info
+`ParameterGroups` agrupa los parámetros en secciones con título, y `ParameterLabels`
+reemplaza el nombre lógico por un texto legible. Solo lo lee la consola de
+CloudFormation: el CLI y las APIs lo ignoran.
+::: # info
+::: # add
+::: # inline-slide
