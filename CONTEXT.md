@@ -77,6 +77,111 @@ CodePipeline → CloudWatch**.
 `22-cierre-del-curso` (ej. 17–18 + optional capstone ej. 19). **All 4 weeks
 authored.**
 
+**CloudFormation coverage (2026-08-01).** A gap audit compared sections `07`–`12`
+against the features actually used in `infra/templates/*.yaml`. Eleven features
+appeared in templates the students read without ever being taught, and `06`'s
+bridge answer promised `DependsOn` for Week 2 without delivering it. All are now
+closed, with no new exercises (numbering stays 1–18):
+
+- `07` — `!Join`/`!Select`/`!GetAZs`/`!Split`/`!FindInMap`, pseudo parameters
+  (`AWS::Region`, `AWS::StackName`, `AWS::AccountId`, `AWS::Partition`,
+  `AWS::NoValue`), and the `Mappings` section the sections table had promised.
+  Also corrected `Fn::Ref` → `Ref` (the only intrinsic without the `Fn::` prefix).
+- `08` — resource **attributes** versus `Properties` (table + the "never inside
+  `Properties`" rule), implicit versus explicit ordering with `DependsOn`, and the
+  network block (`!Select [0, !GetAZs ""]`, `Tags`). `::: extra` on
+  `Metadata: AWS::CloudFormation::Interface`.
+- `09` — *Update requires* as the source of truth for replacement, plus failed
+  rollback: `UPDATE_ROLLBACK_FAILED`, *Continue update rollback* with skipped
+  resources, and *preserve successfully provisioned resources* for diagnosis.
+- `11` — `UpdateReplacePolicy` paired with `DeletionPolicy` (the data-loss trap),
+  `Snapshot` as the third value, stack-level tags and cost allocation, termination
+  protection, stack policies, and service quotas. `::: extra` on
+  `aws cloudformation deploy`.
+- `12` — the price of an export (a value cannot change while imported; single
+  region and account). `::: extra` on nested stacks and on SSM Parameter Store
+  with `AWS::SSM::Parameter::Value<String>`.
+- `22` — `::: extra` positioning `Transform`/SAM, CDK, and Terraform.
+
+**Stack-splitting method (2026-08-01).** `12` previously handed over the three
+stacks as a given and taught only the *mechanics* of moving a resource
+(`Retain` → orphan → import). It now **derives** the split first, with a
+four-step drill run on the Week 1 monolith: list the 21 resources → group by
+rate of change (11 network / 1 data / 9 app) → mark the references that cross a
+group → each crossing becomes an export. The drill lands on exactly the 7
+exports the shipped templates already have (5 in `-red`, 2 in `-datos`), so
+students can verify the method against the files. Added with it: the other two
+axes (owner, blast radius; lifecycle wins when they disagree), **where security
+goes** — the rule is *a permission follows its consumer, not the resource it
+protects*, which is why both IAM roles live in the app stack while `RolTarea`
+imports the table ARN — the three cases that do justify a separate security
+stack (shared roles, separate approver, account-wide governance), and **when not
+to split** (always deployed together, huge contract, changes cross constantly;
+start together and split when it hurts). No separate security stack: both IAM
+roles stay with the app.
+
+**The platform stack, and adding a second app (2026-08-01).** The three-way
+split left the ECS cluster and the ALB inside the app stack, so a second app
+would duplicate both. `12` now derives a **fourth** cut from a second question
+asked of the nine app-group resources — *how many applications use it?* — which
+separates cluster + ALB + listener (all) from service, task def, target group,
+log group, and the two roles (one). Teaching points: a Fargate cluster reserves
+no capacity and is free, which is exactly why the duplication goes unnoticed,
+while an ALB bills per hour of existence; exports are single-account and
+single-region, so cross-account sharing means RAM for subnets plus a cluster per
+account. The app stack no longer imports a load balancer — it **adds** an
+`AWS::ElasticLoadBalancingV2::ListenerRule` to the platform's listener, whose
+default action is a `fixed-response` 404, so the platform stack never names an
+application. Rules evaluate low-to-high `Priority`, first match wins, priority
+unique per listener, so the catch-all `/*` carries the highest number. New
+sections: adding a second app, and distributing the pattern (versioned template
+in S3; `::: extra` on CloudFormation modules, Service Catalog, and StackSets).
+
+The second app is concrete rather than hypothetical: the **echo server**
+subcommand of the same binary (see Server / build notes). Same image, same
+template, only `ComandoContenedor=courses_server,echo`, `RutaPath=/eco/*`, and
+`Prioridad=10`. It carries three teaching points that needed a real second app —
+one artifact running as two applications via the container `Command` (with
+`AWS::NoValue` to delete the property rather than send an empty list), routing by
+`host-header` instead of `path-pattern` through an `Fn::If` inside the rule's
+`Conditions`, and the networking the guide could previously only draw —
+`peer` (the ALB) vs `forwarded_for` (the chain) vs `client_ip` (what to log),
+`local` as the task's own ENI IP, and the ECS task metadata turning the week-1
+VPC diagram into measured AZ, subnet CIDR, gateway, and resolver.
+Host routing is what forced the platform certificate to carry a `*.<dominio>`
+SAN and a wildcard alias record: with one certificate per name, adding an app
+would mean editing — and revalidating — the shared stack.
+
+**Teardown of the five-stack layout, and the echo server's second use
+(2026-08-01).** The four-way split plus the echo stack left the course ending with
+**five stacks** — `-eco`, `-app`, `-datos`, `-plataforma`, `-red` — and a
+DynamoDB table that `DeletionPolicy: Retain` orphans on the way out. `05` covers
+only Week 1's single stack, so `22` gained a **"Desarmar el ambiente"** section:
+reverse-dependency delete order (an export cannot be deleted while imported —
+the `Export … cannot be deleted as it is in use by …` message is the guarantee,
+not a failure), a CLI loop with `wait stack-delete-complete`, `DELETE_SKIPPED`
+and deleting the retained table by hand (the cost side of `Retain`: it moves the
+delete from CloudFormation to a person), and a table of what never lived in a
+stack (CodeCommit repo, CodeBuild project, ECR repo, the CodePipeline artifact
+bucket, dashboard + alarm, `/aws/codebuild/…` log group, console-made IAM roles)
+— which is the most concrete argument for IaC, and only visible at teardown. No
+new exercise; numbering stays 1–19.
+
+Two follow-ups landed with it. The echo server is now used past `12`: `14` reads
+its `network` block as the request chain seen from inside the task (`peer` is the
+balancer, not the browser; `local` alternates across healthy targets), and `21`
+teaches `X-Amzn-Trace-Id` — the ALB-injected identifier the echo server returns
+for free, the `trace_id` field of the ALB access log, and the `Root=` prefix of
+an X-Ray trace — as correlation by identifier instead of by clock. And since the
+cluster now holds two services, `13` says so (diagram plus prose: the cluster is
+the context, not the subject), and `13`/`14`/`21` name **which** service each
+console step means. `14`'s traffic chain gained the listener **rule** hop, and
+its health-check path was corrected from `GET /` to the template's `/health`,
+with the note that the health check bypasses the rule and talks to the task
+directly.
+
+Design record: `.claude/designs/2026-08-01-cloudformation-gap-closure-design.md`.
+
 **Note:** new content files are not served until added to a `[[session]]` in
 `content/<course>/course.toml`, in either mode. On the embedded path, `include_dir!`
 also does not re-embed on new files alone — `touch crates/server/src/content.rs`
@@ -155,10 +260,25 @@ Week 3.
   monolith `taller-aws-devops-semana1.yaml` plus variant
   `…-semana1-vpc-existente.yaml` (takes `VpcId`/`SubredAId`/`SubredBId` instead
   of creating the network); Week 2 split
-  `taller-aws-devops-semana2-{red,datos,app}.yaml` (lifecycle separation; the
-  table migrates via resource import in `12-separar-stacks`, ej. 11) plus
-  `…-semana2-red-existente.yaml` (network from params, SGs only, same five
-  exports as `-red`). Extras: `…-extra-subredes-publicas.yaml` (account admin
+  `taller-aws-devops-semana2-{red,datos,plataforma,app}.yaml` (lifecycle
+  separation; the table migrates via resource import in `12-separar-stacks`,
+  ej. 11) plus `…-semana2-red-existente.yaml` (network from params, SGs only,
+  same five exports as `-red`). `-plataforma` owns the shared ECS cluster, the
+  ALB, and its listeners, takes `RedStackName` plus optional
+  `NombreDominio`/`HostedZoneId` (a `ConHttps` condition adds the ACM cert —
+  with a `*.<dominio>` SAN so each app can take its own subdomain — the 443
+  listener, the apex and wildcard Route 53 aliases, and the 443 ingress), and
+  exports
+  `${StackName}-{cluster-nombre,listener-http-arn,listener-https-arn,alb-arn,alb-dns,alb-zona}`.
+  `-app` takes nine params (`ImageUri`, `ComandoContenedor`, the three stack
+  names, `NombreHost`, `RutaPath`, `Prioridad`, `UsarHttps`), has an
+  `AWS::CloudFormation::Interface` block, and exports
+  `${StackName}-grupo-destino-arn`; deploying it twice with a different command,
+  route, and priority is the whole second-app story. `ComandoContenedor` is a
+  `CommaDelimitedList` that overrides the container `Command` (empty →
+  `AWS::NoValue`), and `NombreHost` switches the listener rule from
+  `path-pattern` to `host-header` via `Fn::If`. All nine templates pass
+  `cfn-lint` clean. Extras: `…-extra-subredes-publicas.yaml` (account admin
   deploys once: two public subnets + routing on an existing VPC, optional
   existing-IGW param) and `…-extra-https.yaml` (optional per participant: ACM
   cert DNS-validated in a Route 53 hosted zone — workshop zone
@@ -218,7 +338,8 @@ SSE bus.
   multiplexed `EventSource`. `<cb-file>` accepts a repository-relative UTF-8 path;
   the server embeds the source during rendering rather than exposing a filesystem
   route. It can start collapsed with `toggleable`, and provides content-size and copy
-  controls. The bundle loads when `uses_apps` is set (via `:::app`).
+  controls. `full-path` disables truncation of the slide label. The bundle loads when
+  `uses_apps` is set (via `:::app`).
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret
@@ -249,6 +370,32 @@ SSE bus.
 ### Server / build notes
 
 - Run: `cargo run -p courses_server`; local dev port `8090`.
+- **Subcommands** (`clap`, optional — a bare `courses_server` still means
+  `serve`, so the `Dockerfile` `CMD` and every existing task definition keep
+  working). `courses_server echo [--port|PORT] [--name|CB_ECHO_NAME]` starts an
+  echo server: an axum `fallback` route that answers **every** request with a
+  pretty JSON description of it. Five top-level keys — `received_at`, `server`
+  (identity, and whether `Host` matched `--name`), `request` (method, URI, path
+  segments, decoded query, grouped headers), `network`, and `body` (json / text
+  / base64 / omitted over 64 KiB; 413 over 1 MiB).
+  - `network` holds `local` and `peer` (each split into address + port),
+    `client_ip` (first `x-forwarded-for` hop, else the peer address), the
+    forwarded headers, and `ecs`. `local` matters because in `awsvpc` mode it is
+    the task's own ENI IP — reached through a custom `Connected` impl over
+    `IncomingStream::io().local_addr()`, since the stock
+    `ConnectInfo<SocketAddr>` only carries the peer.
+  - `ecs` comes from `${ECS_CONTAINER_METADATA_URI_V4}/task`, fetched **once at
+    startup** (2 s timeout, every failure → `null`): cluster, task id, family,
+    revision, launch type, AZ, network mode, private IPv4 and DNS name, MAC,
+    subnet CIDR, subnet gateway, VPC resolvers. Needs no IAM and no VPC
+    endpoint — it is a link-local address.
+  - All of the shaping is pure in `courses_core::echo` (`EchoRequest` /
+    `EchoServer` / `EcsNetwork` → `echo_json`, plus `parse_ecs_task_metadata`,
+    and hand-rolled RFC 3339, percent-decode, base64, and host:port splitting —
+    37 unit tests); `crates/server/src/echo.rs` is a thin shell.
+  - It is the workshop's **second app**: same image,
+    `Command: [courses_server, echo]`. `/health` returns 200 like any other
+    path, so the existing target group health check needs no change.
 - **Content and static assets are embedded at build time** (`include_dir!` for
   `content/`, `include_str!` for CSS/JS, and a generated `include_str!` registry
   for each repository file referenced by `<cb-file>`). Any referenced source,
