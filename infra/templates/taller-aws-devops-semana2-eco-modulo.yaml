@@ -53,7 +53,8 @@ Parameters:
 
   ComandoContenedor:
     # String, no CommaDelimitedList: el valor viaja como propiedad del módulo,
-    # y es el parámetro del fragmento el que lo parte por comas.
+    # y una propiedad de módulo se sustituye tal cual, sin convertir el tipo.
+    # El que lo parte por comas es el Fn::Split del fragmento.
     Type: String
     Default: "courses_server,echo"
     Description: >-
@@ -147,7 +148,7 @@ Resources:
     Type: CloudBridge::Taller::App::MODULE
     Properties:
       ImageUri: !Ref ImageUri
-      ComandoContenedor: courses_server,eco
+      ComandoContenedor: !Ref ComandoContenedor
       VpcId:
         Fn::ImportValue: !Sub "${RedStackName}-vpc-id"
       SubredAId:
@@ -161,12 +162,15 @@ Resources:
       ListenerHttpArn:
         Fn::ImportValue: !Sub "${PlataformaStackName}-listener-http-arn"
       # El export del listener 443 solo existe si la plataforma tiene HTTPS:
-      # importarlo incondicionalmente rompería el caso sin dominio. AWS::NoValue
-      # deja la propiedad afuera y el módulo usa su default vacío.
+      # importarlo incondicionalmente rompería el caso sin dominio. Fn::If no
+      # evalúa la rama que no se toma, así que sin HTTPS el import no ocurre.
+      # La rama falsa devuelve "" y no AWS::NoValue: quitar una propiedad de
+      # módulo depende de una condición que todavía no está resuelta cuando el
+      # módulo se expande.
       ListenerHttpsArn: !If
         - ConHttps
         - Fn::ImportValue: !Sub "${PlataformaStackName}-listener-https-arn"
-        - !Ref AWS::NoValue
+        - ""
       TablaNombre:
         Fn::ImportValue: !Sub "${DatosStackName}-tabla-nombre"
       TablaArn:

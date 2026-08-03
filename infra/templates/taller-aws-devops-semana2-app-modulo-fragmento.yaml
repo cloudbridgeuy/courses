@@ -28,7 +28,7 @@ Parameters:
     Description: URI de la imagen en ECR, con etiqueta.
 
   ComandoContenedor:
-    Type: CommaDelimitedList
+    Type: String
     Default: ""
     Description: >-
       Opcional. Comando que ejecuta el contenedor, separado por comas. Vacío
@@ -132,9 +132,7 @@ Parameters:
 Conditions:
   ConHttps: !Equals [!Ref UsarHttps, "si"]
 
-  # Una lista vacía no se compara con "" directamente: Fn::Join la convierte en
-  # la cadena vacía, y ahí sí.
-  ConComando: !Not [!Equals [!Join ["", !Ref ComandoContenedor], ""]]
+  ConComando: !Not [!Equals [!Ref ComandoContenedor, ""]]
 
   ConHost: !Not [!Equals [!Ref NombreHost, ""]]
 
@@ -187,7 +185,7 @@ Resources:
           # vez de mandar una lista vacía, que ECS rechazaría.
           Command: !If
             - ConComando
-            - !Ref ComandoContenedor
+            - !Split [",", !Ref ComandoContenedor]
             - !Ref AWS::NoValue
           PortMappings:
             - ContainerPort: 8080
