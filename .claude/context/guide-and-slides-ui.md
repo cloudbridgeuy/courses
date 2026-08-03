@@ -57,20 +57,25 @@
   has `touch-action: pan-y`, so it also works with a touch gesture. Its scrollbar is
   hidden (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) so no
   rail shows during the presentation; wheel/touch/key scrolling still works.
-- The CSS hides `.cb-slide-scroll-indicator` by default. The renderer compares the
-  active slide's scroll height, visible height, and scroll position. It adds
-  `.cb-visible` and enables the button while content remains below; otherwise, it
-  hides and disables the button.
+- The renderer uses the active slide's scroll height, visible height, and scroll
+  position, with a 2 px bottom tolerance, to set the button state. When content
+  remains below, it adds `.cb-visible`, sets `aria-hidden="false"`, and enables the
+  native button. The CSS makes it visible and pointer-active; the enabled button is
+  in the keyboard focus order. At the bottom or without overflow, the renderer
+  removes `.cb-visible`, sets `aria-hidden="true"`, and disables the button. The CSS
+  hides it and makes it pointer-inert.
 - The renderer schedules an update when Reveal is ready and after a slide change,
   an active-slide scroll, a window resize, a `.slides` `ResizeObserver` update, or
   a call to the wrapped `Reveal.layout()`. The CSS only renders this state.
 - The fixed chevron is a native button at the viewport's bottom center, above the
-  progress bar. Clicking it or pressing Enter or Space scrolls the active slide by
-  80% of its visible height; repeated activations continue downward. The button
-  stays clear of Reveal's controls. Its translucent dark background works on light
-  and dark slides, and it pulses while visible.
-  `prefers-reduced-motion: reduce` uses immediate scrolling and keeps the visual
-  cue static.
+  progress bar. Each click, including a native click from Enter or Space, scrolls
+  the active slide by 80% of its visible height. Repeated activations continue
+  downward, and the browser clamps the final step at the bottom. When the button has
+  focus, its Space keydown guard stops propagation to Reveal but does not prevent the
+  native click. The button stays clear of Reveal's controls. Its translucent dark
+  background works on light and dark slides, and it pulses while visible.
+  `prefers-reduced-motion: reduce` uses immediate scrolling and a static cue (no
+  transition or pulse).
 - Fenced code blocks that declare a language load Shiki on demand. The client-side
   initializer uses the local TextMate definition of `tokyonight-storm`; Mermaid and
   untyped blocks keep their dedicated/plain rendering.
