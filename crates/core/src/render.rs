@@ -278,8 +278,8 @@ pub fn render_slideshow_page(
          <div class=\"reveal\">\n<div class=\"slides\">\n\
          {sections}\
          </div>\n</div>\n\
-         <div class=\"cb-slide-scroll-indicator\" role=\"status\" \
-aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>\n\
+         <button type=\"button\" class=\"cb-slide-scroll-indicator\" \
+aria-label=\"Desplazar diapositiva hacia abajo\" aria-hidden=\"true\" disabled></button>\n\
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          {mermaid_script}\
@@ -289,8 +289,9 @@ aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>\n\
 var cbSlideKey='cb-slide:'+location.pathname;\
 if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
 var cbScrollIndicator=document.querySelector('.cb-slide-scroll-indicator'),cbScrollFrame=0;\
-function cbUpdateScrollIndicator(){{var cbSlide=Reveal.getCurrentSlide();var cbHasMore=!!cbSlide&&cbSlide.scrollHeight>cbSlide.clientHeight&&cbSlide.scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2;cbScrollIndicator.classList.toggle('cb-visible',cbHasMore);cbScrollIndicator.setAttribute('aria-hidden',String(!cbHasMore));}}\
+function cbUpdateScrollIndicator(){{var cbSlide=Reveal.getCurrentSlide();var cbHasMore=!!cbSlide&&cbSlide.scrollHeight>cbSlide.clientHeight&&cbSlide.scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2;cbScrollIndicator.classList.toggle('cb-visible',cbHasMore);cbScrollIndicator.setAttribute('aria-hidden',String(!cbHasMore));cbScrollIndicator.disabled=!cbHasMore;}}\
 function cbScheduleScrollIndicator(){{if(cbScrollFrame)return;cbScrollFrame=requestAnimationFrame(function(){{cbScrollFrame=0;cbUpdateScrollIndicator();}});}}\
+cbScrollIndicator.addEventListener('click',function(){{var cbSlide=Reveal.getCurrentSlide();if(!cbSlide)return;var cbReduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;cbSlide.scrollBy({{top:cbSlide.clientHeight*0.8,behavior:cbReduceMotion?'auto':'smooth'}});}});\
 Reveal.on('ready',cbScheduleScrollIndicator);\
 Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);cbScheduleScrollIndicator();}});\
 document.addEventListener('scroll',function(e){{if(e.target===Reveal.getCurrentSlide())cbScheduleScrollIndicator();}},true);\
@@ -779,11 +780,20 @@ mod tests {
         assert!(html.contains("cb-slides-close"));
         assert!(html.contains("aria-label=\"Cerrar diapositivas\""));
         assert!(html.contains(
-            "<div class=\"cb-slide-scroll-indicator\" role=\"status\" \
-aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>"
+            "<button type=\"button\" class=\"cb-slide-scroll-indicator\" \
+aria-label=\"Desplazar diapositiva hacia abajo\" aria-hidden=\"true\" disabled></button>"
         ));
+        assert!(!html.contains("<div class=\"cb-slide-scroll-indicator\" role=\"status\""));
         assert!(html.contains("classList.toggle('cb-visible',cbHasMore)"));
         assert!(html.contains("setAttribute('aria-hidden',String(!cbHasMore))"));
+        assert!(html.contains("cbScrollIndicator.disabled=!cbHasMore"));
+        assert!(html.contains("cbScrollIndicator.addEventListener('click',function()"));
+        assert!(html.contains("var cbSlide=Reveal.getCurrentSlide();if(!cbSlide)return;"));
+        assert!(html.contains("window.matchMedia('(prefers-reduced-motion: reduce)').matches"));
+        assert!(html.contains("cbSlide.clientHeight*0.8"));
+        assert!(html.contains("cbSlide.scrollBy({top:"));
+        assert!(html.contains("behavior:cbReduceMotion?'auto':'smooth'"));
+        assert!(!html.contains("cbScrollIndicator.addEventListener('keydown'"));
         assert!(html.contains("requestAnimationFrame"));
         assert!(html.contains("scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2"));
         assert!(html.contains("Reveal.on('ready',cbScheduleScrollIndicator)"));
