@@ -57,6 +57,17 @@
   has `touch-action: pan-y`, so it also works with a touch gesture. Its scrollbar is
   hidden (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) so no
   rail shows during the presentation; wheel/touch/key scrolling still works.
+- The CSS hides `.cb-slide-scroll-indicator` by default. The renderer compares the
+  active slide's scroll height, visible height, and scroll position. It adds
+  `.cb-visible` while content remains below and removes it at the bottom.
+- The renderer schedules an update when Reveal is ready and after a slide change,
+  an active-slide scroll, a window resize, a `.slides` `ResizeObserver` update, or
+  a call to the wrapped `Reveal.layout()`. The CSS only renders this state.
+- The fixed chevron is at the viewport's bottom center, above the progress bar. Its
+  translucent dark background works on light and dark slides. It does not accept
+  pointer input, and it stays clear of Reveal's controls. It pulses while visible.
+  `prefers-reduced-motion: reduce` removes the animation and transition but keeps
+  the chevron visible.
 - Fenced code blocks that declare a language load Shiki on demand. The client-side
   initializer uses the local TextMate definition of `tokyonight-storm`; Mermaid and
   untyped blocks keep their dedicated/plain rendering.

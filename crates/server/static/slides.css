@@ -535,6 +535,62 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
+/* The renderer owns overflow detection. This fixed cue only reflects its
+   `.cb-visible` state and stays clear of Reveal's bottom-right controls. */
+
+.cb-slide-scroll-indicator {
+  position: fixed;
+  bottom: 1.1rem;
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(30, 28, 27, 0.72);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.35rem);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.cb-slide-scroll-indicator::before {
+  content: "";
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-top: -0.2rem;
+  border-right: 0.16rem solid #fff;
+  border-bottom: 0.16rem solid #fff;
+  transform: rotate(45deg);
+}
+
+.cb-slide-scroll-indicator.cb-visible {
+  opacity: 0.9;
+  transform: translate(-50%, 0);
+  animation: cb-slide-scroll-indicator-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cb-slide-scroll-indicator-pulse {
+  50% {
+    opacity: 1;
+    transform: translate(-50%, 0.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-slide-scroll-indicator {
+    transition: none;
+  }
+
+  .cb-slide-scroll-indicator.cb-visible {
+    animation: none;
+  }
+}
+
 /* Admonitions nested in slide content. */
 
 .reveal .cb-warning {
