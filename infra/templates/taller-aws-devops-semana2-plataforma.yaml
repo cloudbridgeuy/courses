@@ -3,7 +3,7 @@ Description: Taller AWS DevOps — Semana 2 · Plataforma compartida (clúster E
 
 # Capa de plataforma del taller: el sustrato de ejecución que todas las
 # aplicaciones comparten. Contiene el clúster de ECS, el balanceador, y sus
-# listeners. Cambia poco —al ritmo de la red, no al de la aplicación— y una
+# listeners. Cambia poco. Al ritmo de la red, no al de la aplicación. Una
 # sola instancia de este stack alcanza para varias aplicaciones: cada una
 # agrega su propio ListenerRule al listener compartido.
 #
@@ -13,8 +13,8 @@ Description: Taller AWS DevOps — Semana 2 · Plataforma compartida (clúster E
 # dependencia apunta siempre de la aplicación hacia la plataforma.
 #
 # HTTPS es opcional. Si se indican NombreDominio y HostedZoneId, el stack
-# agrega el certificado de ACM —con comodín, para que cada aplicación pueda
-# tener su propio subdominio—, los dos registros alias en Route 53, el listener
+# agrega el certificado de ACM, con comodín, para que cada aplicación pueda
+# tener su propio subdominio, los dos registros alias en Route 53, el listener
 # 443, y la regla de entrada del puerto 443 en el grupo de seguridad del ALB. Si
 # se dejan vacíos, el stack se despliega solo con HTTP y esos cinco recursos no
 # se crean.

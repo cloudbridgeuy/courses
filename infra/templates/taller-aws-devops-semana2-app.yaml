@@ -272,7 +272,7 @@ Resources:
   #
   # Enruta de una de dos formas, según los parámetros: por nombre de host, si la
   # aplicación tiene subdominio propio, o por prefijo de ruta. Son excluyentes a
-  # propósito — mezclarlas en una misma regla exige que se cumplan las dos.
+  # propósito. Mezclarlas en una misma regla exige que se cumplan las dos.
   ReglaHTTP:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -315,8 +315,7 @@ Resources:
 # La URL ya no sale de aquí: el nombre DNS pertenece al balanceador compartido,
 # y se lee en el output UrlBase del stack de plataforma. Este stack solo publica
 # qué ruta atiende, y su target group, para que un add-on pueda enviarle tráfico
-# sin modificarlo — el mismo motivo por el que el stack monolítico de la Semana 1
-# exportaba el suyo.
+# sin modificarlo.
 Outputs:
   RutaAtendida:
     Description: Cómo llega el tráfico a esta aplicación en el balanceador compartido

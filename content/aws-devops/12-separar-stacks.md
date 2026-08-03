@@ -3,38 +3,39 @@ title = "Separar los stacks por ciclo de vida"
 +++
 
 ## Un stack, tres ciclos de vida
+:::inline-slide with-title light
 
-El stack monolítico de la Semana 1 cumplió su función: un archivo, dos parámetros, un
+El stack monolítico de la Semana 1 cumplió su función: un archivo, algunos parámetros, un
 ambiente completo. Pero dentro de ese stack conviven recursos que envejecen a ritmos
 muy distintos:
 
+:::skip
 - La **red** (VPC, subredes, grupos de seguridad) casi nunca cambia. Se define una vez
   y varias aplicaciones podrían compartirla.
 - Los **datos** (la tabla de DynamoDB) deben sobrevivir. Destruir el ambiente no
   debería tocarlos.
 - La **aplicación** (servicio, task definition, balanceador) cambia todo el tiempo, y
   es deliberadamente descartable —el seguro del taller depende de eso.
+:::
 
+:::add visibility=slide
+Tenemos 3 o 4 cortes claros en nuestro stack actual: `red`, `datos`, `aplicación`, y `clúster`.
+:::
+
+::: warning
 Mientras los tres viven en un solo stack, comparten un solo destino: no se puede borrar
 la aplicación sin borrar la tabla, ni recrear el ambiente sin recrear la red. La
 [guía oficial de buenas prácticas de CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html)
 recomienda exactamente esta separación: **organizar los stacks por ciclo de vida y
 por responsable**, no por conveniencia de tener todo junto.
+::: # warning
+::: # inline-slide
 
 ## Cómo encontrar el corte
 
 Decir "tres stacks" es fácil cuando alguien ya los dividió. La pregunta útil es la
 otra: frente a un template propio de cuatrocientas líneas, ¿cómo se decide **dónde**
 cortar? El procedimiento es mecánico, y tiene cuatro pasos.
-
-:::slide
-## Cuatro pasos para dividir un stack
-
-1. **Listar** los recursos.
-2. **Agrupar** por ritmo de cambio.
-3. **Marcar** las referencias que cruzan un grupo.
-4. Cada cruce es un **export**.
-:::
 
 ### Paso 1: listar los recursos
 
@@ -99,7 +100,16 @@ Un export del stack de aplicación hacia el de red sería una señal de que el c
 mal puesto.
 :::
 
-## Los otros ejes: quién manda, y qué se rompe
+:::slide
+## Cuatro pasos para dividir un stack
+
+1. **Listar** los recursos.
+2. **Agrupar** por ritmo de cambio.
+3. **Marcar** las referencias que cruzan un grupo.
+4. Cada cruce es un **export**.
+:::
+
+## Eje de implementación
 
 El ciclo de vida alcanza para este taller, y suele alcanzar. Cuando no alcanza, hay
 otros dos criterios, y la guía de AWS nombra el primero junto al ciclo de vida.
@@ -130,14 +140,17 @@ porque es el único de los tres que la plataforma hace cumplir.
 Cuando no coinciden, manda el **ciclo de vida**.
 :::
 
+:::inline-slide light
 ## Dónde va la seguridad
 
 Red, datos, y aplicación son capas fáciles de ubicar. La seguridad no: un rol de IAM no
 "pertenece" de manera obvia a ninguna, porque siempre conecta dos cosas. `RolTarea` es
-el ejemplo exacto —lo usa la aplicación, y da acceso a la tabla, que vive en otro
-stack—.
+el ejemplo exacto. Lo usa la aplicación, y da acceso a la tabla, que vive en otro
+stack.
 
+:::skip
 El template de aplicación resuelve el caso así:
+:::
 
 ```yaml
   RolTarea:
@@ -152,25 +165,30 @@ El template de aplicación resuelve el caso así:
                   Fn::ImportValue: !Sub "${DatosStackName}-tabla-arn"
 ```
 
+:::skip
 El rol vive con la **aplicación**, no con los datos, y de ahí sale la regla general:
+:::
 
 ::: info
 **Un permiso sigue a quien lo consume, no al recurso que protege.**
 :::
+:::
 
 La razón es la de siempre, el ciclo de vida. El permiso cambia cuando cambia la
-aplicación —una función nueva necesita una acción nueva—, no cuando cambia la tabla.
+aplicación (una función nueva necesita una acción nueva), no cuando cambia la tabla.
 Ponerlo en el stack de datos obligaría a tocar los datos para cambiar el código, que es
 justo lo que la separación quiere evitar. Y la dependencia queda apuntando en la
 dirección correcta: la aplicación importa el ARN, el stack de datos no sabe quién lo
 usa.
 
+:::inline-slide
 ### Cuándo sí conviene un stack de seguridad aparte
 
 La regla anterior no dice "nunca separar la seguridad". Dice que un rol de un solo
 consumidor va con su consumidor. Un stack de seguridad propio se justifica cuando
 aparece cualquiera de estas tres cosas:
 
+:::skip
 - **Roles compartidos por varias aplicaciones.** Si tres stacks de aplicación usan el
   mismo rol, ya no sigue a un consumidor: es infraestructura común, como la red.
 - **Un aprobador distinto.** Cuando el equipo de seguridad revisa los cambios de IAM y
@@ -178,33 +196,33 @@ aparece cualquiera de estas tres cosas:
 - **Recursos de gobierno**: *permission boundaries*, políticas de contraseñas,
   proveedores de identidad, roles de auditoría. No sirven a una aplicación; son la
   cuenta entera.
+:::
+
+:::add visibility=slide
+1. **Roles compartidos por varias aplicaciones.**
+2. **Un aprobador distinto.**
+3. **Recursos de gobierno.** (contraseñas, IdP, roles de auditoría.
+::: #add
+::: #inline-slide
 
 Ninguna de las tres se da en el taller: dos roles, un solo consumidor, un solo
 responsable. Por eso los roles viven con la aplicación, y por eso no hay un stack de
 seguridad. La decisión de **no** dividir también se toma con el mismo criterio.
 
-:::slide
-## Dónde va la seguridad
+## Corte por Aplicación
+:::inline-slide light
 
-**Un permiso sigue a quien lo consume, no al recurso que protege.**
-
-Un stack de seguridad aparte se justifica si hay:
-
-- Roles **compartidos** por varias aplicaciones.
-- Un **aprobador distinto** para los cambios de IAM.
-- Recursos de **gobierno** de la cuenta entera.
-:::
-
-## El cuarto corte: lo que comparten las aplicaciones
-
+:::skip
 El procedimiento de arriba se aplicó a una pregunta concreta: **un** ambiente, **una**
 aplicación. Cambiando la pregunta, cambia la respuesta. Supongamos que mañana hay que
-poner una segunda aplicación en la misma cuenta —otra imagen, otro equipo, la misma
-red—. ¿Alcanza con lanzar el stack de aplicación una segunda vez?
+poner una segunda aplicación en la misma cuenta (otra imagen, otro equipo, la misma
+red). ¿Alcanza con lanzar el stack de aplicación una segunda vez?
 
 Alcanza, y sale mal. Porque el grupo "Aplicación" del paso 2 escondía una diferencia
 que con una sola aplicación no se nota. A cada uno de esos nueve recursos hay que
 hacerle ahora una segunda pregunta: **¿cuántas aplicaciones lo usan?**
+:::
+
 
 | Recurso | ¿Cuántas aplicaciones lo usan? |
 | --- | --- |
@@ -216,37 +234,54 @@ hacerle ahora una segunda pregunta: **¿cuántas aplicaciones lo usan?**
 | `GrupoLogs` | Una. Los logs de *esta* aplicación. |
 | `RolEjecucion`, `RolTarea` | Una. Los permisos de *esta* aplicación. |
 
-Tres arriba, seis abajo. Los tres de arriba forman una capa que hasta ahora no tenía
-nombre: la **plataforma**, el sustrato de ejecución sobre el que corre cualquier
+:::
+
+Los tres de arriba forman una capa que hasta ahora no tenía nombre: la
+**plataforma**, el sustrato de ejecución sobre el que corre cualquier
 aplicación.
 
+:::inline-slide with-title
 ### El clúster engaña; el balanceador no
 
+:::skip
 Duplicar el clúster no duele, y ese es exactamente el problema. Con Fargate, un clúster
 de ECS **no reserva capacidad**: es una agrupación lógica, y no se factura. Diez
 clústeres vacíos cuestan lo mismo que uno. Por eso el error sobrevive sin que nadie lo
-note —hasta que aparece un inventario con treinta clústeres de una aplicación cada uno,
+note, hasta que aparece un inventario con treinta clústeres de una aplicación cada uno,
 y ya nadie sabe cuál es cuál.
 
 El balanceador sí duele. Un ALB se factura por **hora de existencia**, además del
 tráfico que procesa. Dos balanceadores para el mismo tráfico no reparten el costo: lo
 duplican en su parte fija. Y el costo no es lo único: dos balanceadores son dos nombres
 DNS, dos certificados, y dos lugares donde configurar lo mismo.
+:::
+
+:::add visibility=slide
+Duplicar el clúster no duele, el balanceador sí.
+:::
 
 ::: info
 El clúster compartido tiene un límite que conviene saber: los exports de CloudFormation
 viven en **una sola cuenta y una sola región**. Una plataforma compartida sirve a las
-aplicaciones de esa cuenta. Entre cuentas, lo que se comparte es la **red** —con AWS
-Resource Access Manager, que sí permite compartir subredes— y cada cuenta pone su
+aplicaciones de esa cuenta. Entre cuentas, lo que se comparte es la **red**, con AWS
+Resource Access Manager, que sí permite compartir subredes, y cada cuenta pone su
 propio clúster. Como el clúster es gratis, esa duplicación no cuesta nada; el ALB, sí.
 :::
+::: #inline-slide
 
+:::inline-slide with-title
 ### La regla del listener: el contrato al revés
 
+:::skip
 Sacar el balanceador del stack de aplicación plantea un problema nuevo. Hasta acá cada
 cruce se resolvía **importando**: la aplicación lee un valor que otro stack publicó. El
 balanceador necesita lo contrario. La aplicación no quiere *leer* el listener: quiere
 **agregarle** algo, una entrada que diga "lo que venga por esta ruta, mandámelo a mí".
+:::
+
+:::add visibility=slide
+La aplicación no necesita *leer* el `listener`: quiere *agregarle* algo.
+:::
 
 El recurso que hace eso es `AWS::ElasticLoadBalancingV2::ListenerRule`, y vive en el
 stack de aplicación:
@@ -266,16 +301,17 @@ stack de aplicación:
         - Type: forward
           TargetGroupArn: !Ref GrupoDestino
 ```
+::: #inline-slide
 
 Lo importante es lo que **no** pasa. El stack de plataforma no menciona ninguna
 aplicación, y no cambia cuando aparece una nueva: su listener tiene como acción por
 defecto un `fixed-response` con un 404, y todo el tráfico útil lo colocan las reglas.
-La dependencia sigue apuntando en la dirección correcta —de lo que cambia seguido hacia
-lo que cambia poco—, igual que con la red y los datos.
+La dependencia sigue apuntando en la dirección correcta, igual que con la red y los datos.
 
 Esta forma ya apareció en el taller: el template opcional de HTTPS de la Semana 1 le
 agrega un listener al ALB de otro stack sin modificarlo. Es el mismo movimiento.
 
+:::inline-slide with-title light
 ### Prioridades: la más específica primero
 
 Las reglas de un listener se evalúan **de menor a mayor `Priority`**, y gana la primera
@@ -290,31 +326,35 @@ consecuencias prácticas:
 
 ::: info
 El enrutado por ruta exige que la aplicación sepa servirse desde su prefijo: una app que
-genera enlaces absolutos a `/estilos.css` se rompe detrás de `/b/*`. Cuando eso no se
-puede cambiar, se enruta por **host** en vez de por ruta —`Field: host-header`, un
-dominio por aplicación, un solo balanceador— y el problema desaparece.
+genera enlaces absolutos a `/estilos.css` se rompe detrás de `/*`. Cuando eso no se
+puede cambiar, se enruta por **host** en vez de por ruta, `Field: host-header`, un
+dominio por aplicación, un solo balanceador, y el problema desaparece.
 :::
+::: #inline-slide
 
-:::slide
-## El cuarto corte
-
-Segunda pregunta sobre el grupo "Aplicación": **¿cuántas aplicaciones lo usan?**
-
-| Todas → **plataforma** | Una → **aplicación** |
-| --- | --- |
-| Clúster, ALB, listener | Servicio, tarea, target group, logs, roles |
-
-El clúster duplicado es **gratis** con Fargate; el ALB duplicado, no.
-
-La aplicación no importa el balanceador: le **agrega** un `ListenerRule`.
-:::
-
+:::inline-slide
 ## Cuándo no dividir
 
+:::skip
 Dividir tiene precio, y conviene decirlo antes de que parezca gratis. Tres stacks son
 tres despliegues a coordinar, un orden de borrado obligatorio, y valores congelados
 mientras alguien los importe. Un ambiente partido en ocho stacks para lo que necesitaba
 dos no es más mantenible: es el mismo sistema, con más ceremonia.
+:::
+
+:::add visibility=slide
+Dividir tiene precio y conviene decirlo. Hay señales que podemos usar para saber cuando
+la división no esta sumando.
+
+1. Dos stacks **siempre se depliegan juntos.**
+2. Contratos enormes. En general, **un contrato sano es chico.**
+3. Cambios **cruzan fronteras todo el tiempo.**
+:::
+
+::: info
+Regla práctica: **empezar junto, y dividir cuando duela.**
+:::
+::: #inline-slide
 
 Las señales de que un corte sobra:
 
@@ -326,26 +366,43 @@ Las señales de que un corte sobra:
   la frontera está estorbando en vez de proteger.
 
 La regla práctica: **empezar junto, y dividir cuando duela**. El dolor es concreto y se
-reconoce —no poder borrar el ambiente sin perder los datos es exactamente el dolor que
-motiva esta sección—. Dividir antes de sentirlo es adivinar.
+reconoce (no poder borrar el ambiente sin perder los datos es exactamente el dolor que
+motiva esta sección). Dividir antes de sentirlo es adivinar.
+
+:::
 
 :::inline-slide light
 ## La arquitectura en cuatro stacks
 
 ```mermaid
-flowchart LR
-  APP["Stack de aplicación<br/>servicio · tarea · IAM<br/><i>cambia seguido</i>"]
-  PLAT["Stack de plataforma<br/>clúster ECS · ALB · listener<br/><i>compartido por las apps</i>"]
-  RED["Stack de red<br/>VPC · subredes · SGs<br/><i>casi nunca cambia</i>"]
-  DATOS[("Stack de datos<br/>TablaApp<br/><i>debe sobrevivir</i>")]
-  APP -->|Fn::ImportValue| PLAT
-  APP -->|Fn::ImportValue| RED
-  APP -->|Fn::ImportValue| DATOS
-  PLAT -->|Fn::ImportValue| RED
+%%{init: {"flowchart": {"nodeSpacing": 60, "rankSpacing": 55}, "themeVariables": {"edgeLabelBackground": "#ffffff"}}}%%
+flowchart TB
+  APP["<b>Stack de aplicación</b><br/>servicio · tarea · IAM<br/><i>cambia seguido</i>"]
+  PLAT["<b>Stack de plataforma</b><br/>clúster ECS · ALB · listener<br/><i>compartido por las apps</i>"]
+  DATOS[("<b>Stack de datos</b><br/>TablaApp<br/><i>debe sobrevivir</i>")]
+  RED["<b>Stack de red</b><br/>VPC · subredes · SGs<br/><i>casi nunca cambia</i>"]
+
+  APP -->|"clúster · listeners"| PLAT
+  APP -->|"nombre y ARN<br/>de la tabla"| DATOS
+  APP -->|"subredes · SG"| RED
+  PLAT -->|"subredes · SG del ALB"| RED
+
+  classDef appNode fill:#fdf2f8,stroke:#e7157b,stroke-width:2px,color:#831843
+  classDef platNode fill:#fef3c7,stroke:#d97706,color:#451a03
+  classDef datosNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+  classDef redNode fill:#f1f5f9,stroke:#475569,color:#0f172a
+  class APP appNode
+  class PLAT platNode
+  class DATOS datosNode
+  class RED redNode
 ```
+
+Cada flecha es un `Fn::ImportValue`: el stack lee los exports del stack al que
+apunta. Cuanto más abajo, más estable.
 :::
 
-El instructor provee los cuatro templates que salen de ese análisis:
+:::inline-slide with-title light
+En el directorio `/infra/templates` esta el mismo template de la semana 1 dividido en 4:
 
 | Template | Stack | Contiene |
 | --- | --- | --- |
@@ -354,13 +411,31 @@ El instructor provee los cuatro templates que salen de ese análisis:
 | `taller-aws-devops-semana2-plataforma.yaml` | `taller-aws-<su-nombre>-plataforma` | Clúster de ECS, balanceador, listeners |
 | `taller-aws-devops-semana2-app.yaml` | `taller-aws-<su-nombre>-app` | Servicio, task definition, target group, regla, logs, roles |
 
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-app.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+
 :::app
 <cb-file path="./infra/templates/taller-aws-devops-semana2-plataforma.yaml" type="yaml" toggleable full-path></cb-file>
 :::
 
 :::app
-<cb-file path="./infra/templates/taller-aws-devops-semana2-app.yaml" type="yaml" toggleable full-path></cb-file>
+<cb-file path="./infra/templates/taller-aws-devops-semana2-datos.yaml" type="yaml" toggleable full-path></cb-file>
 :::
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-red.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+
+::: info
+Para el diagrama de red, hay una versión con VPC existente.
+:::
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-red-existente.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+::: #inline-slide
 
 Nótese la única flecha nueva que no sale de la aplicación: **plataforma → red**. El
 balanceador necesita las subredes y el grupo de seguridad, así que importa del stack de
@@ -393,22 +468,38 @@ valor, CloudFormation **impide borrar o modificar** el stack que lo exporta. El 
 de borrado deja de ser una convención y pasa a estar garantizado por CloudFormation:
 primero la aplicación, después la plataforma y los datos, al final la red.
 
+:::inline-slide
 ### El precio del contrato
 
+:::skip
 Esa garantía tiene un costo que conviene conocer antes de apoyarse en exports para
 todo. Mientras alguien importa un export, su valor **no se puede cambiar**: no solo
 está protegido el stack, está congelado el valor. Cambiar el CIDR de la VPC del stack
 de red, con la aplicación importándolo, exige borrar primero el stack de aplicación,
 cambiar la red, y volver a crearla. La rigidez es el precio de la seguridad.
+:::
 
+:::add visibility=slide
+Mientras alguien importa un `export`, su valor **no se puede cambiar**.
+:::
+
+:::skip
 Los otros dos límites son de alcance. Un export vive en **una sola región y una sola
 cuenta**: no hay import entre regiones ni entre cuentas. Y el nombre del export es
 único en la región, de ahí el prefijo `${AWS::StackName}` que convive con el resto de
 los participantes.
+:::
 
+:::add visibility=slide
+Un `export` vive en `**una sola región y una sola cuenta.**
+:::
+
+::: info
 La regla práctica que sale de esto: exportar lo que de verdad es un contrato estable
-—identificadores de red, ARNs de recursos compartidos— y no exportar valores que se
+(identificadores de red, ARNs de recursos compartidos) y no exportar valores que se
 espera ajustar seguido.
+:::
+::: #inline-slide
 
 ::: extra El contrato en acción: reutilizar una VPC existente
 La separación paga un dividendo inmediato. En cuentas donde no se crea una VPC por
@@ -430,22 +521,32 @@ y la salida a internet, con el Internet Gateway existente como parámetro opcion
 (si no se indica, lo crea y lo adjunta).
 :::
 
+:::inline-slide
 ## El problema: la tabla ya tiene datos
 
-Recrear la red y la aplicación es gratis —es lo que se practicó en la Semana 1. La
-tabla es distinta: los contadores que la guía fue acumulando viven ahí. Borrar el
-stack monolítico y lanzar los tres nuevos destruiría esos datos.
+:::skip
+Recrear la red y la aplicación es gratis. La tabla es distinta: los contadores
+que la guía fue acumulando viven ahí. Borrar el stack monolítico y lanzar los
+tres nuevos destruiría esos datos.
 
 CloudFormation tiene una respuesta específica para esto: **importar recursos**. Un
-stack puede *adoptar* un recurso que ya existe —sin tocarlo, sin recrearlo— siempre
+stack puede *adoptar* un recurso que ya existe: sin tocarlo, sin recrearlo. Siempre
 que el template lo describa tal como es y declare una `DeletionPolicy` explícita. La
 migración completa usa tres piezas que ya se conocen, más el import:
+:::
+
+:::add visibility=slide
+¿Como migramos la tabla sin eliminarla?
+
+Utilizamos un `import`, para *adoptar* un recurso a otro template.
+:::
 
 1. `DeletionPolicy: Retain` sobre la tabla, aplicado con un change set.
 2. Borrar el stack monolítico —todo muere, salvo la tabla, que queda **huérfana**:
    viva, funcionando, pero sin stack que la gestione.
 3. Crear los stacks de red, plataforma, y aplicación como siempre.
 4. Crear el stack de datos **importando** la tabla huérfana.
+:::
 
 :::slide
 ## La migración
@@ -457,54 +558,28 @@ migración completa usa tres piezas que ya se conocen, más el import:
 5. Crear el stack de aplicación.
 
 La tabla nunca se recrea. Los datos nunca se mueven.
+
+:::app
+<cb-goto path="Práctica guiada: la migración"></cb-goto>
+::: # add
 :::
 
 ## Práctica guiada: la migración
 
-### Dejar una marca en la tabla
-
-Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
-
-1. Resolver el nombre físico de la tabla a partir del stack:
-
-   ```bash
-   export STACK=taller-aws-<su-nombre>
-   TABLA=$(aws cloudformation describe-stack-resources \
-     --stack-name "$STACK" \
-     --logical-resource-id TablaApp \
-     --query "StackResources[0].PhysicalResourceId" \
-     --output text)
-   echo "$TABLA"
-   ```
-
-2. Incrementar un contador de prueba:
-
-   ```bash
-   aws dynamodb update-item \
-     --table-name "$TABLA" \
-     --key '{"collection": {"S": "counters"}, "key": {"S": "migracion"}}' \
-     --update-expression "ADD #v :uno" \
-     --expression-attribute-names '{"#v": "value"}' \
-     --expression-attribute-values '{":uno": {"N": "1"}}'
-   ```
-
-3. Confirmar que el dato está:
-
-   ```bash
-   aws dynamodb get-item \
-     --table-name "$TABLA" \
-     --key '{"collection": {"S": "counters"}, "key": {"S": "migracion"}}'
-   ```
-
 ### Proteger la tabla con `Retain`
 
-1. Abrir `taller-aws-devops-semana1.yaml` en el editor y agregar la política sobre
-   la tabla:
+1. Abrir su template de CloudFormation en el editor y agregar la política sobre la tabla:
 
    ```yaml
    TablaApp:
      Type: AWS::DynamoDB::Table
      DeletionPolicy: Retain
+   ```
+2. Ir a la configuración de variables de entorno de su aplicación y agregar la siguiente variable:
+
+   ```yaml
+            - Name: CB_APPS_SECRET
+              Value: secreto
    ```
 
 2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home),
@@ -513,12 +588,45 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    stack**, subir el template modificado, y ejecutarlo. `TablaApp` aparece como
    **Modify** sin reemplazo —la política es metadata del stack, no toca la tabla.
 
+### Dejar una marca en la tabla
+
+Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
+
+1. Resolver el nombre físico de la tabla a partir del stack verificando los `Outputs` del stack.
+
+   Con la `awscli`:
+
+   ```bash
+   export STACK=taller-aws-<su-nombre>
+   TABLA=$(aws cloudformation describe-stack-resources \
+     --stack-name "$STACK"
+     --logical-resource-id TablaApp \
+     --query "StackResources[0].PhysicalResourceId" \
+     --output text)
+   echo "$TABLA"
+   ```
+
+2. Incrementar un contador de prueba con la app `counter` de la guía. El botón
+   emite un evento al servidor que sirve la página, y este ejecuta sobre la
+   tabla el mismo `UpdateItem` con `ADD` que se lanzaría a mano con la CLI.
+   Como escribe en la tabla del ambiente que sirve la página, usar esta misma
+   sección en la guía de su propio stack. Encuentre la **UrlBase** de
+   `taller-aws-<su-nombre>` en los `Outputs` luego debloquee la app con su
+   secreto y pulse el botón un par de veces:
+
+:::app
+<cb-counter key="migracion" label="Contador de migración"></cb-counter>
+:::
+
+3. Verifique refrescando la página que esta valor persiste:
+
 ### Borrar el stack monolítico
 
 1. Con el change set aplicado, pulsar **Delete → Delete stack**. Es el mismo
    teardown de la Semana 1, con una diferencia: en la pestaña **Events**, la tabla
-   aparece como **DELETE_SKIPPED** —CloudFormation la deja atrás, intacta.
-2. Confirmar que la tabla sigue viva, ahora sin stack:
+   aparece como **DELETE_SKIPPED**. CloudFormation la deja atrás, intacta.
+2. Confirmar que la tabla sigue viva, ahora sin stack desde el servicio DynamoDB o
+   utilizando la `awscli`.
 
    ```bash
    aws dynamodb describe-table --table-name "$TABLA" \
@@ -578,15 +686,14 @@ Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
 1. Volver a abrir la **UrlBase** del stack de plataforma —la misma URL que antes
    devolvía `404`—. Ahora carga la guía: lo único que cambió es que existe una regla
    que enruta esa ruta al nuevo servicio.
-2. Releer el contador escrito antes de la migración:
+2. Releer el contador escrito antes de la migración. En la guía recién
+   desplegada, el visor muestra el valor que se escribió antes de borrar el stack:
 
-   ```bash
-   aws dynamodb get-item \
-     --table-name "$TABLA" \
-     --key '{"collection": {"S": "counters"}, "key": {"S": "migracion"}}'
-   ```
+:::app
+<cb-counter mode="view" key="migracion" label="Contador de migración"></cb-counter>
+:::
 
-   El valor sigue ahí. El ambiente se desarmó y se rearmó en cuatro stacks, y los
+   Si el valor sigue ahí. El ambiente se desarmó y se rearmó en cuatro stacks, y los
    datos nunca dejaron de existir.
 
 ## Opcional: HTTPS sobre el balanceador compartido
@@ -996,8 +1103,9 @@ Escribir un contador antes de empezar y demostrar, al final, que sigue ahí.
 ::: solucion
 1. Resolver el nombre físico de la tabla con
    `aws cloudformation describe-stack-resources` y guardarlo en `$TABLA`.
-2. Escribir un contador de prueba con `aws dynamodb update-item`
-   (`collection = counters`, `key = migracion`).
+2. Escribir un contador de prueba con la app `counter` de la guía servida por el
+   propio stack (el widget ejecuta un `UpdateItem` con `ADD` sobre
+   `collection = counters`, `key = migracion`).
 3. Agregar `DeletionPolicy: Retain` a `TablaApp` en
    `taller-aws-devops-semana1.yaml` y aplicarlo con un change set.
 4. Borrar el stack `taller-aws-<su-nombre>`. En **Events**, la tabla queda como

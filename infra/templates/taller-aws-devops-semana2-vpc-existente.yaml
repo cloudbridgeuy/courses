@@ -1,0 +1,316 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 1 · VPC existente
+
+# Variante del ambiente de la Semana 1 para cuentas donde no se crea una VPC
+# por participante: en lugar de crear su propia red, recibe una VPC existente
+# (por ejemplo, la VPC por defecto de la cuenta) y dos subredes públicas. Todo
+# lo demás es idéntico al template principal. Al borrar el stack, la red del
+# cliente queda intacta.
+#
+# Requisitos de la red recibida:
+#  - Las dos subredes deben estar en zonas de disponibilidad distintas (lo
+#    exige el balanceador).
+#  - Las subredes deben ser públicas: con ruta 0.0.0.0/0 hacia un Internet
+#    Gateway. Las subredes de la VPC por defecto cumplen ambas condiciones.
+#  - Si la VPC no tiene subredes así, el template
+#    taller-aws-devops-extra-subredes-publicas.yaml las crea.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: URI de la imagen en ECR, con etiqueta.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/[a-z0-9._/-]+:[a-zA-Z0-9._-]+$'
+    ConstraintDescription: >-
+      Debe ser un URI de ECR con etiqueta, por ejemplo
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
+
+  # Los tipos AWS::EC2::*::Id hacen que la consola muestre un desplegable con
+  # los recursos de la cuenta, en vez de un campo de texto libre.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC existente donde se despliega el ambiente.
+
+  SubredAId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Primera subred pública de la VPC.
+
+  SubredBId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Segunda subred pública, en una zona de disponibilidad distinta.
+
+  Secreto:
+    Type: String
+    Default: "secreto"
+    Description: Secreto para habilitar las aplicaciones.
+
+  RedirigirAHttps:
+    Type: String
+    Default: "no"
+    AllowedValues: ["no", "si"]
+    Description: >-
+      Con "si", el listener HTTP (80) redirige a HTTPS (443) en lugar de
+      servir la aplicación. Usar solo con el template opcional de HTTPS ya
+      desplegado, que es el que crea el listener 443.
+
+Conditions:
+  RedirigirHttps: !Equals [!Ref RedirigirAHttps, "si"]
+
+Resources:
+  # --- Base de datos ---
+
+  TablaApp:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: collection
+          AttributeType: S
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: collection
+          KeyType: HASH
+        - AttributeName: key
+          KeyType: RANGE
+
+  # --- ECS: clúster, servicio, y task definition ---
+
+  ClusterApp:
+    Type: AWS::ECS::Cluster
+
+  ServicioApp:
+    Type: AWS::ECS::Service
+    DependsOn: ListenerHTTP
+    Properties:
+      Cluster: !Ref ClusterApp
+      DesiredCount: 1
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TareaApp
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubredAId
+            - !Ref SubredBId
+          SecurityGroups:
+            - !Ref GrupoSeguridadServicio
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 8080
+          TargetGroupArn: !Ref GrupoDestino
+
+  TareaApp:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !GetAtt RolEjecucion.Arn
+      TaskRoleArn: !GetAtt RolTarea.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Ref ImageUri
+          PortMappings:
+            - ContainerPort: 8080
+          # Configuración de la aplicación. Dos variables están ausentes a
+          # propósito:
+          #  - CB_HOOK_TOKEN: mismo motivo; solo lo necesita el servidor del
+          #    instructor que recibe los webhooks de SNS.
+          # CB_DEV_ROOT es solo para desarrollo local y no se define aquí.
+          Environment:
+            - Name: PORT
+              Value: "8080"
+            - Name: CB_APPS_TABLE
+              Value: !Ref TablaApp
+            - Name: CB_APPS_PUBLIC_COLLECTIONS
+              Value: counters
+            - Name: CB_APPS_GATED
+              Value: all
+            - Name: CB_APPS_SECRET
+              Value: !Ref Secreto
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref GrupoLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+
+  GrupoLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AWS::StackName}"
+      RetentionInDays: 7
+
+  # --- Roles de IAM ---
+
+  # Rol de ejecución: lo usa ECS para descargar la imagen y escribir logs.
+  RolEjecucion:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Rol de tarea: lo usa la aplicación dentro del contenedor.
+  RolTarea:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: acceso-tabla-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt TablaApp.Arn
+        - PolicyName: publicar-metricas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                # PutMetricData no acepta un ARN como recurso; el namespace es
+                # la forma de acotar el permiso.
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: Taller/Custom
+
+  # --- Grupos de seguridad ---
+
+  # Los grupos de seguridad sí se crean por stack, aunque la VPC sea
+  # compartida: son gratis, no chocan entre participantes, y se van con el
+  # teardown.
+
+  GrupoSeguridadALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico HTTP publico hacia el balanceador
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  GrupoSeguridadServicio:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Trafico del balanceador hacia el contenedor
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref GrupoSeguridadALB
+
+  # --- Balanceador de carga ---
+
+  BalanceadorApp:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - !Ref SubredAId
+        - !Ref SubredBId
+      SecurityGroups:
+        - !Ref GrupoSeguridadALB
+      LoadBalancerAttributes:
+        # Las notificaciones en vivo de la guía usan SSE: la conexión queda
+        # abierta y sin tráfico, así que el timeout por defecto (60 s) la corta.
+        - Key: idle_timeout.timeout_seconds
+          Value: "3600"
+
+  GrupoDestino:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      HealthCheckPath: /health
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "15"
+
+  # El listener 80 existe siempre: el servicio ECS exige que el grupo de
+  # destino esté asociado a un listener para poder crearse. Con RedirigirAHttps
+  # en "si" deja de servir la aplicación y responde 301 hacia HTTPS.
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BalanceadorApp
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - !If
+          - RedirigirHttps
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+          - Type: forward
+            TargetGroupArn: !Ref GrupoDestino
+
+Outputs:
+  ALBUrl:
+    Description: URL pública de la aplicación
+    Value: !Sub "http://${BalanceadorApp.DNSName}"
+
+  # El ALB no tiene IPs públicas estables; el DNS externo se configura contra su
+  # nombre DNS (CNAME) o, en Route 53, con un registro alias usando la zona
+  # canónica del balanceador.
+  ALBDnsName:
+    Description: Nombre DNS del balanceador, para configurar el DNS externo
+    Value: !GetAtt BalanceadorApp.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-dns"
+
+  ALBHostedZoneId:
+    Description: Zona canónica del balanceador, para registros alias en Route 53
+    Value: !GetAtt BalanceadorApp.CanonicalHostedZoneID
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-zona"
+
+  # Exports para el template opcional de HTTPS: le permiten agregar un listener
+  # 443 y abrir el puerto sin modificar este stack.
+  ALBArn:
+    Description: ARN del balanceador, para agregarle listeners desde otro stack
+    Value: !Ref BalanceadorApp
+    Export:
+      Name: !Sub "${AWS::StackName}-alb-arn"
+
+  TargetGroupArn:
+    Description: ARN del grupo de destino, para listeners agregados desde otro stack
+    Value: !Ref GrupoDestino
+    Export:
+      Name: !Sub "${AWS::StackName}-grupo-destino-arn"
+
+  ALBSecurityGroupId:
+    Description: Grupo de seguridad del balanceador, para abrir puertos desde otro stack
+    Value: !Ref GrupoSeguridadALB
+    Export:
+      Name: !Sub "${AWS::StackName}-sg-alb-id"
