@@ -1280,11 +1280,13 @@ acoplamiento entre stacks aparece más abajo, en el refactoring a escala.
 1. Abrir [**CloudShell**](https://console.aws.amazon.com/cloudshell/home). Todo el
    registro se hace ahí: trae Python, `pip`, y las credenciales del pod ya
    resueltas.
-2. Instalar la **CLI de CloudFormation** —una herramienta aparte de la `awscli`,
-   hecha para desarrollar extensiones del registro—:
+2. Instalar la [**CLI de CloudFormation**](https://docs.aws.amazon.com/cloudformation-cli/latest/userguide/what-is-cloudformation-cli.html)
+   (CFN-CLI 2.0) —una herramienta aparte de la `awscli`, hecha para desarrollar
+   extensiones del registro—. Para módulos no hace falta ningún plugin de
+   lenguaje; `setuptools` sí, porque el Python de CloudShell ya no lo trae:
 
    ```bash
-   pip3 install cloudformation-cli
+   pip3 install cloudformation-cli "setuptools<81"
    ```
 
 3. Crear el proyecto del módulo. `cfn init` pregunta qué se desarrolla

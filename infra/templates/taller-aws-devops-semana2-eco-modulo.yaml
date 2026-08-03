@@ -30,6 +30,7 @@ Metadata:
         Parameters: [AppsGated, AppsPublicCollections, AppsSecret]
     ParameterLabels:
       ImageUri: { default: "URI de la imagen en ECR" }
+      ComandoContenedor: { default: "Comando del contenedor" }
       RedStackName: { default: "Stack de red" }
       DatosStackName: { default: "Stack de datos" }
       PlataformaStackName: { default: "Stack de plataforma" }
@@ -49,6 +50,16 @@ Parameters:
     ConstraintDescription: >-
       Debe ser un URI de ECR con etiqueta, por ejemplo
       123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
+
+  ComandoContenedor:
+    # String, no CommaDelimitedList: el valor viaja como propiedad del módulo,
+    # y es el parámetro del fragmento el que lo parte por comas.
+    Type: String
+    Default: "courses_server,echo"
+    Description: >-
+      Comando que ejecuta el contenedor, separado por comas. El default arranca
+      el servidor de eco; con nombre propio:
+      courses_server,echo,--name,echo.midominio.com
 
   RedStackName:
     Type: String
@@ -137,6 +148,11 @@ Resources:
     Properties:
       ImageUri: !Ref ImageUri
       ComandoContenedor: !Ref ComandoContenedor
+      ComandoContenedor: !Join
+        - ","
+        - - courses_server
+          - eco
+          - !Sub "--secret=${SecretARN}"
       VpcId:
         Fn::ImportValue: !Sub "${RedStackName}-vpc-id"
       SubredAId:

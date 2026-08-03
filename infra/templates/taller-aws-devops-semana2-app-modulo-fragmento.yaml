@@ -8,7 +8,7 @@ Description: Taller AWS DevOps — Semana 2 · Aplicación como módulo (fragmen
 #
 # Dos reglas del registro explican todas las diferencias con el template:
 #
-#  - Un fragmento no puede usar Fn::ImportValue ni Export. Cada uno de los nueve
+#  - Un fragmento no puede usar imports ni exports. Cada uno de los nueve
 #    imports del template se volvió un parámetro del módulo: el *consumidor*
 #    hace los imports y pasa los valores como propiedades. El contrato que antes
 #    estaba implícito en los nombres de stack ahora es explícito, propiedad por
