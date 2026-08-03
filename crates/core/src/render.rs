@@ -278,6 +278,8 @@ pub fn render_slideshow_page(
          <div class=\"reveal\">\n<div class=\"slides\">\n\
          {sections}\
          </div>\n</div>\n\
+         <div class=\"cb-slide-scroll-indicator\" role=\"status\" \
+aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>\n\
          <script src=\"{REVEAL_JS_PATH}\"></script>\n\
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          {mermaid_script}\
@@ -286,9 +288,18 @@ pub fn render_slideshow_page(
          <script>\
 var cbSlideKey='cb-slide:'+location.pathname;\
 if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)location.hash=cbSaved;}}\
-Reveal.initialize({{hash:true,controls:true,progress:true,center:false,transition:'slide',width:1280,height:720}});\
-Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);}});\
+var cbScrollIndicator=document.querySelector('.cb-slide-scroll-indicator'),cbScrollFrame=0;\
+function cbUpdateScrollIndicator(){{var cbSlide=Reveal.getCurrentSlide();var cbHasMore=!!cbSlide&&cbSlide.scrollHeight>cbSlide.clientHeight&&cbSlide.scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2;cbScrollIndicator.classList.toggle('cb-visible',cbHasMore);cbScrollIndicator.setAttribute('aria-hidden',String(!cbHasMore));}}\
+function cbScheduleScrollIndicator(){{if(cbScrollFrame)return;cbScrollFrame=requestAnimationFrame(function(){{cbScrollFrame=0;cbUpdateScrollIndicator();}});}}\
+var cbRevealLayout=Reveal.layout;\
+Reveal.layout=function(){{var cbLayoutResult=cbRevealLayout.apply(this,arguments);cbScheduleScrollIndicator();return cbLayoutResult;}};\
+Reveal.on('ready',cbScheduleScrollIndicator);\
+Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);cbScheduleScrollIndicator();}});\
+document.addEventListener('scroll',function(e){{if(e.target===Reveal.getCurrentSlide())cbScheduleScrollIndicator();}},true);\
+window.addEventListener('resize',cbScheduleScrollIndicator);\
+if('ResizeObserver'in window){{new ResizeObserver(cbScheduleScrollIndicator).observe(document.querySelector('.slides'));}}\
 document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
+Reveal.initialize({{hash:true,controls:true,progress:true,center:false,transition:'slide',width:1280,height:720}});\
 </script>\n\
          <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
 aria-label=\"Cerrar diapositivas\">\
@@ -769,6 +780,29 @@ mod tests {
         assert!(html.contains("Diapositivas"));
         assert!(html.contains("cb-slides-close"));
         assert!(html.contains("aria-label=\"Cerrar diapositivas\""));
+        assert!(html.contains(
+            "<div class=\"cb-slide-scroll-indicator\" role=\"status\" \
+aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>"
+        ));
+        assert!(html.contains("classList.toggle('cb-visible',cbHasMore)"));
+        assert!(html.contains("setAttribute('aria-hidden',String(!cbHasMore))"));
+        assert!(html.contains("requestAnimationFrame"));
+        assert!(html.contains("scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2"));
+        assert!(html.contains("Reveal.on('ready',cbScheduleScrollIndicator)"));
+        assert!(html.contains("Reveal.on('slidechanged'"));
+        assert!(!html.contains("Reveal.on('layout'"));
+        assert!(html.contains("var cbRevealLayout=Reveal.layout;"));
+        assert!(html.contains(
+            "Reveal.layout=function(){var cbLayoutResult=cbRevealLayout.apply(this,arguments);\
+cbScheduleScrollIndicator();return cbLayoutResult;}"
+        ));
+        assert!(html.contains(
+            "document.addEventListener('scroll',function(e){if(e.target===Reveal.getCurrentSlide())\
+cbScheduleScrollIndicator();},true)"
+        ));
+        assert!(html.contains("addEventListener('resize',cbScheduleScrollIndicator)"));
+        assert!(html.contains("new ResizeObserver(cbScheduleScrollIndicator)"));
+        assert!(html.contains("observe(document.querySelector('.slides'))"));
         assert!(html.contains("slides.css"));
         assert!(!html.contains("reveal-theme-black"));
         // close button must appear before </body>
