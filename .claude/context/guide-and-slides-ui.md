@@ -59,15 +59,18 @@
   rail shows during the presentation; wheel/touch/key scrolling still works.
 - The CSS hides `.cb-slide-scroll-indicator` by default. The renderer compares the
   active slide's scroll height, visible height, and scroll position. It adds
-  `.cb-visible` while content remains below and removes it at the bottom.
+  `.cb-visible` and enables the button while content remains below; otherwise, it
+  hides and disables the button.
 - The renderer schedules an update when Reveal is ready and after a slide change,
   an active-slide scroll, a window resize, a `.slides` `ResizeObserver` update, or
   a call to the wrapped `Reveal.layout()`. The CSS only renders this state.
-- The fixed chevron is at the viewport's bottom center, above the progress bar. Its
-  translucent dark background works on light and dark slides. It does not accept
-  pointer input, and it stays clear of Reveal's controls. It pulses while visible.
-  `prefers-reduced-motion: reduce` removes the animation and transition but keeps
-  the chevron visible.
+- The fixed chevron is a native button at the viewport's bottom center, above the
+  progress bar. Clicking it or pressing Enter or Space scrolls the active slide by
+  80% of its visible height; repeated activations continue downward. The button
+  stays clear of Reveal's controls. Its translucent dark background works on light
+  and dark slides, and it pulses while visible.
+  `prefers-reduced-motion: reduce` uses immediate scrolling and keeps the visual
+  cue static.
 - Fenced code blocks that declare a language load Shiki on demand. The client-side
   initializer uses the local TextMate definition of `tokyonight-storm`; Mermaid and
   untyped blocks keep their dedicated/plain rendering.

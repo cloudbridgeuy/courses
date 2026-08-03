@@ -548,8 +548,10 @@
   justify-content: center;
   width: 2rem;
   height: 1.5rem;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.38);
   border-radius: 999px;
+  appearance: none;
   background: rgba(30, 28, 27, 0.72);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   opacity: 0;
@@ -570,8 +572,16 @@
 
 .cb-slide-scroll-indicator.cb-visible {
   opacity: 0.9;
+  pointer-events: auto;
+  cursor: pointer;
   transform: translate(-50%, 0);
   animation: cb-slide-scroll-indicator-pulse 1.6s ease-in-out infinite;
+}
+
+.cb-slide-scroll-indicator:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 @keyframes cb-slide-scroll-indicator-pulse {
