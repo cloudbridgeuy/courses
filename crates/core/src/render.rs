@@ -291,6 +291,7 @@ if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)lo
 var cbScrollIndicator=document.querySelector('.cb-slide-scroll-indicator'),cbScrollFrame=0;\
 function cbUpdateScrollIndicator(){{var cbSlide=Reveal.getCurrentSlide();var cbHasMore=!!cbSlide&&cbSlide.scrollHeight>cbSlide.clientHeight&&cbSlide.scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2;cbScrollIndicator.classList.toggle('cb-visible',cbHasMore);cbScrollIndicator.setAttribute('aria-hidden',String(!cbHasMore));cbScrollIndicator.disabled=!cbHasMore;}}\
 function cbScheduleScrollIndicator(){{if(cbScrollFrame)return;cbScrollFrame=requestAnimationFrame(function(){{cbScrollFrame=0;cbUpdateScrollIndicator();}});}}\
+cbScrollIndicator.addEventListener('keydown',function(e){{if(e.key===' ')e.stopPropagation();}});\
 cbScrollIndicator.addEventListener('click',function(){{var cbSlide=Reveal.getCurrentSlide();if(!cbSlide)return;var cbReduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;cbSlide.scrollBy({{top:cbSlide.clientHeight*0.8,behavior:cbReduceMotion?'auto':'smooth'}});}});\
 Reveal.on('ready',cbScheduleScrollIndicator);\
 Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);cbScheduleScrollIndicator();}});\
@@ -793,7 +794,16 @@ aria-label=\"Desplazar diapositiva hacia abajo\" aria-hidden=\"true\" disabled><
         assert!(html.contains("cbSlide.clientHeight*0.8"));
         assert!(html.contains("cbSlide.scrollBy({top:"));
         assert!(html.contains("behavior:cbReduceMotion?'auto':'smooth'"));
-        assert!(!html.contains("cbScrollIndicator.addEventListener('keydown'"));
+        assert!(html.contains(
+            "cbScrollIndicator.addEventListener('keydown',function(e){if(e.key===' ')\
+e.stopPropagation();});"
+        ));
+        assert_eq!(
+            html.matches("cbScrollIndicator.addEventListener('keydown'")
+                .count(),
+            1,
+            "the sole keyboard handler must only guard Space propagation; scrolling stays click-driven"
+        );
         assert!(html.contains("requestAnimationFrame"));
         assert!(html.contains("scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2"));
         assert!(html.contains("Reveal.on('ready',cbScheduleScrollIndicator)"));
