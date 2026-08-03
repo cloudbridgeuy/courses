@@ -89,7 +89,7 @@ Parameters:
 
   RutaPath:
     Type: String
-    Default: "/eco/*"
+    Default: "/eco2/*"
     Description: >-
       Patrón de ruta que esta aplicación atiende en el balanceador compartido.
       Se ignora si se indica NombreHost.
@@ -147,12 +147,7 @@ Resources:
     Type: CloudBridge::Taller::App::MODULE
     Properties:
       ImageUri: !Ref ImageUri
-      ComandoContenedor: !Ref ComandoContenedor
-      ComandoContenedor: !Join
-        - ","
-        - - courses_server
-          - eco
-          - !Sub "--secret=${SecretARN}"
+      ComandoContenedor: courses_server,eco
       VpcId:
         Fn::ImportValue: !Sub "${RedStackName}-vpc-id"
       SubredAId:

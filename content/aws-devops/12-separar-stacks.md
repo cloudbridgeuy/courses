@@ -1345,20 +1345,19 @@ stacks y es normal: es infraestructura de la herramienta, no del taller.
 
 1. Pulsar **Create stack → With new resources (standard)** y subir
    `taller-aws-devops-semana2-eco-modulo.yaml`.
-2. En **Stack name**, escribir `taller-aws-<su-nombre>-eco` —el mismo nombre de
-   antes, a propósito: de ahí salen los nombres físicos—.
+2. En **Stack name**, escribir `taller-aws-<su-nombre>-modulo-eco`.
 3. Completar **ImageUri** con la imagen de siempre, y los tres nombres de stack
-   —red, datos, plataforma—. El resto ya viene con los valores del eco:
-   `ComandoContenedor=courses_server,echo`, `RutaPath=/eco/*`, `Prioridad=10`.
+   (red, datos, plataforma). El resto ya viene con los valores del eco:
+   `ComandoContenedor=courses_server,echo`, `RutaPath=/eco2/*`, `Prioridad=10`.
 4. Aceptar la capacidad de IAM y esperar a **CREATE_COMPLETE**.
 5. Probar que el eco contesta, igual que la primera vez:
 
    ```bash
-   curl -s "<UrlBase>/eco/prueba?x=1" | head -20
+   curl -s "<UrlBase>/eco2/prueba?x=1" | head -20
    ```
 
 :::app
-<cb-http endpoint="/eco/prueba?x=1"></cb-http>
+<cb-http endpoint="/eco2/prueba?x=1"></cb-http>
 :::
 
 ### Mirar dónde quedaron los recursos
