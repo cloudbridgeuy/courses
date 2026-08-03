@@ -408,6 +408,7 @@ En el directorio `/infra/templates` esta el mismo template de la semana 1 dividi
 | --- | --- | --- |
 | `taller-aws-devops-semana2-red.yaml` | `taller-aws-<su-nombre>-red` | VPC, subredes, gateway, grupos de seguridad |
 | `taller-aws-devops-semana2-datos.yaml` | `taller-aws-<su-nombre>-datos` | La tabla de DynamoDB, con `DeletionPolicy: Retain` |
+| `taller-aws-devops-semana2-datos-import.yaml` | `taller-aws-<su-nombre>-datos` | La misma tabla, sin `Outputs`: la versión que exige la operación de import |
 | `taller-aws-devops-semana2-plataforma.yaml` | `taller-aws-<su-nombre>-plataforma` | Clúster de ECS, balanceador, listeners |
 | `taller-aws-devops-semana2-app.yaml` | `taller-aws-<su-nombre>-app` | Servicio, task definition, target group, regla, logs, roles |
 
@@ -422,6 +423,10 @@ En el directorio `/infra/templates` esta el mismo template de la semana 1 dividi
 
 :::app
 <cb-file path="./infra/templates/taller-aws-devops-semana2-datos.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-datos-import.yaml" type="yaml" toggleable full-path></cb-file>
 :::
 
 :::app
@@ -597,9 +602,9 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    Con la `awscli`:
 
    ```bash
-   export STACK=taller-aws-<su-nombre>
+   export TALLER=taller-aws-<su-nombre>
    TABLA=$(aws cloudformation describe-stack-resources \
-     --stack-name "$STACK"
+     --stack-name "$TALLER" \
      --logical-resource-id TablaApp \
      --query "StackResources[0].PhysicalResourceId" \
      --output text)
@@ -610,21 +615,27 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    emite un evento al servidor que sirve la página, y este ejecuta sobre la
    tabla el mismo `UpdateItem` con `ADD` que se lanzaría a mano con la CLI.
    Como escribe en la tabla del ambiente que sirve la página, usar esta misma
-   sección en la guía de su propio stack. Encuentre la **UrlBase** de
-   `taller-aws-<su-nombre>` en los `Outputs` luego debloquee la app con su
-   secreto y pulse el botón un par de veces:
+   sección en la guía del propio stack. Encontrar la **UrlBase** de
+   `taller-aws-<su-nombre>` en los `Outputs`, desbloquear la app con el
+   secreto, y pulsar el botón un par de veces:
 
 :::app
 <cb-counter key="migracion" label="Contador de migración"></cb-counter>
 :::
 
-3. Verifique refrescando la página que esta valor persiste:
+3. Verificar, refrescando la página, que el valor persiste.
 
 ### Borrar el stack monolítico
 
 1. Con el change set aplicado, pulsar **Delete → Delete stack**. Es el mismo
    teardown de la Semana 1, con una diferencia: en la pestaña **Events**, la tabla
    aparece como **DELETE_SKIPPED**. CloudFormation la deja atrás, intacta.
+
+::: info
+Si está ejecutando al `app` en modo HTTPS, debe eliminar el `Stack` que lo configura
+primero.
+:::
+
 2. Confirmar que la tabla sigue viva, ahora sin stack desde el servicio DynamoDB o
    utilizando la `awscli`.
 
@@ -656,10 +667,13 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
 
 ### Crear el stack de datos, importando la tabla
 
-Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
+Este stack no se crea: se crea *alrededor* de la tabla que ya existe. Y son dos
+pasos, porque la operación de import solo acepta los recursos que se importan: un
+template con `Outputs` se rechaza. Primero el import, con la versión sin `Outputs`;
+después un update, con el template completo, para publicar los exports.
 
 1. Pulsar **Create stack → With existing resources (import resources)**.
-2. Subir `taller-aws-devops-semana2-datos.yaml`.
+2. Subir `taller-aws-devops-semana2-datos-import.yaml`.
 3. En la pantalla **Identify resources**, CloudFormation lista los recursos del
    template que necesitan un identificador. Para `TablaApp`, pegar en **TableName**
    el nombre físico de la tabla (el valor de `$TABLA`).
@@ -668,6 +682,27 @@ Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
    Pulsar **Import resources**.
 6. En la pestaña **Events**, esperar a **IMPORT_COMPLETE**. La tabla no se reinició
    ni se recreó: solo cambió quién la gestiona.
+7. Con el stack ya creado, aplicar el template completo (el mismo, más los
+   `Outputs`) con un update **directo** haciendo click en **Update stack ->
+   Make a direct update**. Y seleccionando **Replace existing template**. Use
+   el template `taller-aws-devops-semana2-datos.yaml`.
+
+   Desde la terminal, parado en el directorio donde está descargado el template:
+
+   ```bash
+   aws cloudformation update-stack \
+     --stack-name taller-aws-<su-nombre>-datos \
+     --template-body file://taller-aws-devops-semana2-datos.yaml
+   aws cloudformation wait stack-update-complete \
+     --stack-name taller-aws-<su-nombre>-datos
+   ```
+
+   El cambio debe ser directo, y no con un change set, por una limitación de
+   CloudFormation: un change set que solo agrega o modifica `Outputs` se
+   reporta como *The submitted information didn't contain changes* y no se
+   puede ejecutar. El update directo sí los aplica, y no toca la tabla: en la
+   pestaña **Outputs** del stack aparecen los dos exports que el stack de
+   aplicación va a importar.
 
 ### Crear el stack de aplicación
 
@@ -693,7 +728,7 @@ Este stack no se crea: se crea *alrededor* de la tabla que ya existe.
 <cb-counter mode="view" key="migracion" label="Contador de migración"></cb-counter>
 :::
 
-   Si el valor sigue ahí. El ambiente se desarmó y se rearmó en cuatro stacks, y los
+   El valor sigue ahí. El ambiente se desarmó y se rearmó en cuatro stacks, y los
    datos nunca dejaron de existir.
 
 ## Opcional: HTTPS sobre el balanceador compartido
@@ -733,16 +768,26 @@ el ID de la zona es incorrecto, el stack queda en `CREATE_IN_PROGRESS` hasta ago
 tiempo: conviene verificarlo antes.
 :::
 
+:::inline-slide
 ## Agregar una segunda aplicación
 
 Con el clúster y el balanceador fuera del stack de aplicación, agregar una segunda
 aplicación deja de ser un problema de diseño y pasa a ser un formulario. **No hay nada
 que escribir**: es el mismo archivo, con otros parámetros.
 
+:::skip
 La segunda aplicación del taller es un **servidor de eco**: contesta cada pedido con un
 JSON que describe ese mismo pedido —método, ruta, query, headers, cuerpo, de dónde vino,
 y por qué red pasó—. No hace falta construir ni publicar otra imagen, porque ya viene
 adentro de la que se usó toda la semana: es un subcomando del mismo binario.
+:::
+
+:::app
+<cb-goto path="Desplegar otra aplicación en el mismo cluster"></cb-goto>
+:::
+::: #inline-slide
+
+### Desplegar otra aplicación en el mismo cluster
 
 1. Pulsar **Create stack → With new resources (standard)** y subir el **mismo**
    `taller-aws-devops-semana2-app.yaml`.
@@ -757,44 +802,29 @@ adentro de la que se usó toda la semana: es un subcomando del mismo binario.
      evalúa antes que el `/*` que atiende todo.
 5. Aceptar la capacidad de IAM y esperar a **CREATE_COMPLETE**.
 
-Después, un pedido cualquiera bajo `/eco/` devuelve algo así:
+Después, un pedido cualquiera bajo `/eco/` devuelve un `echo` del request. Lo podemos
+probar con `curl` o utilizando el widget a continuación.
 
 ```bash
 curl -s "<UrlBase>/eco/prueba?x=1" | head -20
 ```
 
-```json
-{
-  "received_at": "2026-08-01T21:26:31.074Z",
-  "server": { "port": 8080, "public_name": null },
-  "request": {
-    "method": "GET",
-    "path": "/eco/prueba",
-    "query": { "x": "1" },
-    "host": "taller-alb-123.us-east-1.elb.amazonaws.com"
-  },
-  "network": {
-    "local":  { "address": "10.0.1.100", "port": 8080 },
-    "peer":   { "address": "10.0.0.5",   "port": 41234 },
-    "client_ip": "203.0.113.7",
-    "forwarded_for": ["203.0.113.7"],
-    "forwarded_proto": "https",
-    "ecs": {
-      "cluster": "taller-aws-maria-plataforma",
-      "task_id": "158d1c8083dd49d6b527399fd6414f5c",
-      "family": "taller-aws-maria-eco",
-      "availability_zone": "us-east-1b",
-      "network_mode": "awsvpc",
-      "private_ipv4": "10.0.1.100",
-      "subnet_cidr": "10.0.1.0/24",
-      "subnet_gateway": "10.0.1.1/24",
-      "dns_servers": ["10.0.0.2"]
-    }
-  }
-}
-```
+:::app
+<cb-http endpoint="/eco/prueba?x=1"></cb-http>
+:::
 
-### Tres direcciones distintas, y cuál sirve
+> Puede abrir la consola de desarrollo para ver más detalles.
+
+::: extra Eco en desarrollo
+Si la guía no está corriendo detrás del ALB del taller (por ejemplo, en el ambiente
+local), no hay regla que desvíe `/eco/*` y contesta la guía misma con su 404. Ese
+resultado también dice algo: muestra **quién** atendió el pedido. En ese caso se puede
+escribir el dominio del ALB (el de la `<UrlBase>`) en el primer campo, que vacío
+significa "mismo origen": el servidor de eco contesta con CORS abierto, así que el
+navegador permite el pedido aunque la guía viva en otro origen.
+:::
+
+::: extra Tres direcciones de origen distintas, ¿cual sirve?
 
 El bloque `network` contesta tres veces la pregunta "¿quién llamó?", y las tres
 respuestas son distintas a propósito:
@@ -815,9 +845,9 @@ ALB es confiable; expuesto directo a internet, no.
 `local` cierra el cuadro desde el otro lado: en modo `awsvpc` es la **IP privada de la
 tarea**, la misma que el target group tiene registrada. Ahí se ve, sin abstracciones,
 que la tarea es un miembro más de la VPC.
+:::
 
-### La red, desde adentro de la tarea
-
+::: extra La red, desde adentro de la tarea
 El bloque `ecs` no sale de ningún header: sale del **endpoint de metadata de la tarea**,
 que ECS expone en cada tarea a través de la variable `ECS_CONTAINER_METADATA_URI_V4`. El
 servidor lo consulta una vez al arrancar —esos datos no cambian mientras la tarea vive—
@@ -834,21 +864,10 @@ Vale la pena porque convierte el dibujo de la Semana 1 en datos verificables:
 - `task_id`, `family`, y `revision` identifican **qué** contestó. Al desplegar una
   versión nueva, `revision` cambia sin que cambie nada más, y ese es el pulso del
   deploy.
-
-:::slide
-## Tres direcciones, tres respuestas
-
-| Campo | Qué es | Detrás de un ALB |
-| --- | --- | --- |
-| `peer` | el otro extremo del socket | **el balanceador** |
-| `forwarded_for` | la cadena de saltos | el cliente va primero |
-| `client_ip` | la respuesta corta | lo que hay que loguear |
-| `local` | dónde cayó la conexión | la IP privada de la tarea |
-
-Y `ecs`: zona, subred, gateway, DNS — la VPC vista desde adentro.
 :::
 
 ### La misma imagen, otro comando
+:::inline-slide light with-title
 
 Lo que convierte una imagen en dos aplicaciones distintas es una sola propiedad de la
 task definition:
@@ -865,16 +884,20 @@ como una lista de dos elementos y reemplaza el `CMD` del Dockerfile. Si el pará
 queda vacío, `AWS::NoValue` **borra la propiedad entera** y la imagen arranca con su
 comando de siempre. Sin ese `AWS::NoValue` se enviaría una lista vacía, que no es lo
 mismo que no enviar nada: ECS la rechaza.
+:::
 
 Esto vale más allá del taller. Un mismo artefacto que corre como servidor web, como
 worker de una cola, o como tarea programada, según el comando, es un patrón habitual —
 y del lado de CloudFormation cuesta cinco líneas.
 
+:::inline-slide
 ### Enrutar por nombre en vez de por ruta
 
+:::skip
 `/eco/*` funciona, pero obliga a que la aplicación viva bajo un prefijo. La alternativa
 es darle **nombre propio**: `echo.<dominio>`, con el mismo balanceador. El template lo
 soporta con el parámetro `NombreHost`, que cambia el tipo de condición de la regla:
+:::
 
 ```yaml
 Conditions:
@@ -887,6 +910,7 @@ Conditions:
       PathPatternConfig:
         Values: [!Ref RutaPath]
 ```
+:::
 
 Para que un nombre nuevo funcione hacen falta dos cosas del lado de la plataforma, y las
 dos ya están resueltas allí: el certificado se pide **con comodín** (`*.<dominio>` como
@@ -902,39 +926,74 @@ Con `NombreHost=echo.<dominio>` y `UsarHttps=si`, el servidor de eco contesta en
 llegó por el DNS crudo del balanceador. Es una forma barata de comprobar que la regla
 de host enruta lo que se cree que enruta.
 
+:::inline-slide light
+## Que mirar despues del despliegue
+
+:::skip
 Lo que hay que mirar después vale más que el despliegue en sí:
+:::
 
 - En **ECS → Clusters** hay **un** clúster, con **dos** servicios adentro.
+
+:::skip
+  ```bash
+  export TALLER=taller-aws-<su-nombre>
+  aws ecs list-services \
+    --cluster "$TALLER-plataforma" \
+    --query "serviceArns" --output text
+  ```
+:::
+
 - En **EC2 → Load Balancers** hay **un** balanceador. Su listener del puerto 80 tiene
   ahora dos reglas, ordenadas por prioridad, más la acción por defecto.
+
+:::skip
+  ```bash
+  LISTENER=$(aws cloudformation describe-stacks \
+    --stack-name "$TALLER-plataforma" \
+    --query "Stacks[0].Outputs[?OutputKey=='ListenerHttpArn'].OutputValue" \
+    --output text)
+  aws elbv2 describe-rules --listener-arn "$LISTENER" \
+    --query "Rules[].{Prioridad:Priority,Regla:Conditions[0].Values[0]}" \
+    --output table
+  ```
+:::
+
 - En **CloudWatch → Log groups** hay dos grupos, `/ecs/taller-aws-<su-nombre>-app` y
   `/ecs/taller-aws-<su-nombre>-eco`. Salen separados solos, porque el template los
   nombra con `!Sub "/ecs/${AWS::StackName}"`.
+
+:::skip
+  ```bash
+  aws logs describe-log-groups \
+    --log-group-name-prefix "/ecs/$TALLER" \
+    --query "logGroups[].logGroupName" --output text
+  ```
+:::
+
 - Borrar el stack `-eco` deja el resto intacto. Ninguna otra pieza se enteró de que
   existió.
 
-Y sobre todo: **ni una línea cambió** en los stacks de red, datos, o plataforma. Esa es
-la prueba de que el corte quedó donde debía. Un corte mal puesto se delata al revés —
-para agregar la segunda aplicación habría que editar el stack de la primera.
-
-:::slide
-## Una segunda aplicación
-
-El **mismo** template, y hasta la **misma imagen**:
-
-| Parámetro | App | Eco |
-| --- | --- | --- |
-| `ImageUri` | igual | igual |
-| `ComandoContenedor` | vacío | `courses_server,echo` |
-| `RutaPath` | `/*` | `/eco/*` |
-| `Prioridad` | `100` | `10` |
-| Red, datos, plataforma | iguales | iguales |
-
-Un clúster, un balanceador, dos servicios. Nada más cambió.
+:::skip
+  ```bash
+  aws cloudformation delete-stack --stack-name "$TALLER-eco"
+  aws cloudformation wait stack-delete-complete --stack-name "$TALLER-eco"
+  aws cloudformation list-stacks \
+    --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE IMPORT_COMPLETE \
+    --query "StackSummaries[?starts_with(StackName, '$TALLER')].StackName" \
+    --output text
+  ```
 :::
 
+Y sobre todo: **ni una línea cambió** en los stacks de red, datos, o plataforma. Esa es
+la prueba de que el corte quedó donde debía. Un corte mal puesto se delata al revés,
+para agregar la segunda aplicación habría que editar el stack de la primera.
+:::
+
+:::inline-slide light
 ## Distribuir el patrón entre proyectos
 
+:::skip
 Lo anterior funcionó porque el template de aplicación quedó **portátil**, y eso no fue
 casualidad. Dos propiedades lo hacen distribuible, y las dos se pueden verificar leyendo
 el archivo:
@@ -945,9 +1004,23 @@ el archivo:
 - **Ningún nombre físico está fijo.** El grupo de logs, y todo lo demás que se nombra,
   derivan de `${AWS::StackName}`. Por eso dos copias del template conviven sin
   colisionar.
+:::
 
+:::add visibility=slide
+Dos propiedades hacen el stack de aplicación distribuible:
+
+1. **Nada del ambiente está escrito adentro.**
+2. **Ningún nombre físico está fijo.**
+:::
+
+:::skip
 Con eso, distribuirlo es publicarlo. El template va a un bucket de S3, versionado, y
 cada proyecto lo lanza desde ahí sin copiarlo a su repositorio:
+:::
+
+:::add visibility=slide
+Podemos publicarlo en S3 y consumirlo desde otros proyectos.
+:::
 
 ```bash
 # Quien mantiene el patrón lo publica, con versión en la ruta
@@ -963,20 +1036,26 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_IAM
 ```
 
+::: info
 La versión en la ruta es lo que hace usable el esquema: `v3.yaml` no cambia bajo los
 pies de quien ya lo desplegó, y migrar a `v4` es una decisión de cada proyecto.
+::: #info
+::: #inline-slide
 
 El límite es el mismo de siempre: los exports viven en **una cuenta y una región**. Una
 plataforma compartida sirve a las aplicaciones de esa cuenta, y no más. Repartir un
 mismo patrón entre varias cuentas es distribuir el **template**, no compartir los
 recursos.
 
-::: extra Tres formas de ir más allá del archivo en S3
+:::inline-slide light
+## Formas de servir CloudFormation más alla de S3
+
+:::skip
 Publicar el template alcanza para un puñado de proyectos. Cuando son muchos, o cuando
 hace falta gobernarlos, AWS ofrece tres mecanismos, de menor a mayor ceremonia:
 
 - **Módulos de CloudFormation.** Un fragmento de template se registra en el registro
-  privado de la cuenta como un tipo propio —`MiOrg::Taller::App::MODULE`— y desde
+  privado de la cuenta como un tipo propio (ejemplo: `MiOrg::Taller::App::MODULE`) y desde
   entonces se usa como si fuera un recurso más. A diferencia del archivo en S3, el
   consumidor no ve las piezas de adentro: ve un recurso con sus propiedades. Los
   recursos del módulo terminan en el stack de quien lo usa, así que no hay un stack
@@ -990,10 +1069,390 @@ hace falta gobernarlos, AWS ofrece tres mecanismos, de menor a mayor ceremonia:
   cuentas y regiones a la vez, con una sola operación. Sirve justamente para lo que los
   exports no pueden: la red compartida, la plataforma, o las políticas de base en cada
   cuenta de la organización.
+:::
 
+:::add visibility=slide
+AWS Ofrece otros tres mecanismos:
+
+- **Módulos de CloudFormation.**
+- **Service Catalog.**
+- **StackSets.**
+:::
+
+::: info
 Los tres resuelven el mismo problema con distinta rigidez, y los tres siguen
 desplegando stacks de CloudFormation. Lo aprendido en esta semana —change sets,
 eventos, exports— no cambia.
+:::
+::: #inline-slide
+
+## El patrón como módulo
+:::inline-slide light with-title
+
+Esta práctica registra el patrón de aplicación como el tipo
+`CloudBridge::Taller::App::MODULE`, y vuelve a desplegar el eco como **un solo
+recurso** de ese tipo.
+
+```yaml
+  Eco:
+    Type: CloudBridge::Taller::App::MODULE
+```
+::: #inline-slide
+
+:::inline-slide with-title light
+El fragmento del módulo no es el template de aplicación copiado: dos reglas del
+registro obligan a cambiarlo, y las dos enseñan algo.
+
+- **Un fragmento no puede usar `Fn::ImportValue` ni `Export`.** Un módulo debe ser
+  predecible: nada externo puede colarse adentro. Los nueve imports del template se
+  vuelven **parámetros** del módulo, y el que importa es el consumidor:
+
+  ```yaml
+  # El template importaba…
+  Cluster:
+    Fn::ImportValue: !Sub "${PlataformaStackName}-cluster-nombre"
+
+  # …el fragmento declara un parámetro, y el consumidor le pasa el valor
+  Cluster: !Ref ClusterNombre
+  ```
+
+  Las referencias que cruzan deben quedar explicitas en el esquema del módulo.
+::: #inline-slide
+
+:::inline-slide with-title
+- **Los parámetros de un módulo no validan restricciones.** `AllowedPattern`,
+  `AllowedValues`, y `MinValue` no se aplican, así que las restricciones se
+  recuperan en el template consumidor, que sí es un template normal.
+:::
+
+Un fragmento **no puede** usar `Fn::ImportValue` ni `Export`.
+
+Cada import se vuelve un **parámetro**: el contrato queda explícito,
+propiedad por propiedad. El que importa es el **consumidor**.
+
+:::inline-slide light with-title
+::: info
+A diferencia de un stack anidado, un módulo no agrega un stack: al crear el change
+set, CloudFormation lo expande y sus recursos aparecen **en el stack del
+consumidor**, con el nombre del módulo como prefijo del ID lógico
+(`Eco` → `EcoServicioApp`). Los nombres físicos siguen saliendo de
+`${AWS::StackName}` (ahora el del consumidor), así que un stack llamado
+`taller-aws-<su-nombre>-eco` produce exactamente los mismos nombres que el stack
+clásico que se borró.
+::: # info
+
+Los dos archivos de la práctica:
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-app-modulo-fragmento.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+
+:::app
+<cb-file path="./infra/templates/taller-aws-devops-semana2-eco-modulo.yaml" type="yaml" toggleable full-path></cb-file>
+:::
+::: #inline-slide
+
+### La configuración también es contrato
+:::inline-slide light with-title
+
+:::skip
+El template clásico traía el bloque `Environment` del contenedor escrito adentro, y
+quien necesitaba otra configuración lo editaba. Un módulo no se edita: lo que se
+puede configurar tiene que estar **en el esquema**, como una propiedad más. El
+fragmento expone tres decisiones con nombre:
+
+
+| Propiedad | Variable | Default |
+| --- | --- | --- |
+| `AppsGated` | `CB_APPS_GATED` | `all` |
+| `AppsPublicCollections` | `CB_APPS_PUBLIC_COLLECTIONS` | `counters` |
+| `AppsSecret` | `CB_APPS_SECRET` | vacío — la variable **no se define** |
+
+Y lo estructural queda fijo a propósito: `PORT` va atado al puerto del target
+group, y `CB_APPS_TABLE` a la tabla que entra por propiedad. Exponerlos sería
+invitar a romper el módulo desde afuera. Esa es la diferencia con el archivo en
+S3: el template expone todo lo que contiene; el módulo expone **lo que su autor
+decidió**, y nada más.
+:::
+
+:::add visibility=slide
+El bloque `Environment` no se edita: se expone **en el esquema**.
+
+- `AppsGated` → `CB_APPS_GATED`
+- `AppsPublicCollections` → `CB_APPS_PUBLIC_COLLECTIONS`
+- `AppsSecret` → `CB_APPS_SECRET` (vacío: la variable no existe)
+
+Lo estructural (`PORT`, `CB_APPS_TABLE`) queda fijo a propósito.
+::: # add
+
+La variable opcional reusa un truco ya visto. `Command` usaba `AWS::NoValue` para
+borrar una propiedad entera; aquí borra **un elemento de una lista**:
+
+```yaml
+Environment:
+  - Name: CB_APPS_GATED
+    Value: !Ref AppsGated
+  - !If
+    - ConSecreto
+    - Name: CB_APPS_SECRET
+      Value: !Ref AppsSecret
+    - !Ref AWS::NoValue
+```
+
+::: warning
+En este taller el secreto es un **string simple**, a propósito: viaja en texto
+plano y queda legible en la task definition. El `NoEcho` del template consumidor
+solo lo oculta en la consola de CloudFormation. La forma seria `secrets` +
+`valueFrom`, con el valor en Secrets Manager.
+::: # warning
+::: # inline-slide
+
+:::inline-slide with-title
+### ¿Y si la configuración viajara por el comando?
+
+Hay una salida al límite de los arrays que no pasa por `Environment`: el
+**comando**. El fragmento no cambia (`ComandoContenedor` sigue siendo un string
+que se parte por comas). Es el consumidor el que escribe el comando como lista,
+interpola lo sensible como **referencia**, y deja que `Fn::Join` lo aplane:
+
+```yaml
+Parameters:
+  SecretARN:
+    Type: String
+    Description: Valor del secreto, ARN de Secrets Manager, o ARN de Parameter Store
+
+Resources:
+  Eco:
+    Type: CloudBridge::Taller::App::MODULE
+    Properties:
+      ImageUri: !Ref ImageUri
+      ComandoContenedor: !Join
+        - ","
+        - - courses_server
+          - eco
+          - !Sub "--secret=${SecretARN}"
+      # ... el resto de las propiedades, igual que antes
+```
+
+:::skip
+YAML no concatena listas; `Fn::Join` sí: la lista se escribe donde se lee, y el
+string aparece recién al crear el change set. El `!Sub` va solo en el elemento
+que interpola, anidado dentro del `!Join`. Si el argumento es opcional, el mismo
+`Fn::If` + `AWS::NoValue` de la variable de entorno borra el elemento antes del
+`Join`.
+
+El parámetro admite el valor directo o un ARN: la aplicación decide mirando el
+prefijo `arn:`. Un ARN no es secreto: puede quedar legible en la task definition
+sin exponer nada. La aplicación lo resuelve al arrancar, con el SDK, contra
+Secrets Manager o Parameter Store. Las dos estabilidades que se ganan: el módulo no necesita
+versiones nuevas —configuración nueva es un argumento nuevo—, y cambiar un valor
+detrás de la referencia ni siquiera toca CloudFormation: `aws ssm put-parameter`
+y un `--force-new-deployment` del servicio.
+
+El costo no desaparece: **se muda a IAM**. El task role del fragmento tendría
+que poder leer esos ARNs, así que el esquema necesitaría una propiedad más —una
+lista de ARNs permitidos que el fragmento convierte en policy—. El contrato no
+se achica; cambia de forma. Y la aplicación carga con código que ECS ofrece
+gratis: `secrets` + `valueFrom` hace exactamente esa resolución, sin SDK ni
+argumentos, y se ve en la siguiente sección. La variante de Parameter Store como
+acoplamiento entre stacks aparece más abajo, en el refactoring a escala.
+:::
+::: #inline-slide
+
+:::slide
+## La práctica: el patrón como módulo
+
+1. **Registrar** el tipo con la CLI de CloudFormation, en CloudShell.
+2. **Leer** el contrato en el registro.
+3. **Recrear** el eco: un stack, un recurso.
+4. **Mirar** dónde quedaron los recursos.
+5. **Publicar** una segunda versión.
+
+:::app
+<cb-goto path="Práctica guiada: el patrón como módulo"></cb-goto>
+::: # app
+:::
+
+## Práctica guiada: el patrón como módulo
+
+### Registrar el tipo
+
+1. Abrir [**CloudShell**](https://console.aws.amazon.com/cloudshell/home). Todo el
+   registro se hace ahí: trae Python, `pip`, y las credenciales del pod ya
+   resueltas.
+2. Instalar la **CLI de CloudFormation** —una herramienta aparte de la `awscli`,
+   hecha para desarrollar extensiones del registro—:
+
+   ```bash
+   pip3 install cloudformation-cli
+   ```
+
+3. Crear el proyecto del módulo. `cfn init` pregunta qué se desarrolla
+   (contestar `m`, módulo) y el nombre del tipo (contestar
+   `CloudBridge::Taller::App::MODULE`):
+
+   ```bash
+   mkdir app-modulo && cd app-modulo
+   cfn init
+   ```
+
+4. Reemplazar el fragmento de ejemplo por el del taller:
+
+   ```bash
+   rm fragments/sample.json
+   curl -o fragments/app-modulo.yaml \
+     https://raw.githubusercontent.com/cloudbridgeuy/courses/main/infra/templates/taller-aws-devops-semana2-app-modulo-fragmento.yaml
+   ```
+
+5. Registrar. `cfn submit` valida el fragmento, genera el esquema, y sube el tipo
+   al registro de la cuenta:
+
+   ```bash
+   cfn submit
+   ```
+
+6. Verificar que el tipo existe:
+
+   ```bash
+   aws cloudformation list-types --visibility PRIVATE \
+     --query "TypeSummaries[].{Tipo:TypeName,Version:DefaultVersionId}" \
+     --output table
+   ```
+
+::: info
+`cfn submit` necesita un bucket donde subir el paquete, y lo resuelve creando un
+stack propio: `CloudFormationManagedUploadInfrastructure`. Aparece en la lista de
+stacks y es normal: es infraestructura de la herramienta, no del taller.
+:::
+
+### Leer el contrato
+
+1. Abrir [**CloudFormation → Registry → Activated extensions**](https://console.aws.amazon.com/cloudformation/home#/registry/activated),
+   pestaña **Modules**, y entrar a `CloudBridge::Taller::App::MODULE`.
+2. La pestaña **Schema** muestra lo que el consumidor ve: las propiedades —una por
+   parámetro del fragmento— y los recursos a los que el módulo se resuelve. El
+   mismo esquema, desde la terminal:
+
+   ```bash
+   aws cloudformation describe-type --type MODULE \
+     --type-name CloudBridge::Taller::App::MODULE \
+     --query "Schema" --output text | head -30
+   ```
+
+### Recrear el eco
+
+1. Pulsar **Create stack → With new resources (standard)** y subir
+   `taller-aws-devops-semana2-eco-modulo.yaml`.
+2. En **Stack name**, escribir `taller-aws-<su-nombre>-eco` —el mismo nombre de
+   antes, a propósito: de ahí salen los nombres físicos—.
+3. Completar **ImageUri** con la imagen de siempre, y los tres nombres de stack
+   —red, datos, plataforma—. El resto ya viene con los valores del eco:
+   `ComandoContenedor=courses_server,echo`, `RutaPath=/eco/*`, `Prioridad=10`.
+4. Aceptar la capacidad de IAM y esperar a **CREATE_COMPLETE**.
+5. Probar que el eco contesta, igual que la primera vez:
+
+   ```bash
+   curl -s "<UrlBase>/eco/prueba?x=1" | head -20
+   ```
+
+:::app
+<cb-http endpoint="/eco/prueba?x=1"></cb-http>
+:::
+
+### Mirar dónde quedaron los recursos
+
+En la pestaña **Resources** del stack están el servicio, la task definition, la
+regla, y el resto —los mismos nueve recursos del stack clásico—, todos con el
+prefijo `Eco` en el ID lógico. No hay ningún stack anidado. La misma vista, desde
+la terminal:
+
+```bash
+export TALLER=taller-aws-<su-nombre>
+aws cloudformation describe-stack-resources \
+  --stack-name "$TALLER-eco" \
+  --query "StackResources[].{Logico:LogicalResourceId,Tipo:ResourceType,Modulo:ModuleInfo.TypeHierarchy}" \
+  --output table
+```
+
+La columna `Modulo` dice de qué tipo salió cada recurso: esa es la traza que queda
+después de la expansión. Y el grupo de logs se llama `/ecs/taller-aws-<su-nombre>-eco`,
+como siempre, porque `${AWS::StackName}` resolvió al stack consumidor:
+
+```bash
+aws logs describe-log-groups \
+  --log-group-name-prefix "/ecs/$TALLER-eco" \
+  --query "logGroups[].logGroupName" --output text
+```
+
+Y la configuración quedó como el esquema la prometía. La task definition se
+resuelve por su ID lógico —con el prefijo del módulo—, y adentro están las
+variables:
+
+```bash
+TAREA=$(aws cloudformation describe-stack-resources \
+  --stack-name "$TALLER-eco" \
+  --logical-resource-id EcoTareaApp \
+  --query "StackResources[0].PhysicalResourceId" --output text)
+aws ecs describe-task-definition --task-definition "$TAREA" \
+  --query "taskDefinition.containerDefinitions[0].environment" \
+  --output table
+```
+
+`CB_APPS_GATED` y `CB_APPS_PUBLIC_COLLECTIONS` traen los defaults del módulo, y
+`CB_APPS_SECRET` **no aparece**: `AppsSecret` quedó vacío, así que `AWS::NoValue`
+borró el elemento antes de que la lista llegara a ECS.
+
+### Publicar una segunda versión
+
+Un módulo no se edita: se **versiona**. Cada `cfn submit` publica una versión
+nueva, y los stacks existentes no se enteran.
+
+1. En CloudShell, subir la retención de logs del fragmento, de `7` a `14` días:
+
+   ```bash
+   sed -i 's/RetentionInDays: 7/RetentionInDays: 14/' fragments/app-modulo.yaml
+   cfn submit
+   ```
+
+2. Listar las versiones. La nueva existe, y la default sigue siendo la primera:
+
+   ```bash
+   aws cloudformation list-type-versions --type MODULE \
+     --type-name CloudBridge::Taller::App::MODULE \
+     --query "TypeVersionSummaries[].{Version:VersionId,Default:IsDefaultVersion}" \
+     --output table
+   ```
+
+3. Promover la nueva versión a default:
+
+   ```bash
+   aws cloudformation set-type-default-version --type MODULE \
+     --type-name CloudBridge::Taller::App::MODULE \
+     --version-id "00000002"
+   ```
+
+4. El stack del eco sigue en la versión con la que se creó. Migra recién en su
+   próximo update, cuando su change set vuelva a expandir el módulo —y ese change
+   set muestra el cambio de retención antes de aplicarlo.
+
+::: info
+Es la misma disciplina que el `v3.yaml`/`v4.yaml` del bucket de S3: la versión
+publicada no cambia bajo los pies de nadie, y migrar es una decisión de cada
+consumidor. La diferencia es quién la hace cumplir —allá una convención de rutas,
+acá el registro—.
+:::
+
+:::slide light
+## Lo que el módulo cambió
+
+| | Template en S3 | Módulo |
+| --- | --- | --- |
+| El consumidor ve | El archivo entero | Un recurso con propiedades |
+| El contrato | Parámetros + convención | Esquema en el registro |
+| Los recursos viven | En su propio stack | En el stack del consumidor |
+| Versionar | Convención de rutas | El registro lo hace cumplir |
+
+Mismo patrón, distinta rigidez.
 :::
 
 ## A escala: stack refactoring
@@ -1118,8 +1577,12 @@ Escribir un contador antes de empezar y demostrar, al final, que sigue ahí.
    los dos parámetros de dominio vacíos. La **UrlBase** de sus outputs debe responder
    `404`: el balanceador existe y ninguna regla lo enruta todavía.
 7. Crear `taller-aws-<su-nombre>-datos` con **Create stack → With existing resources
-   (import resources)**, subiendo `taller-aws-devops-semana2-datos.yaml` y pegando
-   `$TABLA` como **TableName**. Esperar a **IMPORT_COMPLETE**.
+   (import resources)**, subiendo `taller-aws-devops-semana2-datos-import.yaml` (el
+   import no acepta `Outputs`) y pegando `$TABLA` como **TableName**. Esperar a
+   **IMPORT_COMPLETE**. Después, aplicar `taller-aws-devops-semana2-datos.yaml`
+   con `aws cloudformation update-stack` (update directo: un change set con
+   cambios solo en `Outputs` reporta "didn't contain changes") para agregar los
+   dos exports.
 8. Crear `taller-aws-<su-nombre>-app` con `taller-aws-devops-semana2-app.yaml`,
    completando el URI de la imagen y los nombres de los stacks de red, datos, y
    plataforma. Aceptar la capacidad de IAM.

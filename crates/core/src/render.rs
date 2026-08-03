@@ -256,7 +256,9 @@ pub fn render_slideshow_page(
         String::new()
     };
     let uses_syntax_highlighting = slides_html.iter().any(|slide| {
-        slide.html.contains("<code class=\"language-") || slide.html.contains("<cb-file")
+        slide.html.contains("<code class=\"language-")
+            || slide.html.contains("<cb-file")
+            || slide.html.contains("<cb-http")
     });
     let shiki_script = if uses_syntax_highlighting {
         format!("<script defer src=\"{SHIKI_INIT_JS_PATH}\"></script>\n")
@@ -938,6 +940,20 @@ cbScheduleScrollIndicator();},true)"
         let loaded = sample();
         let slides = vec![SlideFragment {
             html: "<pre><code class=\"language-yaml\">version: 0.2\n</code></pre>\n".to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains(SHIKI_INIT_JS_PATH));
+    }
+
+    #[test]
+    fn slideshow_page_with_an_http_app_injects_shiki() {
+        // The <cb-http> response panel highlights on demand, so a deck that
+        // carries the app needs Shiki even without a language fence.
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<div class=\"cb-app\">\n<cb-http endpoint=\"/eco\"></cb-http></div>\n"
+                .to_owned(),
             light: false,
         }];
         let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);

@@ -105,6 +105,11 @@ Resources:
   # una segunda aplicación puede publicarse como echo.<dominio> sin tocar este
   # stack. ACM valida ambos nombres con el mismo registro CNAME, así que el
   # comodín no agrega ni un paso más a la validación.
+  #
+  # DomainValidationOptions lleva una sola entrada, la del dominio base. Listar
+  # también el comodín hace que CloudFormation intente crear dos veces el mismo
+  # CNAME en un solo cambio de Route 53, que lo rechaza con "invalid set of
+  # changes for a resource record set".
   Certificado:
     Condition: ConHttps
     Type: AWS::CertificateManager::Certificate
@@ -115,8 +120,6 @@ Resources:
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: !Ref NombreDominio
-          HostedZoneId: !Ref HostedZoneId
-        - DomainName: !Sub "*.${NombreDominio}"
           HostedZoneId: !Ref HostedZoneId
 
   ListenerHTTPS:

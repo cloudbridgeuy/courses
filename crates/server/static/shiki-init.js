@@ -22,6 +22,33 @@ const TOKYONIGHT_STORM = {
   ],
 };
 
+// Pin the CDN dependency: Shiki is ESM-only and its generated markup includes
+// token colours, so no grammar-specific CSS is needed here. The import promise
+// is cached so the static pass and on-demand callers share one load.
+let cbShikiModule = null;
+function cbLoadShiki() {
+  if (!cbShikiModule) cbShikiModule = import('https://esm.sh/shiki@3.0.0');
+  return cbShikiModule;
+}
+
+// On-demand highlighter for content that appears after the static pass below
+// (e.g. the <cb-http> response panel). Returns the highlighted <pre> element,
+// or null when the grammar or the CDN fails — callers keep their plain text.
+window.cbShiki = {
+  highlight: async function (code, lang) {
+    try {
+      const { codeToHtml } = await cbLoadShiki();
+      const html = await codeToHtml(code, { lang, theme: TOKYONIGHT_STORM });
+      const template = document.createElement('template');
+      template.innerHTML = html.trim();
+      return template.content.firstElementChild;
+    } catch (error) {
+      console.warn('No se pudo resaltar un bloque de código con Shiki.', error);
+      return null;
+    }
+  },
+};
+
 (async function highlightCodeBlocks() {
   const blocks = Array.from(
     document.querySelectorAll('pre:not(.mermaid) > code[class*="language-"]'),
@@ -29,9 +56,7 @@ const TOKYONIGHT_STORM = {
   if (blocks.length === 0) return;
 
   try {
-    // Pin the CDN dependency: Shiki is ESM-only and its generated markup
-    // includes token colours, so no grammar-specific CSS is needed here.
-    const { codeToHtml } = await import('https://esm.sh/shiki@3.0.0');
+    const { codeToHtml } = await cbLoadShiki();
 
     await Promise.all(blocks.map(async (code) => {
       const languageClass = Array.from(code.classList)

@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Eco como instancia del módulo
+
+# El servidor de eco, desplegado como UNA instancia del módulo
+# CloudBridge::Taller::App::MODULE en vez de como copia del template de
+# aplicación. Requiere el módulo ya registrado en la cuenta (cfn submit).
+#
+# Este template es la otra mitad del contrato del fragmento: como un fragmento
+# no puede usar Fn::ImportValue, los nueve imports viven aquí, y sus valores
+# entran al módulo como propiedades. También recupera lo que el fragmento no
+# puede tener: las restricciones de los parámetros, el formulario de la
+# consola, y el export del target group.
+#
+# Los recursos del módulo aparecen en ESTE stack — no hay stack anidado. Sus
+# IDs lógicos llevan el nombre del módulo como prefijo (Eco → EcoServicioApp),
+# y los nombres físicos salen de ${AWS::StackName}, así que un stack llamado
+# taller-aws-<su-nombre>-eco produce exactamente los mismos nombres que el
+# stack clásico.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Imagen de la aplicación" }
+        Parameters: [ImageUri, ComandoContenedor]
+      - Label: { default: "Stacks de los que depende" }
+        Parameters: [RedStackName, DatosStackName, PlataformaStackName]
+      - Label: { default: "Lugar en el balanceador compartido" }
+        Parameters: [NombreHost, RutaPath, Prioridad, UsarHttps]
+      - Label: { default: "Configuración de la aplicación" }
+        Parameters: [AppsGated, AppsPublicCollections, AppsSecret]
+    ParameterLabels:
+      ImageUri: { default: "URI de la imagen en ECR" }
+      RedStackName: { default: "Stack de red" }
+      DatosStackName: { default: "Stack de datos" }
+      PlataformaStackName: { default: "Stack de plataforma" }
+      NombreHost: { default: "Nombre DNS propio" }
+      RutaPath: { default: "Patrón de ruta" }
+      Prioridad: { default: "Prioridad de la regla" }
+      UsarHttps: { default: "¿Publicar también en HTTPS?" }
+      AppsGated: { default: "Escenarios detrás del secreto" }
+      AppsPublicCollections: { default: "Colecciones públicas" }
+      AppsSecret: { default: "Secreto de los escenarios" }
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: URI de la imagen en ECR, con etiqueta.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/[a-z0-9._/-]+:[a-zA-Z0-9._-]+$'
+    ConstraintDescription: >-
+      Debe ser un URI de ECR con etiqueta, por ejemplo
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest
+
+  RedStackName:
+    Type: String
+    Description: Nombre del stack de red del que se importan VPC y grupo de seguridad.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+
+  DatosStackName:
+    Type: String
+    Description: Nombre del stack de datos del que se importa la tabla de DynamoDB.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+
+  PlataformaStackName:
+    Type: String
+    Description: Nombre del stack de plataforma del que se importan el clúster y el listener.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9-]*$'
+
+  NombreHost:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. Nombre DNS propio de esta aplicación, por ejemplo
+      echo.midominio.com. Si se indica, la regla enruta por host y se ignora
+      RutaPath. Requiere que el stack de plataforma tenga HTTPS activo, porque
+      de ahí salen el comodín en DNS y el certificado.
+    AllowedPattern: '^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    ConstraintDescription: Debe quedar vacío, o ser un nombre de dominio en minúsculas.
+
+  RutaPath:
+    Type: String
+    Default: "/eco/*"
+    Description: >-
+      Patrón de ruta que esta aplicación atiende en el balanceador compartido.
+      Se ignora si se indica NombreHost.
+
+  Prioridad:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    MaxValue: 50000
+    Description: >-
+      Orden de evaluación de la regla en el listener. Se evalúan de menor a
+      mayor y gana la primera que coincide, así que la ruta más específica
+      lleva el número más bajo. Debe ser única por listener.
+
+  UsarHttps:
+    Type: String
+    Default: "no"
+    AllowedValues: ["si", "no"]
+    Description: >-
+      Publicar también la regla en el listener 443. Solo si el stack de
+      plataforma se desplegó con dominio y hosted zone.
+
+  AppsGated:
+    Type: String
+    Default: "all"
+    Description: >-
+      Valor de CB_APPS_GATED: "all" pone todos los escenarios de la guía detrás
+      del secreto, o una lista de tipos separada por comas.
+
+  AppsPublicCollections:
+    Type: String
+    Default: "counters"
+    Description: >-
+      Valor de CB_APPS_PUBLIC_COLLECTIONS: las colecciones que se pueden leer
+      sin secreto.
+
+  AppsSecret:
+    Type: String
+    Default: ""
+    # NoEcho oculta el valor en la consola y en describe-stacks, pero no en la
+    # task definition: eso lo arregla secrets + valueFrom, en la sección de ECS.
+    NoEcho: true
+    Description: >-
+      Opcional. Valor de CB_APPS_SECRET, el secreto que desbloquea los
+      escenarios. Vacío, la variable no se define.
+
+Conditions:
+  ConHttps: !Equals [!Ref UsarHttps, "si"]
+
+Resources:
+  # Toda la aplicación es este único recurso. CloudFormation lo expande al
+  # crear el change set: el preview ya muestra el servicio, la task definition,
+  # la regla, y el resto, como recursos de este stack.
+  Eco:
+    Type: CloudBridge::Taller::App::MODULE
+    Properties:
+      ImageUri: !Ref ImageUri
+      ComandoContenedor: !Ref ComandoContenedor
+      VpcId:
+        Fn::ImportValue: !Sub "${RedStackName}-vpc-id"
+      SubredAId:
+        Fn::ImportValue: !Sub "${RedStackName}-subred-a-id"
+      SubredBId:
+        Fn::ImportValue: !Sub "${RedStackName}-subred-b-id"
+      GrupoSeguridadServicioId:
+        Fn::ImportValue: !Sub "${RedStackName}-sg-servicio-id"
+      ClusterNombre:
+        Fn::ImportValue: !Sub "${PlataformaStackName}-cluster-nombre"
+      ListenerHttpArn:
+        Fn::ImportValue: !Sub "${PlataformaStackName}-listener-http-arn"
+      # El export del listener 443 solo existe si la plataforma tiene HTTPS:
+      # importarlo incondicionalmente rompería el caso sin dominio. AWS::NoValue
+      # deja la propiedad afuera y el módulo usa su default vacío.
+      ListenerHttpsArn: !If
+        - ConHttps
+        - Fn::ImportValue: !Sub "${PlataformaStackName}-listener-https-arn"
+        - !Ref AWS::NoValue
+      TablaNombre:
+        Fn::ImportValue: !Sub "${DatosStackName}-tabla-nombre"
+      TablaArn:
+        Fn::ImportValue: !Sub "${DatosStackName}-tabla-arn"
+      NombreHost: !Ref NombreHost
+      RutaPath: !Ref RutaPath
+      Prioridad: !Ref Prioridad
+      UsarHttps: !Ref UsarHttps
+      AppsGated: !Ref AppsGated
+      AppsPublicCollections: !Ref AppsPublicCollections
+      AppsSecret: !Ref AppsSecret
+
+# Los Outputs del fragmento llegan solos, con el prefijo del módulo
+# (EcoRutaAtendida, EcoGrupoDestinoArn). El export no: un fragmento no puede
+# exportar, así que el contrato hacia los add-ons se re-crea aquí, referenciando
+# el recurso interno del módulo con la sintaxis Modulo.Recurso.
+Outputs:
+  GrupoDestinoArn:
+    Description: ARN del grupo de destino de esta aplicación
+    Value: !Ref Eco.GrupoDestino
+    Export:
+      Name: !Sub "${AWS::StackName}-grupo-destino-arn"

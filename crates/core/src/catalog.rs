@@ -96,8 +96,11 @@ fn assemble_session(
         uses_mermaid |= rendered.uses_mermaid;
         uses_syntax_highlighting |= rendered.html.contains("<code class=\"language-")
             || rendered.html.contains("<cb-file")
+            || rendered.html.contains("<cb-http")
             || rendered.slide_html.iter().any(|slide| {
-                slide.html.contains("<code class=\"language-") || slide.html.contains("<cb-file")
+                slide.html.contains("<code class=\"language-")
+                    || slide.html.contains("<cb-file")
+                    || slide.html.contains("<cb-http")
             });
         uses_file_apps |= rendered.html.contains("<cb-file")
             || rendered
@@ -151,6 +154,8 @@ fn assemble_session(
     }
     // `cb-file` creates its code block when apps.js runs, so apps must be
     // registered before Shiki scans the document for language-tagged blocks.
+    // `cb-http` needs Shiki too — its response panel highlights on demand
+    // through the `window.cbShiki` helper shiki-init.js exposes.
     if uses_syntax_highlighting {
         assets.push_script(SHIKI_INIT_JS_PATH);
     }
@@ -505,6 +510,26 @@ mod tests {
         let input = CourseInput {
             slug: "course-code",
             manifest: &make_manifest_one_session("Course Code", &["01-code.md"]),
+            files: &files,
+        };
+
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&SHIKI_INIT_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn section_with_an_http_app_injects_shiki() {
+        // <cb-http> highlights its response panel through the on-demand
+        // helper shiki-init.js exposes, so the app alone must pull Shiki in.
+        let body = ":::app\n<cb-http endpoint=\"/eco/prueba\"></cb-http>\n:::\n";
+        let files = make_files(&[("01-http.md", make_section("Http", body))]);
+        let input = CourseInput {
+            slug: "course-http",
+            manifest: &make_manifest_one_session("Course Http", &["01-http.md"]),
             files: &files,
         };
 

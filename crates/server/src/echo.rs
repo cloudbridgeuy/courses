@@ -198,11 +198,22 @@ fn now() -> (i64, u32) {
 /// Writes a value as indented JSON, so a plain `curl` is readable without a
 /// formatter. Serialization of a `serde_json::Value` cannot fail, but the error
 /// path still answers rather than panicking.
+///
+/// Every answer allows any cross-origin caller: the echo server holds nothing
+/// private, and the in-guide `<cb-http>` client must be able to reach it from
+/// a page served elsewhere (a local guide against the workshop ALB). The `*`
+/// values also satisfy the preflight, which the fallback route answers like
+/// any other request.
 fn json_response(status: StatusCode, value: &serde_json::Value) -> Response {
     match serde_json::to_string_pretty(value) {
         Ok(body) => (
             status,
-            [(header::CONTENT_TYPE, "application/json; charset=utf-8")],
+            [
+                (header::CONTENT_TYPE, "application/json; charset=utf-8"),
+                (header::ACCESS_CONTROL_ALLOW_ORIGIN, "*"),
+                (header::ACCESS_CONTROL_ALLOW_METHODS, "*"),
+                (header::ACCESS_CONTROL_ALLOW_HEADERS, "*"),
+            ],
             format!("{body}\n"),
         )
             .into_response(),

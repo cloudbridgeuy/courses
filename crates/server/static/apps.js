@@ -761,6 +761,180 @@
   );
 
   // ---------------------------------------------------------------------------
+  // Custom element: <cb-http>
+  // Attributes: method, domain, endpoint, body, label
+  //
+  // In-page HTTP client: method selector, editable domain + endpoint fields,
+  // optional body, and a response panel with status, latency, and the body
+  // (JSON pretty-printed). The authored attributes are only the defaults —
+  // both fields stay editable in the page. An empty domain keeps the request
+  // same-origin (the guide and the echo service share the ALB); a domain
+  // without a scheme inherits the page's, which also avoids mixed content.
+  // The request is a plain browser fetch(); no server handler is involved,
+  // so it never locks.
+  // ---------------------------------------------------------------------------
+
+  customElements.define(
+    "cb-http",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this._rendered) return;
+        this._rendered = true;
+
+        var METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+        var initialMethod = (this.getAttribute("method") || "GET").toUpperCase();
+        var label = this.getAttribute("label") || "Enviar";
+
+        var row = document.createElement("div");
+        row.className = "cb-http-row";
+
+        var select = document.createElement("select");
+        select.className = "cb-http-method";
+        METHODS.forEach(function (m) {
+          var opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          select.appendChild(opt);
+        });
+        if (METHODS.indexOf(initialMethod) !== -1) select.value = initialMethod;
+
+        var domain = document.createElement("input");
+        domain.type = "text";
+        domain.className = "cb-http-domain";
+        domain.value = this.getAttribute("domain") || "";
+        domain.placeholder = "mismo origen";
+        domain.spellcheck = false;
+
+        var url = document.createElement("input");
+        url.type = "text";
+        url.className = "cb-http-url";
+        url.value = this.getAttribute("endpoint") || "/";
+        url.spellcheck = false;
+
+        var btn = makeAppBtn(label);
+
+        row.appendChild(select);
+        row.appendChild(domain);
+        row.appendChild(url);
+        row.appendChild(btn);
+
+        // Joins the two fields into the fetch target. An empty domain keeps
+        // the endpoint relative (same origin); a domain without a scheme gets
+        // the page's own, so a plain host works from http and https alike.
+        function buildUrl() {
+          var base = domain.value.trim();
+          var endpoint = url.value.trim() || "/";
+          if (!base) return endpoint;
+          if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(base)) {
+            base = location.protocol + "//" + base;
+          }
+          base = base.replace(/\/+$/, "");
+          return base + (endpoint.charAt(0) === "/" ? "" : "/") + endpoint;
+        }
+
+        var body = document.createElement("textarea");
+        body.className = "cb-http-body";
+        body.rows = 3;
+        body.placeholder = "Cuerpo del pedido (opcional)";
+        body.spellcheck = false;
+        body.value = this.getAttribute("body") || "";
+
+        var statusLine = document.createElement("div");
+        statusLine.className = "cb-http-status";
+        statusLine.hidden = true;
+
+        var responsePre = document.createElement("pre");
+        var responseCode = document.createElement("code");
+        responsePre.className = "cb-http-response";
+        responsePre.appendChild(responseCode);
+        responsePre.hidden = true;
+
+        // Response render: plain text first (always correct), then swapped
+        // for Shiki tokens when the page ships the highlighter (shiki-init.js
+        // exposes window.cbShiki). The sequence guard drops a slow highlight
+        // that finishes after a newer send already replaced the panel.
+        var renderSeq = 0;
+        function showResponse(text, isJson) {
+          renderSeq++;
+          responseCode.textContent = text;
+          responsePre.style.removeProperty("background-color");
+          responsePre.style.removeProperty("color");
+          responsePre.hidden = false;
+          if (!isJson || !window.cbShiki) return;
+          var seq = renderSeq;
+          window.cbShiki.highlight(text, "json").then(function (highlighted) {
+            var code = highlighted && highlighted.querySelector("code");
+            if (!code || seq !== renderSeq) return;
+            responseCode.innerHTML = code.innerHTML;
+            responsePre.style.backgroundColor = highlighted.style.backgroundColor || "";
+            responsePre.style.color = highlighted.style.color || "";
+          });
+        }
+
+        // GET and HEAD cannot carry a body — fetch() rejects the request.
+        function syncBody() {
+          body.hidden = select.value === "GET" || select.value === "HEAD";
+        }
+        select.addEventListener("change", syncBody);
+        syncBody();
+
+        function send() {
+          var init = { method: select.value };
+          if (!body.hidden && body.value) init.body = body.value;
+          btn.disabled = true;
+          statusLine.hidden = false;
+          statusLine.className = "cb-http-status";
+          statusLine.textContent = "Enviando…";
+          responsePre.hidden = true;
+          var started = performance.now();
+          fetch(buildUrl(), init)
+            .then(function (r) {
+              return r.text().then(function (text) {
+                var ms = Math.round(performance.now() - started);
+                statusLine.textContent =
+                  "HTTP " + r.status +
+                  (r.statusText ? " " + r.statusText : "") +
+                  " · " + ms + " ms";
+                statusLine.classList.add(r.ok ? "cb-http-ok" : "cb-http-fail");
+                if (text) {
+                  var isJson = false;
+                  try {
+                    text = JSON.stringify(JSON.parse(text), null, 2);
+                    isJson = true;
+                  } catch (_) {}
+                  showResponse(text, isJson);
+                } else {
+                  responseCode.textContent = "";
+                  statusLine.textContent += " · sin cuerpo";
+                }
+              });
+            })
+            .catch(function (e) {
+              statusLine.classList.add("cb-http-fail");
+              statusLine.textContent =
+                "Error de red: " + (e && e.message ? e.message : e);
+            })
+            .then(function () {
+              btn.disabled = false;
+            });
+        }
+
+        btn.addEventListener("click", send);
+        var sendOnEnter = function (e) {
+          if (e.key === "Enter") send();
+        };
+        domain.addEventListener("keydown", sendOnEnter);
+        url.addEventListener("keydown", sendOnEnter);
+
+        this.appendChild(row);
+        this.appendChild(body);
+        this.appendChild(statusLine);
+        this.appendChild(responsePre);
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
   // Custom element: <cb-goto>
   // Attributes: path, label, data-target
   //

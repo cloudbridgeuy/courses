@@ -1,0 +1,358 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Aplicación como módulo (fragmento)
+
+# El mismo patrón de taller-aws-devops-semana2-app.yaml, escrito como *fragmento*
+# de módulo para el registro de CloudFormation. Se registra con la CLI de
+# CloudFormation (cfn submit) bajo el nombre CloudBridge::Taller::App::MODULE, y
+# desde entonces se usa como un recurso más.
+#
+# Dos reglas del registro explican todas las diferencias con el template:
+#
+#  - Un fragmento no puede usar Fn::ImportValue ni Export. Cada uno de los nueve
+#    imports del template se volvió un parámetro del módulo: el *consumidor*
+#    hace los imports y pasa los valores como propiedades. El contrato que antes
+#    estaba implícito en los nombres de stack ahora es explícito, propiedad por
+#    propiedad.
+#  - Los parámetros de un módulo no validan restricciones (AllowedPattern,
+#    AllowedValues, MinValue). Las restricciones se recuperan en el template
+#    consumidor, que sí es un template normal.
+#
+# Todo lo demás — condiciones, AWS::NoValue, la regla del listener — queda igual.
+# Los nombres físicos siguen saliendo de ${AWS::StackName}, que aquí resuelve al
+# stack *del consumidor*: por eso dos instancias de este módulo no pueden
+# convivir en un mismo stack sin colisionar en el grupo de logs.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: URI de la imagen en ECR, con etiqueta.
+
+  ComandoContenedor:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: >-
+      Opcional. Comando que ejecuta el contenedor, separado por comas. Vacío
+      deja el comando de la imagen, que sirve la plataforma de cursos. Para el
+      servidor de eco: courses_server,echo,--name,echo.midominio.com
+
+  VpcId:
+    Type: String
+    Description: ID de la VPC donde vive el target group.
+
+  SubredAId:
+    Type: String
+    Description: ID de la primera subred pública del servicio.
+
+  SubredBId:
+    Type: String
+    Description: ID de la segunda subred pública del servicio.
+
+  GrupoSeguridadServicioId:
+    Type: String
+    Description: ID del grupo de seguridad de las tareas del servicio.
+
+  ClusterNombre:
+    Type: String
+    Description: Nombre del clúster de ECS compartido.
+
+  ListenerHttpArn:
+    Type: String
+    Description: ARN del listener HTTP del balanceador compartido.
+
+  ListenerHttpsArn:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. ARN del listener HTTPS del balanceador compartido. Solo se usa
+      con UsarHttps=si.
+
+  TablaNombre:
+    Type: String
+    Description: Nombre físico de la tabla de DynamoDB de la aplicación.
+
+  TablaArn:
+    Type: String
+    Description: ARN de la tabla de DynamoDB, para la política del rol de tarea.
+
+  AppsGated:
+    Type: String
+    Default: "all"
+    Description: >-
+      Valor de CB_APPS_GATED: "all" pone todos los escenarios de la guía detrás
+      del secreto, o una lista de tipos separada por comas.
+
+  AppsPublicCollections:
+    Type: String
+    Default: "counters"
+    Description: >-
+      Valor de CB_APPS_PUBLIC_COLLECTIONS: las colecciones que se pueden leer
+      sin secreto.
+
+  AppsSecret:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. Valor de CB_APPS_SECRET, el secreto que desbloquea los
+      escenarios. Vacío, la variable no se define y los handlers corren
+      abiertos. Viaja en texto plano; la alternativa seria es secrets +
+      valueFrom con Secrets Manager, en la sección de ECS.
+
+  NombreHost:
+    Type: String
+    Default: ""
+    Description: >-
+      Opcional. Nombre DNS propio de esta aplicación, por ejemplo
+      echo.midominio.com. Si se indica, la regla enruta por host y se ignora
+      RutaPath. Requiere que el stack de plataforma tenga HTTPS activo, porque
+      de ahí salen el comodín en DNS y el certificado.
+
+  RutaPath:
+    Type: String
+    Default: "/*"
+    Description: >-
+      Patrón de ruta que esta aplicación atiende en el balanceador compartido.
+      "/*" atiende todo; una segunda aplicación usa un prefijo propio. Se ignora
+      si se indica NombreHost.
+
+  Prioridad:
+    Type: Number
+    Default: 100
+    Description: >-
+      Orden de evaluación de la regla en el listener. Se evalúan de menor a
+      mayor y gana la primera que coincide, así que la ruta más específica
+      lleva el número más bajo. Debe ser única por listener.
+
+  UsarHttps:
+    Type: String
+    Default: "no"
+    Description: >-
+      Publicar también la regla en el listener 443 ("si" o "no"). Solo si el
+      stack de plataforma se desplegó con dominio y hosted zone.
+
+Conditions:
+  ConHttps: !Equals [!Ref UsarHttps, "si"]
+
+  # Una lista vacía no se compara con "" directamente: Fn::Join la convierte en
+  # la cadena vacía, y ahí sí.
+  ConComando: !Not [!Equals [!Join ["", !Ref ComandoContenedor], ""]]
+
+  ConHost: !Not [!Equals [!Ref NombreHost, ""]]
+
+  ConSecreto: !Not [!Equals [!Ref AppsSecret, ""]]
+
+Resources:
+  # --- ECS: servicio y task definition ---
+
+  # El clúster no está aquí: lo comparten todas las aplicaciones, y por eso
+  # vive en el stack de plataforma.
+  ServicioApp:
+    Type: AWS::ECS::Service
+    # El target group debe estar asociado al balanceador antes de que ECS cree
+    # el servicio, y quien lo asocia es la regla del listener. Sin esto, el
+    # stack falla de manera intermitente.
+    DependsOn: ReglaHTTP
+    Properties:
+      Cluster: !Ref ClusterNombre
+      DesiredCount: 1
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TareaApp
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubredAId
+            - !Ref SubredBId
+          SecurityGroups:
+            - !Ref GrupoSeguridadServicioId
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 8080
+          TargetGroupArn: !Ref GrupoDestino
+
+  TareaApp:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !GetAtt RolEjecucion.Arn
+      TaskRoleArn: !GetAtt RolTarea.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Ref ImageUri
+          # Una imagen, varias aplicaciones: el comando decide cuál. Vacío deja
+          # el CMD del Dockerfile, y AWS::NoValue borra la propiedad entera en
+          # vez de mandar una lista vacía, que ECS rechazaría.
+          Command: !If
+            - ConComando
+            - !Ref ComandoContenedor
+            - !Ref AWS::NoValue
+          PortMappings:
+            - ContainerPort: 8080
+          # Configuración de la aplicación. Lo estructural queda fijo (PORT va
+          # atado al puerto del target group, CB_APPS_TABLE a la tabla que
+          # entra por propiedad); lo demás se expone como propiedades del
+          # módulo. CB_HOOK_TOKEN sigue ausente a propósito: solo lo necesita
+          # el servidor del instructor que recibe los webhooks de SNS.
+          # CB_DEV_ROOT es solo para desarrollo local y no se define aquí.
+          Environment:
+            - Name: PORT
+              Value: "8080"
+            - Name: CB_APPS_TABLE
+              Value: !Ref TablaNombre
+            - Name: CB_APPS_PUBLIC_COLLECTIONS
+              Value: !Ref AppsPublicCollections
+            - Name: CB_APPS_GATED
+              Value: !Ref AppsGated
+            # El mismo truco que Command: AWS::NoValue borra el elemento
+            # entero de la lista. Sin secreto, la variable no existe.
+            - !If
+              - ConSecreto
+              - Name: CB_APPS_SECRET
+                Value: !Ref AppsSecret
+              - !Ref AWS::NoValue
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref GrupoLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+
+  GrupoLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      # AWS::StackName resuelve al stack del consumidor: el nombre del grupo
+      # queda idéntico al que tendría el stack clásico con el mismo nombre.
+      LogGroupName: !Sub "/ecs/${AWS::StackName}"
+      RetentionInDays: 7
+
+  # --- Roles de IAM ---
+
+  # Rol de ejecución: lo usa ECS para descargar la imagen y escribir logs.
+  RolEjecucion:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Rol de tarea: lo usa la aplicación dentro del contenedor.
+  RolTarea:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: acceso-tabla-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !Ref TablaArn
+        - PolicyName: publicar-metricas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                # PutMetricData no acepta un ARN como recurso; el namespace es
+                # la forma de acotar el permiso.
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: Taller/Custom
+
+  # --- Lugar de esta aplicación en el balanceador compartido ---
+
+  # El balanceador no está aquí, pero el target group sí: describe a *esta*
+  # aplicación —su puerto, su health check— y se borra con ella.
+  GrupoDestino:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      HealthCheckPath: /health
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "15"
+
+  # La regla es el contrato inverso: en vez de importar un valor, esta
+  # aplicación *agrega* algo al listener de la plataforma. Es lo que permite
+  # que varias aplicaciones compartan un solo ALB.
+  #
+  # Enruta de una de dos formas, según los parámetros: por nombre de host, si la
+  # aplicación tiene subdominio propio, o por prefijo de ruta. Son excluyentes a
+  # propósito. Mezclarlas en una misma regla exige que se cumplan las dos.
+  ReglaHTTP:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ListenerHttpArn
+      Priority: !Ref Prioridad
+      Conditions:
+        - !If
+          - ConHost
+          - Field: host-header
+            HostHeaderConfig:
+              Values: [!Ref NombreHost]
+          - Field: path-pattern
+            PathPatternConfig:
+              Values: [!Ref RutaPath]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref GrupoDestino
+
+  ReglaHTTPS:
+    Condition: ConHttps
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ListenerHttpsArn
+      Priority: !Ref Prioridad
+      Conditions:
+        - !If
+          - ConHost
+          - Field: host-header
+            HostHeaderConfig:
+              Values: [!Ref NombreHost]
+          - Field: path-pattern
+            PathPatternConfig:
+              Values: [!Ref RutaPath]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref GrupoDestino
+
+# Un fragmento admite Outputs, pero no Export. Los outputs se propagan al
+# template consumidor con el nombre del módulo como prefijo (Eco →
+# EcoRutaAtendida); el export que publicaba el stack clásico lo re-crea el
+# consumidor.
+Outputs:
+  RutaAtendida:
+    Description: Cómo llega el tráfico a esta aplicación en el balanceador compartido
+    Value: !If
+      - ConHost
+      - !Sub "host ${NombreHost}"
+      - !Sub "ruta ${RutaPath}"
+
+  GrupoDestinoArn:
+    Description: ARN del grupo de destino de esta aplicación
+    Value: !Ref GrupoDestino

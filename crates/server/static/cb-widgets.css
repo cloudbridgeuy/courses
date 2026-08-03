@@ -111,6 +111,79 @@ cb-file .cb-file-content > pre {
 }
 
 /* ---------------------------------------------------------------------------
+   <cb-http> — in-page HTTP client
+   --------------------------------------------------------------------------- */
+
+cb-http {
+  display: block;
+}
+
+.cb-http-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.cb-http-method,
+.cb-http-domain,
+.cb-http-url,
+.cb-http-body {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--cb-border, #e2e6e8);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--cb-ink, #2d2926);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.cb-http-domain {
+  flex: 0 1 13rem;
+  min-width: 7rem;
+}
+
+.cb-http-url {
+  flex: 1;
+  min-width: 9rem;
+}
+
+.cb-http-body {
+  width: 100%;
+  margin-top: 0.5rem;
+  resize: vertical;
+}
+
+.cb-http-body[hidden] {
+  display: none;
+}
+
+.cb-http-status {
+  margin-top: 0.5rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--cb-grey, #75787b);
+}
+
+.cb-http-status.cb-http-ok {
+  color: var(--cb-teal-deep, #1f7a70);
+}
+
+.cb-http-status.cb-http-fail {
+  color: #b3261e;
+}
+
+.cb-http-response {
+  margin: 0.4rem 0 0;
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.cb-http-response[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
    Locked widget — dimmed, non-interactive, lock symbol overlay
    --------------------------------------------------------------------------- */
 

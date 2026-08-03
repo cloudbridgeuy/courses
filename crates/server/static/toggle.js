@@ -120,7 +120,9 @@ const CB_CHECK_ICON =
 document.addEventListener("DOMContentLoaded", () => {
   for (const pre of document.querySelectorAll("pre")) {
     const code = pre.querySelector("code");
-    if (!code || pre.closest(".cb-code")) continue;
+    // The <cb-http> response panel toggles its own <pre>; a wrapped copy
+    // button would float beside it while it is hidden.
+    if (!code || pre.closest(".cb-code") || pre.closest("cb-http")) continue;
     const fileContent = pre.closest(".cb-file-content");
 
     const wrap = document.createElement("div");

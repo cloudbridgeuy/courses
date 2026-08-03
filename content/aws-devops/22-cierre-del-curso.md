@@ -255,9 +255,24 @@ se creó a mano por la consola, y por eso no se borra sola:
 | El dashboard, y la alarma `cpu-alta-<su-nombre>` | CloudWatch |
 | El grupo de logs `/aws/codebuild/taller-aws-<su-nombre>-build` | CloudWatch Logs |
 | Los roles de servicio que crearon las consolas (`codebuild-…`, `AWSCodePipelineServiceRole-…`) | IAM |
+| El tipo `CloudBridge::Taller::App::MODULE`, si se hizo la práctica de módulos | CloudFormation Registry |
 
 Un bucket de S3 con objetos no se borra hasta vaciarlo, y un repositorio de ECR con
 imágenes pide `--force`.
+
+El módulo se saca del registro al revés de como entró: primero cada versión que no
+sea la default, y al final el tipo entero, que se lleva la default consigo:
+
+```bash
+aws cloudformation deregister-type --type MODULE \
+  --type-name CloudBridge::Taller::App::MODULE --version-id "00000001"
+aws cloudformation deregister-type --type MODULE \
+  --type-name CloudBridge::Taller::App::MODULE
+```
+
+Y `cfn submit` dejó su propio stack, `CloudFormationManagedUploadInfrastructure`,
+con dos buckets adentro. Como todo bucket, hay que vaciarlos antes de que el stack
+se deje borrar.
 
 ::: extra La lista se hace sola cuando todo es un stack
 Esta tabla existe porque el taller creó recursos por la consola para poder enseñarlos

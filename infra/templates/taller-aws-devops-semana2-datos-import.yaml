@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Taller AWS DevOps — Semana 2 · Datos (paso 1, import de la tabla)
+
+# Versión de import del stack de datos. Una operación de import solo acepta los
+# recursos que se importan: un template con `Outputs` se rechaza con "As part of
+# the import operation, you cannot modify or add [Outputs]". Por eso el stack se
+# crea en dos pasos: primero el import con este template, y después un update
+# directo (`aws cloudformation update-stack`) con
+# `taller-aws-devops-semana2-datos.yaml`, que agrega los exports. Directo,
+# porque un change set con cambios solo en `Outputs` se reporta como "didn't
+# contain changes".
+#
+# La tabla debe describirse tal como existe, y el import exige una
+# `DeletionPolicy` explícita en cada recurso importado.
+
+Resources:
+  TablaApp:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    # Retain también ante un reemplazo: si una actualización obligara a crear
+    # una tabla nueva, la vieja con los datos no se borra.
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: collection
+          AttributeType: S
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: collection
+          KeyType: HASH
+        - AttributeName: key
+          KeyType: RANGE

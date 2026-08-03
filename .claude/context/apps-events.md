@@ -193,6 +193,20 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   the build naming the section file. The target may live in any section of the
   same session. On a slides page a click leaves the deck for the guide URL plus
   the hash; on the guide it scrolls in place. Pure navigation — it never locks.
+- `<cb-http domain="eco.example.com" endpoint="/eco/prueba?x=1" method="GET"
+  body="…" label="Enviar">` is an in-page HTTP client: method selector,
+  editable domain + endpoint fields, optional request body (hidden for
+  GET/HEAD), and a response panel showing status, latency, and the body (JSON
+  pretty-printed and Shiki-highlighted — the element's presence injects
+  shiki-init.js, whose `window.cbShiki.highlight` helper renders the tokens;
+  plain text stays when the CDN or the grammar fails). Attributes are only the defaults — both fields stay editable
+  in the page. An empty domain keeps the request same-origin (the guide and the
+  echo service share the ALB, so a relative endpoint lands on whichever service
+  the listener rules route it to); a domain without a scheme inherits the
+  page's. Cross-origin works because the echo subcommand answers every request
+  with `Access-Control-Allow-{Origin,Methods,Headers}: *`, so a guide served
+  elsewhere (e.g. locally) can still call a deployed eco. No server handler, no
+  gate: it never locks.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

@@ -182,6 +182,46 @@ directly.
 
 Design record: `.claude/designs/2026-08-01-cloudformation-gap-closure-design.md`.
 
+**CloudFormation modules guided practice (2026-08-03).** `12` gained
+`## Práctica guiada: el patrón como módulo` (between «Formas de servir
+CloudFormation más allá de S3» and «A escala: stack refactoring»): students
+register the app pattern as the private type `CloudBridge::Taller::App::MODULE`
+(CloudShell, `pip3 install cloudformation-cli`, `cfn init` + `cfn submit`) and
+recreate the eco — deleted at the end of the previous section — as **one**
+resource of that type, in a stack with the same name
+(`taller-aws-<su-nombre>-eco`), so physical names (`/ecs/${AWS::StackName}` etc.)
+match and sessions 13/14/21 keep their running eco. Teaching beats: a fragment
+rejects `Fn::ImportValue`/`Export`, so the nine imports become module parameters
+and the consumer does the importing (the drill's contract becomes explicit
+properties); module parameters don't enforce constraints (the consumer template
+recovers them); resources expand into the consumer's stack (no nested stack,
+logical-ID prefix `Eco…`, `ModuleInfo` in `describe-stack-resources`); versioning
+via a second `cfn submit` + `set-type-default-version` mirrors the S3 `v3/v4`
+discipline. The fragment also exposes the container environment as module
+properties («La configuración también es contrato»): `AppsGated` →
+`CB_APPS_GATED` (default `all`), `AppsPublicCollections` →
+`CB_APPS_PUBLIC_COLLECTIONS` (default `counters`), and the optional plaintext
+`AppsSecret` → `CB_APPS_SECRET` — empty means the variable is not defined, via
+`Fn::If` + `AWS::NoValue` deleting a **list element** (the `Command` trick,
+one level down). Structural vars (`PORT`, `CB_APPS_TABLE`) stay fixed on
+purpose: a module exposes what its author chose, unlike the S3 template. The
+secret is a plain string by design (user decision 2026-08-03, no Secrets
+Manager here); the consumer marks it `NoEcho` and a `::: warning` points to
+`13`'s `secrets`+`valueFrom` treatment. The practice verifies with
+`describe-task-definition` (resolved via logical ID `EcoTareaApp`) that the
+defaults landed and `CB_APPS_SECRET` is absent. No new exercise; numbering
+stays 1–19. `cfn submit` side effect: the
+`CloudFormationManagedUploadInfrastructure` stack. `22`'s «Lo que nunca estuvo en
+un stack» adds the registered type row plus `deregister-type` cleanup (non-default
+versions first, then the type) and the upload-infrastructure stack note. Design
+record: `.claude/designs/2026-08-03-cfn-modules-practice-design.md`. A
+`::: extra` after «La configuración también es contrato» discusses the
+args-with-references pattern (config as `Command` arguments carrying Secrets
+Manager ARNs / Parameter Store paths, resolved by the app at boot): the module's
+one supported array is the command; the cost moves to IAM (the task role would
+need a ConfigArns-style property turned into policy). Documented as a note only
+(user decision 2026-08-03) — the module and `courses_server` stay unchanged.
+
 **Note:** new content files are not served until added to a `[[session]]` in
 `content/<course>/course.toml`, in either mode. On the embedded path, `include_dir!`
 also does not re-embed on new files alone — `touch crates/server/src/content.rs`
@@ -277,8 +317,17 @@ Week 3.
   route, and priority is the whole second-app story. `ComandoContenedor` is a
   `CommaDelimitedList` that overrides the container `Command` (empty →
   `AWS::NoValue`), and `NombreHost` switches the listener rule from
-  `path-pattern` to `host-header` via `Fn::If`. All nine templates pass
-  `cfn-lint` clean. Extras: `…-extra-subredes-publicas.yaml` (account admin
+  `path-pattern` to `host-header` via `Fn::If`. The modules practice adds
+  `…-semana2-app-modulo-fragmento.yaml` (the app pattern as a module fragment:
+  the nine `Fn::ImportValue` become value parameters, no `Export`, no
+  constraints, no console `Interface`; container config exposed as
+  `AppsGated`/`AppsPublicCollections`/`AppsSecret` properties, the secret
+  optional — empty deletes the env-var list element via `AWS::NoValue`) and
+  `…-semana2-eco-modulo.yaml` (consumer: original parameters with constraints
+  restored plus the three config params — `AppsSecret` with `NoEcho` —, the
+  nine imports, one `CloudBridge::Taller::App::MODULE` resource, re-created
+  `grupo-destino-arn` export via the `!Ref Eco.GrupoDestino` module-resource
+  syntax). All eleven templates pass `cfn-lint` clean. Extras: `…-extra-subredes-publicas.yaml` (account admin
   deploys once: two public subnets + routing on an existing VPC, optional
   existing-IGW param) and `…-extra-https.yaml` (optional per participant: ACM
   cert DNS-validated in a Route 53 hosted zone — workshop zone
@@ -343,7 +392,12 @@ SSE bus.
   to a heading of the same session: the server resolves its `path` (visible heading
   text, or a raw `#anchor`) at parse time (`courses_core::goto_apps`) and an unknown
   target fails the build; on slides a click leaves the deck for the guide URL plus
-  the hash. It never locks.
+  the hash. It never locks. `<cb-http>` is an in-page HTTP client (method selector,
+  editable `domain` + `endpoint` fields whose attributes are only defaults, optional
+  body, response panel with status + latency + body): a plain browser `fetch`; empty
+  domain = same origin (reaches the echo through the shared ALB), scheme-less domain
+  inherits the page's — no server handler, never locks. Used in `12` next to the eco
+  `curl` example.
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret
@@ -400,6 +454,10 @@ SSE bus.
   - It is the workshop's **second app**: same image,
     `Command: [courses_server, echo]`. `/health` returns 200 like any other
     path, so the existing target group health check needs no change.
+  - Every answer carries `Access-Control-Allow-{Origin,Methods,Headers}: *`, so
+    the in-guide `<cb-http>` client can call a deployed eco cross-origin (e.g.
+    from a locally served guide). The fallback route answers the preflight
+    OPTIONS like any other request.
 - **Content and static assets are embedded at build time** (`include_dir!` for
   `content/`, `include_str!` for CSS/JS, and a generated `include_str!` registry
   for each repository file referenced by `<cb-file>`). Any referenced source,

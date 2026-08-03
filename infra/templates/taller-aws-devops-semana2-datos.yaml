@@ -10,6 +10,13 @@ Description: Taller AWS DevOps — Semana 2 · Datos
 # (Create stack → With existing resources). Por eso la tabla lleva
 # `DeletionPolicy: Retain`. El import lo exige en cada recurso importado, y
 # además protege los datos si alguien borra este stack.
+#
+# El import no acepta un template con `Outputs`, así que son dos pasos: el
+# import se hace con `taller-aws-devops-semana2-datos-import.yaml` (idéntico,
+# sin `Outputs`), y este template se aplica después para agregar los exports que
+# el stack de aplicación importa. Ese segundo paso debe ser un update directo
+# (`aws cloudformation update-stack`): un change set con cambios solo en
+# `Outputs` se reporta como "didn't contain changes" y no se puede ejecutar.
 
 Resources:
   TablaApp:
