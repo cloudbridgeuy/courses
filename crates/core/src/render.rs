@@ -291,15 +291,13 @@ if(!location.hash){{var cbSaved=sessionStorage.getItem(cbSlideKey);if(cbSaved)lo
 var cbScrollIndicator=document.querySelector('.cb-slide-scroll-indicator'),cbScrollFrame=0;\
 function cbUpdateScrollIndicator(){{var cbSlide=Reveal.getCurrentSlide();var cbHasMore=!!cbSlide&&cbSlide.scrollHeight>cbSlide.clientHeight&&cbSlide.scrollHeight-cbSlide.scrollTop-cbSlide.clientHeight>2;cbScrollIndicator.classList.toggle('cb-visible',cbHasMore);cbScrollIndicator.setAttribute('aria-hidden',String(!cbHasMore));}}\
 function cbScheduleScrollIndicator(){{if(cbScrollFrame)return;cbScrollFrame=requestAnimationFrame(function(){{cbScrollFrame=0;cbUpdateScrollIndicator();}});}}\
-var cbRevealLayout=Reveal.layout;\
-Reveal.layout=function(){{var cbLayoutResult=cbRevealLayout.apply(this,arguments);cbScheduleScrollIndicator();return cbLayoutResult;}};\
 Reveal.on('ready',cbScheduleScrollIndicator);\
 Reveal.on('slidechanged',function(e){{sessionStorage.setItem(cbSlideKey,'#/'+e.indexh);cbScheduleScrollIndicator();}});\
 document.addEventListener('scroll',function(e){{if(e.target===Reveal.getCurrentSlide())cbScheduleScrollIndicator();}},true);\
 window.addEventListener('resize',cbScheduleScrollIndicator);\
 if('ResizeObserver'in window){{new ResizeObserver(cbScheduleScrollIndicator).observe(document.querySelector('.slides'));}}\
 document.addEventListener('click',e=>{{if(e.target.closest('.solucion-toggle'))Reveal.layout();}});\
-Reveal.initialize({{hash:true,controls:true,progress:true,center:false,transition:'slide',width:1280,height:720}});\
+Reveal.initialize({{hash:true,controls:true,progress:true,center:false,transition:'slide',width:1280,height:720}}).then(function(){{var cbRevealLayout=Reveal.layout;Reveal.layout=function(){{var cbLayoutResult=cbRevealLayout.apply(this,arguments);cbScheduleScrollIndicator();return cbLayoutResult;}};}});\
 </script>\n\
          <a class=\"cb-slides-close\" href=\"/courses/{course_slug}/{session_slug}\" \
 aria-label=\"Cerrar diapositivas\">\
@@ -796,6 +794,12 @@ aria-label=\"Más contenido debajo\" aria-hidden=\"true\"></div>"
             "Reveal.layout=function(){var cbLayoutResult=cbRevealLayout.apply(this,arguments);\
 cbScheduleScrollIndicator();return cbLayoutResult;}"
         ));
+        let initialize = html.find("Reveal.initialize({hash:true").unwrap();
+        let layout_wrapper = html.find("var cbRevealLayout=Reveal.layout;").unwrap();
+        assert!(
+            initialize < layout_wrapper,
+            "the layout wrapper must capture Reveal.layout after initialization"
+        );
         assert!(html.contains(
             "document.addEventListener('scroll',function(e){if(e.target===Reveal.getCurrentSlide())\
 cbScheduleScrollIndicator();},true)"
