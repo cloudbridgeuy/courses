@@ -444,11 +444,6 @@ en CloudFormation, con la lista exacta de lo que va a cambiar. Se revisa en
 
 3. Guardar la acción, y pulsar **Save** para confirmar la edición del pipeline.
 
-Al elegir **Execute a change set**, el formulario se acorta solo: desaparecen el template,
-las capacidades, el rol, y los parámetros. No es una omisión de esta guía (todo eso ya
-quedó adentro del change set cuando se lo creó, incluido el rol con el que CloudFormation
-lo va a aplicar). La acción solo lo nombra, y lo aplica.
-
 ### Agregar la segunda aplicación: el eco
 
 El clúster corre dos aplicaciones, y el pipeline construye **una sola** imagen para las
