@@ -16,23 +16,42 @@ El evento del pipeline viaja por una cadena de servicios hasta llegar a Teams:
 :::inline-slide light
 ## De un evento a un canal de Teams
 
-```
-CodePipeline / CodeBuild (evento)
-  → CodeStar Notifications (regla)
-  → Amazon SNS (tema)
-  → AWS Chatbot
-  → canal de Microsoft Teams
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 22, "rankSpacing": 40, "padding": 8, "subGraphTitleMargin": {"top": 6, "bottom": 14}}, "themeVariables": {"fontSize": "13px", "clusterBkg": "#f8fafc", "clusterBorder": "#94a3b8", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
+    pipe["<img src='/static/aws-codepipeline.svg' width='20' height='20' /> <b>Evento</b><br/>CodePipeline / CodeBuild"]
+    rule["<img src='/static/aws-codestar-notifications.svg' width='20' height='20' /> <b>Regla</b><br/>CodeStar Notifications"]
+    sns[("<img src='/static/aws-sns.svg' width='20' height='20' /> <b>Tema</b><br/>Amazon SNS")]
+
+    subgraph lab["Laboratorio"]
+        direction LR
+        hook["🔔 <b>App del instructor</b><br/>suscripción HTTPS"]
+        toast["🖥️ <b>Aviso en la guía</b><br/>toast, por pod"]
+        hook --> toast
+    end
+
+    subgraph prod["Producción"]
+        direction LR
+        cbot["<img src='/static/aws-chatbot.svg' width='20' height='20' /> <b>AWS Chatbot</b><br/>formatea el mensaje"]
+        team["💬 <b>Microsoft Teams</b><br/>canal del equipo"]
+        cbot --> team
+    end
+
+    pipe -->|"cambio de estado"| rule
+    rule -->|"publica"| sns
+    sns --> cbot
+    sns --> hook
+
+    classDef devtools fill:#ffffff,stroke:#c925d1,color:#4a044e
+    classDef integracion fill:#ffffff,stroke:#e7157b,color:#500724
+    classDef tms fill:#ffffff,stroke:#6264a7,color:#312e5f
+    classDef labnode fill:#ffffff,stroke:#475569,color:#0f172a
+    class pipe,rule devtools
+    class sns,cbot integracion
+    class team tms
+    class hook,toast labnode
 ```
 :::
-
-```mermaid
-flowchart LR
-  P["CodePipeline /<br/>CodeBuild (evento)"] --> R["CodeStar<br/>Notifications"]
-  R --> S[("Amazon SNS<br/>(tema)")]
-  S --> CB["AWS Chatbot"]
-  CB --> TM["Microsoft Teams"]
-  S -.->|laboratorio| IA["App del instructor<br/>(toast)"]
-```
 
 - Una **regla de notificación** (CodeStar Notifications) escucha eventos del pipeline:
   ejecución exitosa, fallida, o detenida en una aprobación.
@@ -57,7 +76,7 @@ de proyectos.
 ## Por qué en el laboratorio lo vemos distinto
 
 Conectar Teams de verdad requiere una suscripción de AWS Chatbot al espacio de Teams de
-la organización —algo que cada participante no puede montar en su cuenta del taller. Para
+la organización. Algo que cada participante no puede montar en su cuenta del taller. Para
 no perder el aprendizaje, el laboratorio usa un **espejo** del mismo flujo: los eventos
 de la cuenta llegan a la **aplicación del instructor**, que los muestra como avisos
 (*toasts*) sobre esta misma guía.
@@ -76,20 +95,28 @@ SNS, y la lógica de "qué eventos importan" son idénticos; solo difiere el úl
 Mismo evento, misma regla, mismo SNS. Cambia solo el último salto.
 :::
 
+:::inline-slide with-title
 ### Ver cómo se ve un aviso
 
+:::skip
 Antes de disparar el pipeline de verdad, conviene reconocer el formato del aviso. El
 botón siguiente pide a la aplicación del instructor que emita un *toast* de ejemplo: el
-servidor arma una notificación de prueba —atribuida al *pod* `demo`— y la difunde por el
+servidor arma una notificación de prueba (atribuida al *pod* `demo`) y la difunde por el
 mismo canal que usan los eventos reales. Cada pulsación produce uno de los tres estados
 que la regla selecciona, con su color: ejecución **exitosa** (verde), **fallida** (rojo),
 y **aprobación pendiente** (azul).
+:::
 
 :::app
 <cb-toast-demo label="Mostrar un aviso de ejemplo"></cb-toast-demo>
 :::
 
-El aviso aparece arriba a la derecha y se descarta solo a los pocos segundos. Es el mismo
+:::app
+<cb-goto path="Práctica guiada: crear la regla de notificación"></cb-goto>
+::: #app
+::: #inline-slide
+
+El aviso aparece abajo a la derecha y se descarta solo a los pocos segundos. Es el mismo
 componente que muestra los eventos del pipeline; solo cambia el origen del dato. En
 producción, ese aviso llegaría a un canal de Teams.
 
