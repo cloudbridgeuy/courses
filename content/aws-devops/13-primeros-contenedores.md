@@ -10,13 +10,12 @@ las piezas que mantienen el contenedor vivo y accesible. Al terminar, se los rec
 la consola de ECS y se entiende qué hace cada uno.
 
 ## El modelo de ECS
+:::inline-slide with-title
 
 **Amazon ECS** (Elastic Container Service) es el orquestador de contenedores de AWS:
 decide dónde corren los contenedores, los mantiene en ejecución, y los reemplaza si
 fallan. Tres conceptos lo estructuran.
 
-:::inline-slide light
-## ECS en tres piezas
 
 | Pieza | Qué es |
 | --- | --- |
@@ -25,12 +24,15 @@ fallan. Tres conceptos lo estructuran.
 | **Service** | El controlador que mantiene N tareas vivas y las reemplaza si caen. |
 :::
 
+:::inline-slide light with-title
 ### El clúster
 
 El **clúster** es la agrupación lógica donde viven las tareas. Con Fargate no contiene
 servidores que administrar —es solo el contexto bajo el cual ECS organiza lo que
 corre. En la consola, se accede desde **ECS → Clusters**.
+:::
 
+:::inline-slide light with-title
 ### La task definition
 
 La **task definition** es la plantilla de ejecución de un contenedor: el documento que
@@ -45,6 +47,7 @@ dice *cómo* es una tarea. Sus campos principales:
   contenedor.
 - **Variables de entorno**: pares clave-valor inyectados al contenedor en tiempo de
   ejecución. Hay dos formas de pasarlos, y la diferencia importa.
+:::
 
 ::: extra Variables de entorno vs. secretos en una task definition
 La task definition tiene dos campos distintos para configurar el contenedor con
@@ -80,9 +83,8 @@ expone su valor en cualquier lugar donde la task definition sea legible:
 - La consola de ECS lo muestra en la pestaña de configuración del contenedor.
 - Un template de CloudFormation con el valor hardcodeado queda en el repositorio.
 
-Para un secreto de acceso —como `CB_APPS_SECRET`, la clave que desbloquea los
-escenarios del taller— el texto plano significa que cualquier persona con permiso
-`ecs:DescribeTaskDefinition` puede leerlo.
+Para un secreto de acceso (como `CB_APPS_SECRET`,) el texto plano significa
+que cualquier persona con permiso `ecs:DescribeTaskDefinition` puede leerlo.
 
 Con `secrets` + `valueFrom`, el valor vive en Secrets Manager. La task definition
 solo guarda el ARN. Para leerlo hace falta permiso sobre Secrets Manager, no sobre
@@ -98,6 +100,7 @@ Las task definitions son **versionadas**: cada cambio crea una nueva *revisión*
 (`taller:1`, `taller:2`, …). Esto permite saber exactamente qué configuración está
 corriendo, y volver a una anterior si hace falta.
 
+:::inline-slide light with-title
 ### El service
 
 El **service** es el controlador que mantiene el número deseado de tareas en ejecución.
@@ -110,18 +113,44 @@ responsabilidades:
 
 La distinción clave: la **task definition** describe *cómo es* una tarea; el **service**
 decide *cuántas hay y las mantiene vivas*.
+:::
+
+:::inline-slide light
+### Las piezas juntas
 
 ```mermaid
-flowchart TD
-  CL["Clúster ECS"] --> SV["Service de la app<br/>(DesiredCount = 2)"]
-  CL --> SE["Service del eco<br/>(DesiredCount = 1)"]
-  TD["Task definition<br/>imagen · CPU · memoria · puertos"] -.->|plantilla| SV
-  SV --> T1["Tarea 1 (RUNNING)"]
-  SV --> T2["Tarea 2 (RUNNING)"]
-  SE --> T3["Tarea (RUNNING)"]
-  SV -->|registra| TG["Target Group de la app"]
-  SE -->|registra| TGE["Target Group del eco"]
+%%{init: {"flowchart": {"nodeSpacing": 34, "rankSpacing": 85}, "themeVariables": {"clusterBkg": "#f8fafc", "clusterBorder": "#94a3b8", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
+  TDA[["<b>Task definition</b> de la app<br/>imagen · CPU · memoria · puertos<br/><i>cómo es una tarea</i>"]]
+  TDE[["<b>Task definition</b> del eco<br/><i>su propia revisión</i>"]]
+
+  subgraph cl["Clúster ECS · el contexto"]
+    SV["<b>Service de la app</b><br/><i>DesiredCount = 2</i>"]
+    SE["<b>Service del eco</b><br/><i>DesiredCount = 1</i>"]
+    T1(["Tarea 1 · RUNNING"])
+    T2(["Tarea 2 · RUNNING"])
+    T3(["Tarea · RUNNING"])
+  end
+
+  TDA -.->|"plantilla"| SV
+  SV ==> T1
+  SV ==> T2
+  TDE -.->|"plantilla"| SE
+  SE ==> T3
+  T1 --> TG["<b>Target group</b><br/>de la app"]
+  T2 --> TG
+  T3 -->|"el service registra sus tareas"| TGE["<b>Target group</b><br/>del eco"]
+
+  classDef tdNode fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef svcNode fill:#fdf2f8,stroke:#e7157b,stroke-width:2px,color:#831843
+  classDef taskNode fill:#f0fdf4,stroke:#16a34a,color:#14532d
+  classDef tgNode fill:#fef3c7,stroke:#d97706,color:#451a03
+  class TDA,TDE tdNode
+  class SV,SE svcNode
+  class T1,T2,T3 taskNode
+  class TG,TGE tgNode
 ```
+:::
 
 Un clúster sostiene **varios servicios a la vez**, y desde la sección anterior el del
 taller sostiene dos: la aplicación principal, y el servidor de eco. Cada uno tiene su
@@ -133,10 +162,12 @@ está mirando. El clúster es el contexto, no el sujeto: una métrica de CPU, un
 o una política de escalado son siempre de un servicio, nunca del clúster.
 
 ::: extra Fargate vs. EC2: ¿quién pone los servidores?
-ECS puede ejecutar tareas de dos formas. Con el tipo de lanzamiento **EC2**, se administra una flota de servidores donde corren los contenedores. Con **Fargate**, AWS
-pone y administra esa capacidad: se especifican CPU y memoria por tarea, y no hay
-servidores que mantener. Este taller usa Fargate porque elimina la administración de
-servidores —el foco queda en la aplicación, no en la infraestructura que la ejecuta.
+ECS puede ejecutar tareas de dos formas. Con el tipo de lanzamiento **EC2**, se
+administra una flota de servidores donde corren los contenedores. Con
+**Fargate**, AWS pone y administra esa capacidad: se especifican CPU y memoria
+por tarea, y no hay servidores que mantener. Este taller usa Fargate porque
+elimina la administración de servidores. El foco queda en la aplicación, no en
+la infraestructura que la ejecuta.
 :::
 
 :::slide
@@ -149,6 +180,11 @@ Una describe; el otro opera.
 :::
 
 ## Práctica guiada: reconocer las piezas en la consola
+:::inline-slide with-title
+:::app
+<cb-goto path="Práctica guiada: reconocer las piezas en la consola"></cb-goto>
+::: # app
+:::
 
 ### Abrir el clúster
 

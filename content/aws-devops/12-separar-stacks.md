@@ -1310,7 +1310,7 @@ acoplamiento entre stacks aparece más abajo, en el refactoring a escala.
    al registro de la cuenta:
 
    ```bash
-   cfn submit
+   cfn submit --set-default
    ```
 
 6. Verificar que el tipo existe:
@@ -1363,9 +1363,8 @@ stacks y es normal: es infraestructura de la herramienta, no del taller.
 ### Mirar dónde quedaron los recursos
 
 En la pestaña **Resources** del stack están el servicio, la task definition, la
-regla, y el resto —los mismos nueve recursos del stack clásico—, todos con el
-prefijo `Eco` en el ID lógico. No hay ningún stack anidado. La misma vista, desde
-la terminal:
+regla, y el resto, todos con el prefijo `Eco` en el ID lógico. No hay ningún
+stack anidado. La misma vista, desde la terminal:
 
 ```bash
 export TALLER=taller-aws-<su-nombre>
@@ -1386,7 +1385,7 @@ aws logs describe-log-groups \
 ```
 
 Y la configuración quedó como el esquema la prometía. La task definition se
-resuelve por su ID lógico —con el prefijo del módulo—, y adentro están las
+resuelve por su ID lógico con el prefijo del módulo, y adentro están las
 variables:
 
 ```bash
@@ -1456,15 +1455,16 @@ acá el registro—.
 Mismo patrón, distinta rigidez.
 :::
 
-## A escala: stack refactoring
+:::extra Stack Refactoring
 
-La secuencia manual —`Retain`, huérfano, import— muestra la mecánica real, y para un
+La secuencia manual (`Retain`, huérfano, import) muestra la mecánica real, y para un
 recurso es perfectamente manejable. Para mover decenas de recursos entre stacks, AWS
 ofrece una operación que hace los tres pasos de forma atómica: el **stack
 refactoring** (`CreateStackRefactor`). Se le entregan los templates finales de ambos
 stacks y un mapa de qué recurso va a dónde; CloudFormation valida que ningún recurso
-físico se toque, y ejecuta la mudanza completa —incluyendo renombres de IDs lógicos—
+físico se toque, y ejecuta la mudanza completa (incluyendo renombres de IDs lógicos)
 en una sola operación revisable, al estilo de un change set.
+:::
 
 ::: extra Adoptar infraestructura que nació a mano
 
@@ -1477,16 +1477,23 @@ sin templates.
 Para no escribir esos templates a mano, la consola de CloudFormation incluye el
 **IaC generator**: escanea la cuenta, descubre los recursos que ningún stack
 gestiona, y genera el template por ellos, dejándolo listo para el flujo de import.
+
+::: warning
 Advertencias de uso: el template generado sale con valores fijos que conviene
 parametrizar, las propiedades de solo escritura (como un secreto) no se pueden leer
 de vuelta, no todos los tipos de recurso están soportados, y después de importar
 conviene correr **Detect drift** para confirmar que template y realidad coinciden.
-:::
+::: #warning
+::: #extra
 
-::: extra La otra forma de componer: stacks anidados
+:::inline-slide
+## La otra forma de componer: stacks anidados
+
+:::skip
 Exports e imports no son la única manera de partir un template grande. La alternativa
 son los **stacks anidados**: un template padre que declara a sus hijos como recursos
 de tipo `AWS::CloudFormation::Stack`.
+:::
 
 ```yaml
   Red:
@@ -1512,85 +1519,10 @@ medio. Los dos modelos resuelven el mismo problema con filosofías opuestas:
 | Acoplamiento | Bajo: el contrato es el export | Alto: el padre conoce a todos |
 | Templates | En disco, se suben a mano | En S3, obligatorio |
 
+:::
+
 La elección sigue al ciclo de vida, que es el criterio de toda esta sección. Si las
-partes cambian a ritmos distintos y las gestionan equipos distintos —red, datos,
-aplicación— van en stacks separados. Si son piezas de una sola unidad que siempre se
+partes cambian a ritmos distintos y las gestionan equipos distintos (red, datos,
+aplicación) van en stacks separados. Si son piezas de una sola unidad que siempre se
 despliega junta, anidarlas evita coordinar tres operaciones para un solo cambio. El
 taller usa stacks separados porque su tema **es** la diferencia de ciclos de vida.
-:::
-
-::: extra Acoplamiento flojo con Parameter Store
-Hay una tercera vía, entre el export rígido y el anidamiento. El stack productor
-escribe su valor en **SSM Parameter Store** como un recurso más, y el consumidor lo lee
-como parámetro:
-
-```yaml
-  # En el stack de red: publicar el ID de la VPC
-  ParametroVpc:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /taller/red/vpc-id
-      Type: String
-      Value: !Ref VpcApp
-```
-
-```yaml
-  # En el stack de aplicación: leerlo
-Parameters:
-  VpcId:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /taller/red/vpc-id
-```
-
-El tipo `AWS::SSM::Parameter::Value<String>` hace que CloudFormation resuelva el
-parámetro contra Parameter Store al lanzar el stack, y `VpcId` llegue con el valor, no
-con la ruta. Frente a los exports gana en flexibilidad: el valor se puede cambiar sin
-borrar a nadie, y funciona entre regiones y entre cuentas. Y pierde justo en lo mismo:
-nadie impide borrar el stack de red mientras la aplicación depende de él, porque no hay
-contrato que hacer cumplir. Se elige según lo que duela más, un cambio bloqueado o un
-borrado no detectado.
-:::
-
----
-
-{#ejercicio-11}
-### Ejercicio 11 — Migrar la tabla a su propio stack
-
-Partiendo del stack monolítico de la Semana 1, dejar el ambiente corriendo en cuatro
-stacks separados —red, plataforma, datos, aplicación— sin perder los datos de la tabla.
-Escribir un contador antes de empezar y demostrar, al final, que sigue ahí.
-
-::: solucion
-1. Resolver el nombre físico de la tabla con
-   `aws cloudformation describe-stack-resources` y guardarlo en `$TABLA`.
-2. Escribir un contador de prueba con la app `counter` de la guía servida por el
-   propio stack (el widget ejecuta un `UpdateItem` con `ADD` sobre
-   `collection = counters`, `key = migracion`).
-3. Agregar `DeletionPolicy: Retain` a `TablaApp` en
-   `taller-aws-devops-semana1.yaml` y aplicarlo con un change set.
-4. Borrar el stack `taller-aws-<su-nombre>`. En **Events**, la tabla queda como
-   **DELETE_SKIPPED**; verificar con `aws dynamodb describe-table` que sigue
-   `ACTIVE`.
-5. Crear `taller-aws-<su-nombre>-red` con `taller-aws-devops-semana2-red.yaml`
-   (sin parámetros).
-6. Crear `taller-aws-<su-nombre>-plataforma` con
-   `taller-aws-devops-semana2-plataforma.yaml`, indicando el stack de red y dejando
-   los dos parámetros de dominio vacíos. La **UrlBase** de sus outputs debe responder
-   `404`: el balanceador existe y ninguna regla lo enruta todavía.
-7. Crear `taller-aws-<su-nombre>-datos` con **Create stack → With existing resources
-   (import resources)**, subiendo `taller-aws-devops-semana2-datos-import.yaml` (el
-   import no acepta `Outputs`) y pegando `$TABLA` como **TableName**. Esperar a
-   **IMPORT_COMPLETE**. Después, aplicar `taller-aws-devops-semana2-datos.yaml`
-   con `aws cloudformation update-stack` (update directo: un change set con
-   cambios solo en `Outputs` reporta "didn't contain changes") para agregar los
-   dos exports.
-8. Crear `taller-aws-<su-nombre>-app` con `taller-aws-devops-semana2-app.yaml`,
-   completando el URI de la imagen y los nombres de los stacks de red, datos, y
-   plataforma. Aceptar la capacidad de IAM.
-9. Volver a abrir la **UrlBase** del stack de plataforma: ahora carga la guía. Releer
-   el contador con `aws dynamodb get-item`: el valor escrito en el paso 2 sigue ahí.
-:::
-
-:::slide light
-{{ejercicio-11}}
-:::
