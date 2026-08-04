@@ -508,6 +508,17 @@ SSE bus.
     signature. Pod attribution prefers a baked-in `pod`, falls back to account id —
     and a CodeStar Notifications rule cannot bake one in (no input transformer), so
     lab toasts always carry the account id.
+  - Toast layout reworked 2026-08-04: one compact card (subject + `×N` repeat
+    counter + event clock + close button; state badge + friendly source + pod; a
+    context line `stage · action · phase · reason`), repeats coalesce instead of
+    stacking, at most 4 visible, 8 s countdown bar. Clicking a toast expands it
+    into a labelled field list (Spanish labels) and stops its timer; the subject
+    is a link to the AWS console when the payload gives or implies one. Same
+    rework taught the parser the CloudWatch alarm shape (`AlarmName`,
+    `NewStateValue`, `AWSAccountId`, source `aws.cloudwatch`), which used to
+    produce an empty toast from `20-dashboards-y-alarmas`, and widened
+    `Notification` with `stage`/`action`/`provider`/`phase`/`reason`/`execution`/
+    `region`/`time`/`url` (so `SnsMessage::Event` is now boxed).
   - Topic guide: `.claude/context/notifications.md`. Design:
     `.claude/designs/2026-06-16-lab-notifications-toasts-design.md`.
 
