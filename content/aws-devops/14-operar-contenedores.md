@@ -476,7 +476,7 @@ ese motivo apunta a la aplicación, la respuesta está en los **logs**.
    son los destinos a los que el ALB reparte el tráfico.
 
 :::app
-<cb-cpu-burst seconds="120" intensity="high" label="Generar carga de CPU (120 s)"></cb-cpu-burst>
+<cb-cpu-burst seconds="120" intensity="high" label="Generar carga de CPU"></cb-cpu-burst>
 :::
 
 ---

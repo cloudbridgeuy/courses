@@ -74,7 +74,7 @@ abajo. El evento viaja al propio servidor (mismo origen), así que la CPU se que
 task de ECS, y el pico aparece en CloudWatch.
 
 :::app
-<cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU (60 s)"></cb-cpu-burst>
+<cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU"></cb-cpu-burst>
 :::
 
 ### Consultar los logs

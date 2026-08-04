@@ -392,8 +392,20 @@
 
   // ---------------------------------------------------------------------------
   // Custom element: <cb-cpu-burst>
-  // Attributes: seconds, intensity, label
+  // Attributes: seconds (initial value of the duration field), intensity, label
   // ---------------------------------------------------------------------------
+
+  // Mirrors MAX_BURST_SECONDS in courses_core::events; the server clamps too, so
+  // this bound is only there to keep the field honest.
+  var MAX_BURST_SECONDS = 120;
+
+  var CPU_BURST_DESC =
+    "Ejecuta bucles de cálculo en la tarea de ECS de tu pod durante el tiempo " +
+    "indicado. La CPU sube en todos los núcleos disponibles, y la métrica " +
+    "CPUUtilization de CloudWatch lo refleja uno o dos minutos después. La " +
+    "carga se libera sola al terminar. El servidor limita la duración a " +
+    MAX_BURST_SECONDS +
+    " s.";
 
   customElements.define(
     "cb-cpu-burst",
@@ -406,14 +418,44 @@
           var intensity = this.getAttribute("intensity") || "medium";
           var label = this.getAttribute("label") || "Generar carga de CPU";
 
+          var desc = document.createElement("p");
+          desc.className = "cb-app-desc";
+          desc.textContent = CPU_BURST_DESC;
+
+          this._seconds = document.createElement("input");
+          this._seconds.type = "number";
+          this._seconds.min = "1";
+          this._seconds.max = String(MAX_BURST_SECONDS);
+          this._seconds.step = "1";
+          this._seconds.value = seconds;
+          this._seconds.className = "cb-app-input";
+
+          var field = document.createElement("label");
+          field.className = "cb-app-label";
+          field.appendChild(document.createTextNode("Duración (s)"));
+          field.appendChild(this._seconds);
+
           this._btn = makeAppBtn(label);
           this._status = document.createElement("span");
           this._status.className = "cb-app-status";
 
-          this.appendChild(this._btn);
+          var controls = document.createElement("div");
+          controls.className = "cb-app-controls";
+          controls.appendChild(field);
+          controls.appendChild(this._btn);
+
+          this.appendChild(desc);
+          this.appendChild(controls);
           this.appendChild(this._status);
 
           this._btn.addEventListener("click", () => {
+            var n = Math.round(Number(this._seconds.value));
+            if (!isFinite(n)) {
+              this._status.textContent = "Duración inválida";
+              return;
+            }
+            n = Math.max(1, Math.min(MAX_BURST_SECONDS, n));
+            this._seconds.value = String(n);
             var id = uuid();
             this._btn.disabled = true;
             this._status.textContent = "Enviando…";
@@ -421,7 +463,7 @@
               .emit(
                 id,
                 "cpu-burst",
-                JSON.stringify({ seconds: Number(seconds), intensity: intensity })
+                JSON.stringify({ seconds: n, intensity: intensity })
               )
               .then((code) => {
                 if (code === 202) {

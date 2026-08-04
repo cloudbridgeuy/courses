@@ -178,9 +178,14 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
 `crates/server/static/apps.js` provides:
 
 - Custom elements `<cb-cpu-burst>`, `<cb-counter>`, `<cb-metric>`, and
-  `<cb-toast-demo>` (a fire-and-forget button that emits a `toast-demo` event;
+  `<cb-toast-demo>`. `<cb-cpu-burst>` renders a fixed Spanish note on how the
+  burst works, then a controls row with an editable duration field (1–120 s,
+  seeded by the `seconds` attribute) and the emit button; `intensity` and
+  `label` stay author-only. The client rounds and clamps the duration before
+  emitting, and `CpuBurstConfig::parse` caps it again server-side.
+  `<cb-toast-demo>` is a fire-and-forget button that emits a `toast-demo` event;
   feedback is the broadcast toast itself, so it carries no app-status listener;
-  locks like `cb-cpu-burst` when gated).
+  it locks like `cb-cpu-burst` when gated.
   `<cb-counter>` takes a `mode` attribute — `increment` (button only), `view`
   (value only), or `both` (default); elements sharing a `key` stay in sync via the
   SSE bus, so an incrementer and a separate viewer can sit in different parts of the

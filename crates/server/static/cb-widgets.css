@@ -110,6 +110,46 @@ cb-file .cb-file-content > pre {
   vertical-align: middle;
 }
 
+/* Short "how it works" note rendered above a widget's controls. */
+.cb-app-desc {
+  max-width: 60ch;
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--cb-grey, #75787b);
+}
+
+.cb-app-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cb-app-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.9rem;
+}
+
+/* The input already carries a right margin for inline widgets; inside a
+   flex row the gap covers it. */
+.cb-app-label > .cb-app-input {
+  margin-right: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   <cb-cpu-burst> — description above a controls row
+   --------------------------------------------------------------------------- */
+
+/* The element+class pair outranks .cb-app-locked's inline-block, so gating the
+   widget does not reflow it. */
+cb-cpu-burst,
+cb-cpu-burst.cb-app-locked {
+  display: block;
+}
+
 /* ---------------------------------------------------------------------------
    <cb-http> — in-page HTTP client
    --------------------------------------------------------------------------- */
