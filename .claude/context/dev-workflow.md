@@ -4,7 +4,13 @@
 
 - Port 8080 is often taken by an unrelated Vite app on this machine. Test with:
   `PORT=8090 ./target/debug/courses_server`
-- Kill the server after manual tests: `pkill -f courses_server`.
+- Kill the server after manual tests by port, not by name:
+  `kill $(lsof -t -nP -iTCP:8090 -sTCP:LISTEN)`. `pkill -f courses_server` also
+  takes down every other instance, including an echo on another port.
+- With `CB_HEALTH_CHECKS` set, SIGTERM starts the drain window, so the process
+  keeps the port for `CB_HEALTH_DRAIN_SECS` before exiting. Wait for the port to
+  free (`until ! lsof -nP -iTCP:<port> -sTCP:LISTEN; do sleep 2; done`) instead of
+  assuming the kill was instant.
 - Session URLs use title slugs, not filenames: discover them with
   `curl -s localhost:8090/ | grep -o 'href="/courses/[^"]*"'`. A file such as
   `12-separar-stacks.md` is one *section* of a session — look up which
@@ -22,6 +28,12 @@ the `Dockerfile` `CMD` and existing ECS task definitions are unaffected.
   `./target/debug/courses_server echo --port 8099 --name echo.example.com` and a
   `curl -s localhost:8099/a/b?x=1`. The shaping lives in `courses_core::echo`;
   `crates/server/src/echo.rs` only copies out of axum's types.
+- `courses_server healthcheck [--path <p>] [--port <n>] [--timeout-ms <ms>]` —
+  requests one path over loopback (`127.0.0.1`, never `localhost`) and exits `0`
+  on a success status, `1` otherwise, printing the status or the transport error
+  to stderr. `--path` defaults to `/health/live`, `--port` also reads `PORT`,
+  `--timeout-ms` defaults to 2000. It is what the ECS container health check
+  runs: the runtime image has no `curl`.
 - The `network.ecs` block needs the ECS task metadata endpoint. To exercise it
   off ECS, serve a static `/task` document and point
   `ECS_CONTAINER_METADATA_URI_V4` at it — the server reads it once at startup

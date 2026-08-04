@@ -123,8 +123,15 @@ No I/O. Contains:
   events (`SUCCEEDED` / `FAILED` / pending approval). Backs the `toast-demo` handler.
 - `is_public_collection(collection, whitelist)` — collection allowlist check.
 
-`select` maps `"cpu-burst" | "counter" | "metric" | "toast-demo"` to the matching
-`HandlerKind` (`CpuBurst | Counter | Metric | ToastDemo`); any other string is Unknown.
+`select` maps `"cpu-burst" | "counter" | "metric" | "toast-demo" | "health-fault"`
+to the matching `HandlerKind` (`CpuBurst | Counter | Metric | ToastDemo |
+HealthFault`); any other string is Unknown.
+
+The `health-fault` payload config is pure too, but it lives beside the health
+rules in `courses_core::health`: `Dependency` (the `dynamodb` / `content` wire
+names, with their criticality) and `HealthFaultConfig::parse` (defaults to the
+hard dependency for `DEFAULT_FAULT_SECONDS` = 60, capped at `MAX_FAULT_SECONDS`
+= 600; `seconds: 0` means restore now).
 
 All of these are unit-tested inline.
 
@@ -144,9 +151,16 @@ SDK, pulled in for the metric handler's API path). Contains:
 - `toast_demo(ctx, seed)` — broadcasts a demo `Notification` (built by the pure
   `demo_notification`) on the bus as a `type: "notification"` event, so a guide
   preview toast renders through the exact path real SNS events use. No AWS call.
+- `health_fault(ctx, payload)` — breaks one health-check dependency for a bounded
+  time, then restores it. Writes to `HealthFaults`, which the server's health
+  prober reads; no AWS call. Emits `status-health-fault` on the bus at both ends
+  of the outage (`{"dependency","state":"broken"|"restored","seconds"}`).
 - `read_item(collection, key, ctx)` — DynamoDB `GetItem` for the query side.
+- `HealthFaults` — the injected-outage registry, shared with the server's health
+  prober. Each entry carries an optional deadline; `expire` only removes an entry
+  whose deadline already passed, so a stale timer cannot cut a newer outage short.
 - `AppsCtx` — shared context struct (DynamoDB client, CloudWatch client, table
-  name, broadcast sender, gate, public collections).
+  name, broadcast sender, gate, public collections, health faults).
 - `Outcome` — result type returned by `dispatch`.
 
 Nothing pure depends on `courses_apps`.
@@ -185,6 +199,13 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   increase, and copy controls. The decrease and increase controls only change the
   file content size. Their own size stays fixed. `full-path` disables slide-label
   truncation for a file that must show its complete path.
+- `<cb-health dependency="dynamodb" seconds="60" label="…">` pairs a live board
+  over `/health/live`, `/health/ready`, and `/health/startup` (polled once a
+  second, coloured by status code) with a control that breaks the selected
+  dependency for the chosen time, and a restore button that sends `seconds: 0`.
+  It locks like `cb-cpu-burst` when gated. When the server has
+  `CB_HEALTH_CHECKS` off the three endpoints answer `404`, and the widget says
+  so instead of showing a broken board.
 - `<cb-goto path="…">` is a navigation app: a button that jumps to a heading on
   the session's guide page (`label` overrides the button text; default
   `Ir a: <path>`). The server resolves `path` — visible heading text, or a raw
@@ -219,9 +240,10 @@ custom-element tags in `<div class="cb-app">` and sets `uses_apps`.
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `CB_APPS_SECRET` | unset | Gate unlock secret |
-| `CB_APPS_GATED` | unset | `"all"` or comma kind list (`cpu-burst,counter,metric,toast-demo`) |
+| `CB_APPS_GATED` | unset | `"all"` or comma kind list (`cpu-burst,counter,metric,toast-demo,health-fault`) |
 | `CB_APPS_TABLE` | `"courses-apps"` | DynamoDB table name |
 | `CB_APPS_PUBLIC_COLLECTIONS` | `"counters"` | Comma-separated readable collections |
+| `CB_HEALTH_CHECKS` | unset | Feature flag for the three endpoints `<cb-health>` watches; see `CONTEXT.md` |
 
 ## AWS Secrets Manager teaching hook
 

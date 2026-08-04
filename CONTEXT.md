@@ -453,7 +453,10 @@ SSE bus.
     37 unit tests); `crates/server/src/echo.rs` is a thin shell.
   - It is the workshop's **second app**: same image,
     `Command: [courses_server, echo]`. `/health` returns 200 like any other
-    path, so the existing target group health check needs no change.
+    path, so both the target group check and the Week-2 container check
+    (`courses_server healthcheck --path /health`) pass against it unchanged. It
+    has no three-tier routes, so a Week-3 deploy must set
+    `RutaSaludBalanceador=/health` and leave `RutaSaludContenedor` empty.
   - Every answer carries `Access-Control-Allow-{Origin,Methods,Headers}: *`, so
     the in-guide `<cb-http>` client can call a deployed eco cross-origin (e.g.
     from a locally served guide). The fallback route answers the preflight
@@ -465,6 +468,72 @@ SSE bus.
   served. This production path is unaffected by dev mode below — unchanged behavior,
   bad content still aborts startup.
 - Lint gate before done: `cargo xtask lint` (fallback `cargo run -p xtask -- lint`).
+
+### Three-tier health checks (feature-flagged)
+
+- **Off by default.** `CB_HEALTH_CHECKS` (`1`/`true`/`yes`/`on`) turns on
+  `/health/live`, `/health/ready`, `/health/startup`, and `/health/simulate`.
+  While off, those routes 404, and `/health` keeps returning the plain `200` the
+  deployed target group already checks. Nothing about the existing deployment
+  changes unless the flag is set.
+- **Why it exists**: the guide's health-check section
+  (`content/aws-devops/14-operar-contenedores.md`) teaches liveness vs readiness
+  vs startup, hard vs soft dependencies, background probing, and drain-on-
+  SIGTERM. This makes all of it observable on the platform itself. The echo
+  server stays untouched — it has no hard dependency worth probing.
+- **The dependencies are deliberately asymmetric**: DynamoDB is **hard**
+  (`DescribeTable`, under timeout → readiness `503`), the rendered site is
+  **soft** (`SiteState::Broken` → `status: degraded`, still `200`).
+- **Probing is out of the request path.** One background task probes on
+  `CB_HEALTH_INTERVAL_SECS` (default 5) with a `CB_HEALTH_TIMEOUT_MS` (default
+  2000) per-dependency timeout, and writes a snapshot; the handlers only read it.
+  `/health/live` fails only when that prober stops ticking for four rounds —
+  the one liveness signal a static `200` cannot give.
+- **Drain on shutdown.** After SIGTERM/SIGINT, readiness flips to `503` and the
+  listener stays open for `CB_HEALTH_DRAIN_SECS` (default 15; `0` disables)
+  before connections close, so the ALB deregisters before in-flight requests
+  would be cut. With the flag off, shutdown is immediate as before.
+- **Fault injection, from the guide**: the `<cb-health>` app (`:::app`, in the
+  Week-3 health-check section) shows a live board over the three endpoints and
+  breaks one dependency for a bounded time, default 60 s, max 600 s. It emits a
+  `health-fault` event; the handler is `courses_apps::handlers::health_fault`.
+  The outage expires on its own, so a demo never leaves the pod out of rotation.
+  A payload of `{"seconds":0}` restores it right away (the widget's second
+  button). Progress rides the SSE bus as `status-health-fault`.
+- **Fault injection, from a terminal**: `POST /health/simulate?dependency=<dynamodb|content>&fail=<bool>&seconds=<n>`
+  (`fail` defaults to `true`; without `seconds` the outage lasts until cleared).
+  Guarded by `CB_APPS_SECRET` via `?secret=` when that secret is set. Unknown
+  dependency → `400`.
+- **One registry, two writers.** Injected outages live in
+  `courses_apps::HealthFaults` (on `AppsCtx`), not in the server's snapshot,
+  because the handler runs in the apps crate and the prober in the shell. Each
+  entry carries a deadline; the prober treats an expired entry as gone, so
+  restoring never depends on a timer task surviving.
+- **Layout**: rules, body, `Dependency`, and `HealthFaultConfig` are pure in
+  `courses_core::health` (24 unit tests); `crates/server/src/health.rs` holds the
+  handle, prober, routes, and env parsing. `routes::router` takes the handle, and
+  merges the routes only when the flag is on.
+- **`courses_server healthcheck --path <p> [--port] [--timeout-ms]`** requests one
+  path over loopback and exits `0` on a success status, `1` otherwise. It is what
+  the ECS container health check runs: the runtime image carries no `curl`, and
+  adding one just for a probe is weight plus attack surface.
+- **Week-2 templates already carry the mechanism.** `taller-aws-devops-semana2-app
+  .yaml`, and the module fragment beside it, define a container `HealthCheck` of
+  `[CMD, courses_server, healthcheck, --path, /health]` with `StopTimeout: 30`.
+  Against a static `200` that still catches a *hung* process holding the port
+  open, which is the one thing "the container did not exit" cannot tell you. It
+  also means Week 3 changes the path, not the mechanism. Week-1 templates are left
+  bare on purpose: that lesson is the network chain.
+- **Deployment side** (`infra/templates/taller-aws-devops-semana3-app.yaml`): the
+  Week-2 app template plus the wiring, deployed as an update of the same stack so
+  the change set is the lesson. Target group → `/health/ready` (interval 10,
+  thresholds 2/2, matcher 200); container `HealthCheck` → `/health/live` instead of
+  `/health` (interval 15, retries 3, `StartPeriod` 60);
+  `HealthCheckGracePeriodSeconds` 90; `CB_HEALTH_DRAIN_SECS` 25 with `StopTimeout`
+  60 and `deregistration_delay` 15. The numbers are chained: drain must outlast
+  detection (10 × 2 = 20 s), and `StopTimeout` must outlast drain. Both paths are
+  parameters, because the echo server has only `/health` and must be deployed with
+  `RutaSaludContenedor` empty or it dies in a replace loop.
 
 ### Dev mode / hot reload
 
