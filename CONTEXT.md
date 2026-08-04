@@ -222,6 +222,62 @@ one supported array is the command; the cost moves to IAM (the task role would
 need a ConfigArns-style property turned into policy). Documented as a note only
 (user decision 2026-08-03) — the module and `courses_server` stay unchanged.
 
+**The pipeline deploys with CloudFormation, and deploys both apps (2026-08-04).**
+`17` dropped the CodePipeline **ECS** deploy action: it registers a task-definition
+revision outside CloudFormation, so the stack drifts and the next stack update
+reverts the image from the stored `ImageUri`. The Deploy half is now two
+CloudFormation stages — `ChangeSet` (`CHANGE_SET_REPLACE`) and `Desplegar`
+(`CHANGE_SET_EXECUTE`) — with `Aprobacion` between them, which turns the manual
+approval into a change-set review and mirrors `14`'s `--no-execute-changeset`. The
+wizard's deploy step is **skipped** (one action only, fixed stage name); all three
+stages are built in the editor. `buildspec.yml` no longer writes
+`imagedefinitions.json`: it writes `imagen.json` (`{"ImageUri": …}`) and ships
+`infra/templates/*.yaml` in the artifact, so template and binary travel from the
+same commit; the action reads the tag with `Fn::GetParam`. Deploying **both** apps
+is a second action at the same run order in each CFN stage (run order = the
+parallelism mechanism). The eco action deploys `taller-aws-devops-semana2-app.yaml`
+— the same template as the app — with three extra overrides
+(`ComandoContenedor=courses_server,echo`, `RutaPath=/eco/*`, `Prioridad=10`); that
+is the whole second-app story restated as pipeline configuration, and omitting them
+turns the eco stack into a second copy of the platform whose rule collides with the
+app's. A `::: warning` covers the module variant: a stack recreated as a
+`CloudBridge::Taller::App::MODULE` instance takes
+`taller-aws-devops-semana2-eco-modulo.yaml` (defaults already the eco's, four
+overrides), and never the app template — its logical IDs carry the `Eco` prefix, so
+the app template would replace every resource and collide on priority. Three gotchas are
+warnings in the guide: an unlisted parameter reverts to its default (no
+`UsePreviousValue` in the action), the wizard-generated pipeline role may not cover
+a stack added later (`AccessDenied` + `iam:PassRole`), and `CHANGE_SET_REPLACE`
+fails with `didn't contain changes` when the same commit is re-run.
+
+The practice opens with **«Paso previo: el rol que despliega»**, because the two
+roles are the part that bites first: the wizard makes the pipeline's own role, and
+`taller-aws-<su-nombre>-cfn-deploy` (trust `cloudformation.amazonaws.com`,
+PowerUserAccess + IAMFullAccess — broad on purpose, `IAMFullAccess` non-optional
+since the app template creates the task and execution roles) must exist **before**
+the action is configured. The action's **Role name** field is a free-text search box
+that accepts a name that does not exist and only fails on **Save**, with
+`AccessDeniedException … iam:PassRole on resource: <name>` — which reads as a
+permissions problem even for an administrator. It is not: IAM cannot resolve a
+missing role to an ARN (hence the bare name, not an ARN in the message), and a
+non-existent resource answers `AccessDenied`. Diagnosed live on 2026-08-04 with
+`aws iam get-role` → `NoSuchEntity`; the guide carries the error text, the check,
+and a `::: info` on what `iam:PassRole` is for.
+
+Field tables follow the real **Edit action** panel order (Action name, Action
+provider, Region, Input artifacts, Action mode, Stack name, Change set name,
+Template artifact/file, Capabilities, then Role name and Advanced → Parameter
+overrides). **Execute a change set** has **no** Role name, template, capabilities,
+or parameters — the form shortens by itself, since the change set already carries
+them. `15` and `16` follow: Deploy is CloudFormation, not ECS.
+
+**Known inconsistency:** `12`'s module practice names the recreated eco stack
+`taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification
+commands in the same practice — and `17` — use `taller-aws-<su-nombre>-eco`. The
+reference account (`410228653321`, `us-east-2`) actually has
+`taller-aws-guzman-eco2`. Three names for one stack; unresolved — the naming
+decision is the user's.
+
 **Note:** new content files are not served until added to a `[[session]]` in
 `content/<course>/course.toml`, in either mode. On the embedded path, `include_dir!`
 also does not re-embed on new files alone — `touch crates/server/src/content.rs`
@@ -282,7 +338,9 @@ Week 3.
   a 4-phase `buildspec.yml` (install verifies tools incl. buildx · pre_build
   hadolint + ECR login + `docker buildx create --use` · build `docker buildx build`
   with ECR registry cache (`:cache` tag, `mode=max`, `--provenance=false`) and
-  `--push` · post_build `aws ecr describe-images` verification) and a multi-stage
+  `--push` · post_build `aws ecr describe-images` verification plus the
+  `imagen.json` parameter file, with an `artifacts` section shipping it and
+  `infra/templates/*.yaml` — see the pipeline entry above) and a multi-stage
   `Dockerfile` that compiles `courses_server` (content embeds at compile time),
   pinned by base-image digest and apt package versions (hadolint-clean). Exercise 5
   (session 03) enables CodeBuild local cache. Exercise 6 (session 03) sets up an
