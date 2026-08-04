@@ -10,6 +10,7 @@ mod health;
 mod routes;
 mod site;
 
+use std::io::IsTerminal;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
@@ -117,6 +118,9 @@ async fn main() -> Result<()> {
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
+        // Colors help in a terminal, but CloudWatch keeps the raw escape codes
+        // as text, so only use them when stdout really is a terminal.
+        .with_ansi(std::io::stdout().is_terminal())
         .init();
 
     match Cli::parse().command {
