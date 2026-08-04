@@ -97,8 +97,11 @@ desde el principio:
 | El del pipeline (`AWSCodePipelineServiceRole-…`) | CodePipeline | Leer el repositorio, lanzar el build, llamar a CloudFormation, y **pasar** el segundo rol |
 | `taller-aws-<su-nombre>-cfn-deploy` | CloudFormation | Crear, modificar, y borrar los recursos del stack |
 
-El asistente crea el primero. El segundo hay que crearlo a mano, **antes** de configurar la
-etapa de despliegue: el formulario de la acción lo pide por nombre, y no ofrece crearlo.
+El asistente crea el primero, pero solo con los permisos de las etapas que **él** configura;
+como este pipeline salta la etapa de despliegue, ese rol queda sin permisos de
+CloudFormation, y hay que ampliarlo a mano después de crear el pipeline. El segundo hay que
+crearlo a mano **antes** de configurar la etapa de despliegue: el formulario de la acción lo
+pide por nombre, y no ofrece crearlo.
 
 1. Abrir [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles) y pulsar **Create role**.
 2. En **Trusted entity type**, elegir **AWS service**, y en **Use case**, **CloudFormation**.
@@ -256,6 +259,112 @@ Revisar el resumen, y pulsar **Create pipeline**. CodePipeline ejecuta Source y 
 inmediato. Ese primer build es el que deja `imagen.json` y los templates en el artefacto,
 que es justo lo que las etapas siguientes necesitan.
 
+### Ampliar el rol del pipeline
+
+El rol que el asistente acaba de crear lleva los permisos de las etapas que el asistente
+configuró: leer el repositorio de CodeCommit, escribir en el bucket de artefactos, y lanzar
+el proyecto de CodeBuild. Nada más. La etapa de despliegue se saltó, así que **no tiene un
+solo permiso de CloudFormation**, y las etapas que se agregan después, en el editor, no
+vuelven a generar la política: el rol se calcula una sola vez, al crear el pipeline.
+
+El síntoma llega recién en la primera ejecución de `ChangeSet`, y la acción falla así:
+
+```
+User: arn:aws:sts::…:assumed-role/AWSCodePipelineServiceRole-us-east-2-taller-aws-<su-nombre>-pipeline/…
+is not authorized to perform: cloudformation:DescribeStacks on resource:
+arn:aws:cloudformation:us-east-2:…:stack/taller-aws-<su-nombre>-app/…
+because no identity-based policy allows the cloudformation:DescribeStacks action
+```
+
+Con dos roles en juego, lo primero es leer **quién** es el `User` del mensaje: dice
+`AWSCodePipelineServiceRole-…`, el del pipeline, y no `taller-aws-<su-nombre>-cfn-deploy`.
+Lo que falta es el permiso de **llamar** a CloudFormation, no el de crear los recursos del
+stack. Un `PowerUserAccess` de más en el rol de despliegue no arregla nada.
+
+1. Abrir [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles), y buscar
+   `AWSCodePipelineServiceRole-<región>-taller-aws-<su-nombre>-pipeline`.
+2. En **Permissions**, pulsar **Add permissions → Create inline policy**, y cambiar a la
+   pestaña **JSON**.
+3. Pegar la política, reemplazando `<su-nombre>`:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "cloudformation:DescribeStacks",
+           "cloudformation:DescribeStackEvents",
+           "cloudformation:DescribeStackResources",
+           "cloudformation:CreateChangeSet",
+           "cloudformation:DescribeChangeSet",
+           "cloudformation:ExecuteChangeSet",
+           "cloudformation:DeleteChangeSet",
+           "cloudformation:SetStackPolicy"
+         ],
+         "Resource": [
+           "arn:aws:cloudformation:*:*:stack/taller-aws-<su-nombre>-*/*",
+           "arn:aws:cloudformation:*:*:changeSet/taller-aws-<su-nombre>-*/*"
+         ]
+       },
+       {
+         "Effect": "Allow",
+         "Action": [
+           "cloudformation:ValidateTemplate",
+           "cloudformation:GetTemplateSummary"
+         ],
+         "Resource": "*"
+       },
+       {
+         "Effect": "Allow",
+         "Action": "iam:PassRole",
+         "Resource": "arn:aws:iam::*:role/taller-aws-<su-nombre>-cfn-deploy"
+       }
+     ]
+   }
+   ```
+
+4. Nombrarla `cloudformation-deploy`, y pulsar **Create policy**.
+
+Lo mismo desde CloudShell, con la política guardada en `politica.json`. El nombre largo del
+rol no hace falta escribirlo: sale del pipeline.
+
+```bash
+ROL=$(aws codepipeline get-pipeline \
+  --name taller-aws-<su-nombre>-pipeline \
+  --query 'pipeline.roleArn' --output text | cut -d/ -f3)
+
+aws iam put-role-policy \
+  --role-name "$ROL" \
+  --policy-name cloudformation-deploy \
+  --policy-document file://politica.json
+```
+
+El primer bloque cubre los stacks del taller por **prefijo**, `taller-aws-<su-nombre>-*`, y
+no uno por uno. Es a propósito: la lista de stacks crece durante el taller (`-app`, `-eco`,
+y las copias que salen de las pruebas, como un `-eco2`), y una lista cerrada obliga a volver
+a IAM cada vez. El prefijo sigue siendo un límite real —el rol no toca ningún stack de otra
+persona—, y es la forma normal de escribir estas políticas.
+
+Los dos tipos de ARN del mismo bloque también son a propósito. Las acciones de change set
+tienen su propio tipo de recurso (`changeSet/…`), pero cuando el change set se nombra por
+**stack + nombre de change set**, que es como lo hace la acción de CodePipeline,
+CloudFormation autoriza contra el ARN del **stack**. El mensaje de error lo muestra:
+
+```
+is not authorized to perform: cloudformation:DescribeChangeSet on resource:
+arn:aws:cloudformation:us-east-2:…:stack/taller-aws-<su-nombre>-eco2/…
+```
+
+`DescribeChangeSet` sobre un recurso `stack/…`. Poner las dos formas evita adivinar cuál de
+las dos usa cada llamada.
+
+`ValidateTemplate` no tiene recurso, así que va con `*`. Y el último bloque es el
+`iam:PassRole` del que habla la advertencia de más arriba, ahora del otro lado: quien pulsa
+**Save** en la consola lo necesita para guardar la acción, y el pipeline lo necesita para
+entregarle el rol a CloudFormation en cada ejecución.
+
 ### La etapa que propone el cambio
 
 Un `update` de stack se puede aplicar directo, o se puede **calcular primero**, mirar, y
@@ -310,7 +419,7 @@ revierte.
 
 ### La aprobación manual
 
-1. **Add stage** debajo de `ChangeSet`; nombrarla `Approval`.
+1. **Add stage** debajo de `ChangeSet`; nombrarla `Aprobacion`.
 2. Dentro de esa etapa, **Add action group**: tipo de acción **Manual approval**.
    Nombrarla `revisar-cambios`, y guardar.
 
@@ -320,7 +429,7 @@ en CloudFormation, con la lista exacta de lo que va a cambiar. Se revisa en
 
 ### La etapa que aplica el cambio
 
-1. **Add stage** debajo de `Aprobacion`; nombrarla `Deployment`.
+1. **Add stage** debajo de `Aprobacion`; nombrarla `Desplegar`.
 2. **Add action group**, y completar el panel **Edit action**:
 
 | Campo | Valor |
@@ -450,31 +559,36 @@ los change sets, aprobar, y confirmar que la nueva imagen llegó a los dos servi
    `git`—.
 5. **Add build stage**: **AWS CodeBuild**, proyecto `taller-aws-<su-nombre>-build`.
    **Skip test stage**, y **Skip deploy stage**. **Review** → **Create pipeline**.
-6. **Edit** → **Add stage** `ChangeSet`, con una acción **AWS CloudFormation** en modo
+6. En IAM, agregar al rol `AWSCodePipelineServiceRole-<región>-taller-aws-<su-nombre>-pipeline`
+   una política inline con los permisos de CloudFormation sobre `stack/taller-aws-<su-nombre>-*`
+   y `changeSet/taller-aws-<su-nombre>-*`, y `iam:PassRole` sobre
+   `taller-aws-<su-nombre>-cfn-deploy`. El asistente no los pone, porque la etapa de
+   despliegue se saltó.
+7. **Edit** → **Add stage** `ChangeSet`, con una acción **AWS CloudFormation** en modo
    **Create or replace a change set**, entrada `BuildArtifact`, stack
    `taller-aws-<su-nombre>-app`, change set `taller-aws-<su-nombre>-app-cs`, template
    `infra/templates/taller-aws-devops-semana3-app.yaml`, capacidad `CAPABILITY_IAM`, rol
    `taller-aws-<su-nombre>-cfn-deploy`, y en **Parameter overrides** el `Fn::GetParam`
    sobre `imagen.json` más los tres nombres de stack.
-7. **Add stage** `Aprobacion`, con una acción **Manual approval**. **Add stage**
+8. **Add stage** `Aprobacion`, con una acción **Manual approval**. **Add stage**
    `Desplegar`, con una acción en modo **Execute a change set** sobre el mismo stack, y el
    mismo change set.
-8. En `ChangeSet`, **Add action** a la derecha de la acción existente: misma configuración,
+9. En `ChangeSet`, **Add action** a la derecha de la acción existente: misma configuración,
    con stack `taller-aws-<su-nombre>-eco`, change set `taller-aws-<su-nombre>-eco-cs`,
    template `infra/templates/taller-aws-devops-semana2-app.yaml` —o el del módulo, si el eco
    se recreó con él—, y tres overrides más: `ComandoContenedor`, `RutaPath`, y `Prioridad`.
    Repetir en `Desplegar` con el modo **Execute a change set**. **Save**.
-9. Subir un commit a `main`:
+10. Subir un commit a `main`:
 
-   ```bash
-   git commit -am "Probar el pipeline"
-   git push codecommit main
-   ```
+    ```bash
+    git commit -am "Probar el pipeline"
+    git push codecommit main
+    ```
 
-10. Observar Source → Build → `ChangeSet` (dos acciones en paralelo) → pausa en
+11. Observar Source → Build → `ChangeSet` (dos acciones en paralelo) → pausa en
     `Aprobacion`. Leer los dos change sets en CloudFormation, y pulsar
     **Review → Approve**.
-11. La etapa `Desplegar` aplica los dos change sets. Confirmar el despliegue nuevo en los
+12. La etapa `Desplegar` aplica los dos change sets. Confirmar el despliegue nuevo en los
     dos servicios de ECS.
 :::
 
