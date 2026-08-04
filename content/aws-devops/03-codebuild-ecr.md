@@ -482,11 +482,22 @@ preocupen solamente de que su aplicación corra, sin tener en cuenta requerimien
 que maximicen recursos y apliquen buenas prácticas de seguridad.
 
 El primer ejemplo es el uso de **multi-stage builds**, como en nuestro `Dockerfile`:
-la primera etapa compila el binario con toda la *toolchain* de Rust (compilador,
-`cmake`, `build-essential`); la segunda parte de una imagen mínima y copia solamente
-el binario y los certificados para TLS. La imagen final solo cuenta con lo mínimo
-necesario para ejecutar: se reduce la superficie de ataque —nada de compiladores ni
-herramientas de build en producción— y el espacio de almacenamiento.
+las etapas `chef`, `planner` y `builder` compilan el binario con toda la *toolchain*
+de Rust (compilador, `cmake`, `build-essential`, `lld`); la última parte de una imagen
+mínima y copia solamente el binario y los certificados para TLS. La imagen final solo
+cuenta con lo mínimo necesario para ejecutar: se reduce la superficie de ataque —nada
+de compiladores ni herramientas de build en producción— y el espacio de almacenamiento.
+
+Las tres primeras etapas existen por una segunda razón, que es de DevOps y no de
+desarrollo: **el orden de las capas decide qué se puede cachear**. Si copiáramos todo
+el repositorio antes de compilar, cualquier cambio en el contenido del curso
+invalidaría la capa del `build`, y cada pipeline recompilaría las más de 240
+dependencias del proyecto (el SDK de AWS, `axum`, la librería de TLS). Con
+[`cargo-chef`](https://github.com/LukeMathWalker/cargo-chef), `planner` extrae la
+lista de dependencias a un `recipe.json`, y `builder` las compila *antes* de copiar
+las fuentes. Esa capa depende solo de `Cargo.toml` y `Cargo.lock`, así que sobrevive a
+cualquier edición de `content/`, y el *registry cache* que configuramos en el
+`buildspec.yml` la reutiliza entre builds.
 
 Lo segundo es **la forma en que se descargan las dependencias**. No es lo mismo
 depender de un PPA público que utilizar el *Artifact Registry* de la compañía. Un
@@ -526,7 +537,7 @@ no solamente por etiqueta, en pos de asegurar que siempre hacemos el build con l
 misma imagen base:
 
 ```dockerfile
-FROM rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS builder
+FROM rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS chef
 ```
 
 ::: warning
@@ -554,7 +565,7 @@ las codifica como reglas verificables. Cada una tiene un código; por ejemplo,
 nuestro `Dockerfile` sin los pins de versión dispara esta:
 
 ```
-Dockerfile:5 DL3008 warning: Pin versions in apt get install. Instead of
+Dockerfile:12 DL3008 warning: Pin versions in apt get install. Instead of
 `apt-get install <package>` use `apt-get install <package>=<version>`
 ```
 
@@ -1245,9 +1256,10 @@ más en el repositorio.
 {#ejercicio-6}
 ### Ejercicio 6 — Servir las imágenes base desde nuestro registro
 
-Configurar un **pull-through cache** de la galería pública de ECR, y apuntar las dos
-líneas `FROM` del `Dockerfile` a nuestro registro privado. Al terminar, ningún build
-vuelve a descargar `rust` ni `debian` desde Docker Hub.
+Configurar un **pull-through cache** de la galería pública de ECR, y apuntar a nuestro
+registro privado las dos líneas `FROM` del `Dockerfile` que descargan una imagen —las
+otras dos parten de la etapa `chef`, que ya es local. Al terminar, ningún build vuelve
+a descargar `rust` ni `debian` desde Docker Hub.
 
 ::: solucion
 1. Abrir [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home) y,
@@ -1288,13 +1300,14 @@ vuelve a descargar `rust` ni `debian` desde Docker Hub.
 
    `ecr:CreateRepository` solo hace falta la primera vez, mientras el repositorio
    de cache todavía no existe.
-5. En el clon local del repositorio, editar las dos líneas `FROM` del `Dockerfile`
-   para que apunten al registro privado. La galería pública de ECR publica las
+5. En el clon local del repositorio, editar las dos líneas `FROM` que descargan una
+   imagen —la de `rust` y la de `debian`; las que dicen `FROM chef` se dejan como
+   están— para que apunten al registro privado. La galería pública de ECR publica las
    imágenes oficiales de Docker bajo `docker/library/`, con **el mismo digest** que
    Docker Hub, así que los pins `@sha256:` no cambian —solo cambia el host:
 
    ```dockerfile
-   FROM <AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS builder
+   FROM <AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS chef
    ```
 
    ```dockerfile
