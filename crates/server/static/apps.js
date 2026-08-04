@@ -696,6 +696,234 @@
   );
 
   // ---------------------------------------------------------------------------
+  // Custom element: <cb-health>
+  // Attributes: dependency, seconds, label
+  //
+  // Two halves: a live board polling the three health endpoints, and a control
+  // that breaks one dependency for a bounded time. Watching the board while the
+  // outage runs is the whole point — readiness leaves rotation, liveness does
+  // not, and the instance comes back on its own.
+  // ---------------------------------------------------------------------------
+
+  var HEALTH_CHECKS = [
+    { key: "live", path: "/health/live" },
+    { key: "ready", path: "/health/ready" },
+    { key: "startup", path: "/health/startup" },
+  ];
+
+  var HEALTH_DEPENDENCIES = [
+    { value: "dynamodb", label: "dynamodb (dura)" },
+    { value: "content", label: "content (blanda)" },
+  ];
+
+  var HEALTH_POLL_MS = 1000;
+
+  function healthCodeClass(code) {
+    if (code === 200) return "cb-health-ok";
+    if (code === 503) return "cb-health-fail";
+    if (code === 404) return "cb-health-off";
+    return "cb-health-unknown";
+  }
+
+  customElements.define(
+    "cb-health",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (!this._rendered) {
+          this._rendered = true;
+          this._chips = {};
+          this._until = 0;
+
+          var dependency = this.getAttribute("dependency") || "dynamodb";
+          var seconds = this.getAttribute("seconds") || "60";
+          var label = this.getAttribute("label") || "Romper dependencia";
+
+          // --- board: one chip per endpoint ---
+          var board = document.createElement("div");
+          board.className = "cb-health-board";
+          HEALTH_CHECKS.forEach((check) => {
+            var chip = document.createElement("span");
+            chip.className = "cb-health-chip cb-health-unknown";
+            var name = document.createElement("code");
+            name.textContent = check.path;
+            var code = document.createElement("b");
+            code.textContent = "…";
+            chip.appendChild(name);
+            chip.appendChild(code);
+            board.appendChild(chip);
+            this._chips[check.key] = { chip: chip, code: code };
+          });
+
+          this._detail = document.createElement("div");
+          this._detail.className = "cb-health-detail";
+
+          // --- controls ---
+          var controls = document.createElement("div");
+          controls.className = "cb-health-controls";
+
+          this._select = document.createElement("select");
+          this._select.className = "cb-app-input cb-health-select";
+          HEALTH_DEPENDENCIES.forEach(function (dep) {
+            var option = document.createElement("option");
+            option.value = dep.value;
+            option.textContent = dep.label;
+            this._select.appendChild(option);
+          }, this);
+          this._select.value = dependency;
+
+          this._seconds = document.createElement("input");
+          this._seconds.className = "cb-app-input cb-health-seconds";
+          this._seconds.type = "number";
+          this._seconds.min = "1";
+          this._seconds.max = "600";
+          this._seconds.value = seconds;
+
+          this._break = makeAppBtn(label);
+          this._restore = makeAppBtn("Restaurar");
+          this._restore.classList.add("cb-health-restore");
+
+          controls.appendChild(this._select);
+          controls.appendChild(this._seconds);
+          controls.appendChild(this._break);
+          controls.appendChild(this._restore);
+
+          this._status = document.createElement("span");
+          this._status.className = "cb-app-status";
+
+          this.appendChild(board);
+          this.appendChild(this._detail);
+          this.appendChild(controls);
+          this.appendChild(this._status);
+
+          this._break.addEventListener("click", () => {
+            var requested = Number(this._seconds.value) || 60;
+            this._send(requested, "Rompiendo…");
+          });
+          this._restore.addEventListener("click", () => {
+            // Zero seconds is the restore command.
+            this._send(0, "Restaurando…");
+          });
+        }
+
+        registerLockable(this);
+
+        this._statusListener = (envelope) => {
+          if (envelope.id !== "status-health-fault") return;
+          var status;
+          try {
+            status = JSON.parse(envelope.payload);
+          } catch (_) {
+            return;
+          }
+          if (status.state === "broken") {
+            this._until = Date.now() + Number(status.seconds || 0) * 1000;
+            this._status.textContent =
+              status.dependency + ": en falla por " + status.seconds + "s";
+          } else {
+            this._until = 0;
+            this._status.textContent = status.dependency + ": restaurada";
+          }
+        };
+        appStatusListeners.push(this._statusListener);
+
+        this._poll();
+        this._timer = setInterval(() => this._poll(), HEALTH_POLL_MS);
+      }
+
+      disconnectedCallback() {
+        unregisterLockable(this);
+        clearInterval(this._timer);
+        this._timer = null;
+        var idx = appStatusListeners.indexOf(this._statusListener);
+        if (idx !== -1) appStatusListeners.splice(idx, 1);
+        this._statusListener = null;
+      }
+
+      // Emits one health-fault event. `seconds` of 0 restores.
+      _send(seconds, pending) {
+        this._break.disabled = true;
+        this._restore.disabled = true;
+        this._status.textContent = pending;
+        cbEvents
+          .emit(
+            uuid(),
+            "health-fault",
+            JSON.stringify({ dependency: this._select.value, seconds: seconds })
+          )
+          .then((code) => {
+            this._break.disabled = false;
+            this._restore.disabled = false;
+            if (code === 202) {
+              // The authoritative text arrives on the bus; keep the board moving.
+              this._poll();
+            } else if (code === 403) {
+              this._status.textContent = "";
+              handleForbidden();
+            } else {
+              this._status.textContent = "Error (" + code + ")";
+            }
+          })
+          .catch(() => {
+            this._break.disabled = false;
+            this._restore.disabled = false;
+            this._status.textContent = "Error de red";
+          });
+      }
+
+      // Reads the three endpoints and repaints the board.
+      _poll() {
+        if (document.hidden || !this.isConnected) return;
+        HEALTH_CHECKS.forEach((check) => {
+          fetch(check.path, { cache: "no-store" })
+            .then((r) => {
+              var slot = this._chips[check.key];
+              slot.code.textContent = String(r.status);
+              slot.chip.className = "cb-health-chip " + healthCodeClass(r.status);
+              if (r.status === 404) {
+                this._detail.textContent =
+                  "Los endpoints no están habilitados en este servidor (CB_HEALTH_CHECKS).";
+                return null;
+              }
+              return check.key === "ready" ? r.json() : null;
+            })
+            .then((body) => {
+              if (body) this._paintDetail(body);
+            })
+            .catch(() => {
+              var slot = this._chips[check.key];
+              slot.code.textContent = "×";
+              slot.chip.className = "cb-health-chip cb-health-unknown";
+            });
+        });
+        this._paintCountdown();
+      }
+
+      // The readiness body carries the aggregate and the per-dependency reasons.
+      // The body speaks the wire vocabulary; the guide reads Spanish.
+      _paintDetail(body) {
+        var parts = ["estado: " + body.status, "ciclo: " + body.lifecycle];
+        (body.checks || []).forEach(function (dep) {
+          if (dep.status === "fail") {
+            var kind = dep.criticality === "hard" ? "dura" : "blanda";
+            parts.push(dep.name + " (" + kind + "): " + (dep.error || "falla"));
+          }
+        });
+        this._detail.textContent = parts.join(" · ");
+      }
+
+      _paintCountdown() {
+        if (!this._until) return;
+        var left = Math.ceil((this._until - Date.now()) / 1000);
+        if (left <= 0) {
+          this._until = 0;
+          return;
+        }
+        this._status.textContent = "Restaura sola en " + left + "s";
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
   // Custom element: <cb-file>
   // Attributes: path, type, data-content, toggleable, open, full-path
   //

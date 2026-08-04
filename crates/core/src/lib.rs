@@ -13,6 +13,7 @@ mod echo;
 mod error;
 mod events;
 mod goto_apps;
+mod health;
 mod manifest;
 mod markdown;
 mod notifications;
@@ -37,6 +38,12 @@ pub use events::{
     CpuBurstConfig, Decision, Event, EventId, Gate, GateConfig, HandlerKind, Intensity,
     MetricConfig, MetricMethod, RecentIds, Seen, gate, is_public_collection, parse_event,
     parse_gate, select,
+};
+pub use health::{
+    Check, Criticality, DEFAULT_FAULT_SECONDS, Dependency, DependencyReport, HealthBody, HealthEnv,
+    HealthFaultConfig, HealthSettings, HealthView, Lifecycle, MAX_FAULT_SECONDS, Overall,
+    ProbeStatus, body as health_body, live_code, overall, parse_flag, parse_health_settings,
+    prober_is_stale, ready_code, startup_code, status_code,
 };
 pub use manifest::{Manifest, parse_manifest};
 pub use markdown::render_markdown;

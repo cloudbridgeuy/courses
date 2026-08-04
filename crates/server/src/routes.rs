@@ -9,7 +9,7 @@ use axum::http::{StatusCode, header};
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
-use courses_apps::{AppsCtx, Outcome};
+use courses_apps::{AppsCtx, HealthFaults, Outcome};
 use courses_core::{
     Event, EventId, Notification, RecentIds, Seen, SnsMessage, parse_event, parse_gate,
     parse_sns_message, token_matches,
@@ -19,6 +19,7 @@ use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 
+use crate::health::{HEALTH_CHECKS_ENV, HealthHandle, ProbeCtx};
 use crate::site::{SiteHandle, SiteState};
 
 const APPS_JS: &str = include_str!("../static/apps.js");
@@ -102,7 +103,10 @@ impl FromRef<AppState> for broadcast::Sender<Event> {
 
 /// Builds the application router. Async because it loads AWS SDK config and
 /// reads environment variables.
-pub async fn router(site: SiteHandle, dev: Option<DevCtx>) -> Router {
+///
+/// `health` carries the three-tier health subsystem. Its routes are merged, and
+/// its prober started, only when `CB_HEALTH_CHECKS` turned the feature on.
+pub async fn router(site: SiteHandle, dev: Option<DevCtx>, health_ctx: HealthHandle) -> Router {
     // --- SNS hook token ---
     let hook_token = std::env::var(HOOK_TOKEN_ENV).ok().map(Arc::new);
     if hook_token.is_none() {
@@ -116,6 +120,7 @@ pub async fn router(site: SiteHandle, dev: Option<DevCtx>) -> Router {
     if apps_secret.is_none() {
         tracing::warn!("{APPS_SECRET_ENV} is unset: /events endpoint is open (no secret required)");
     }
+    let apps_secret_arc = apps_secret.clone().map(Arc::new);
     let apps_gated = std::env::var(APPS_GATED_ENV).ok();
     let gate_config = parse_gate(apps_secret.as_deref(), apps_gated.as_deref());
     for unknown in &gate_config.unknown_kinds {
@@ -166,17 +171,36 @@ pub async fn router(site: SiteHandle, dev: Option<DevCtx>) -> Router {
         gate,
         table,
         public_collections: Arc::new(public_collections),
+        faults: HealthFaults::default(),
     };
 
     let state = AppState {
-        site,
+        site: site.clone(),
         dev,
         hook_token,
-        apps,
+        apps: apps.clone(),
         recent: Arc::new(Mutex::new(RecentIds::with_capacity(RECENT_IDS_CAPACITY))),
     };
 
-    Router::new()
+    // --- Three-tier health checks (off unless the flag is set) ---
+    let health_routes = if health_ctx.settings().enabled {
+        tracing::info!(
+            interval_secs = health_ctx.settings().interval_secs,
+            drain_secs = health_ctx.settings().drain_secs,
+            "{HEALTH_CHECKS_ENV} is on: serving /health/live, /health/ready, and /health/startup"
+        );
+        let faults = apps.faults.clone();
+        crate::health::spawn_prober(ProbeCtx {
+            handle: health_ctx.clone(),
+            apps,
+            site,
+        });
+        Some(crate::health::router(health_ctx, faults, apps_secret_arc))
+    } else {
+        None
+    };
+
+    let router = Router::new()
         .route("/", get(index))
         .route("/courses", get(index))
         .route("/courses/{slug}", get(course_page))
@@ -192,7 +216,12 @@ pub async fn router(site: SiteHandle, dev: Option<DevCtx>) -> Router {
         .route("/dev/reload", get(dev_reload))
         .route("/state/{collection}/{key}", get(state_read))
         .route("/health", get(health))
-        .with_state(state)
+        .with_state(state);
+
+    match health_routes {
+        Some(extra) => router.merge(extra),
+        None => router,
+    }
 }
 
 // ---------------------------------------------------------------------------

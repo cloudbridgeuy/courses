@@ -7,7 +7,9 @@ use serde_json::Value;
 use crate::AppsCtx;
 use crate::error::{Error, Result};
 use crate::{emit_notification, emit_status};
-use courses_core::{CpuBurstConfig, Intensity, MetricConfig, MetricMethod, is_public_collection};
+use courses_core::{
+    CpuBurstConfig, HealthFaultConfig, Intensity, MetricConfig, MetricMethod, is_public_collection,
+};
 
 // ---------------------------------------------------------------------------
 // cpu_burst
@@ -270,6 +272,80 @@ pub async fn toast_demo(ctx: &AppsCtx, seed: &str) -> Result<()> {
     emit_notification(ctx, &format!("notif-demo-{seed}"), &notification);
     tracing::info!(state = %notification.state, "demo notification broadcast");
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// health_fault
+// ---------------------------------------------------------------------------
+
+/// Status key shared by every emission, so one widget follows both dependencies.
+const HEALTH_FAULT_STATUS: &str = "health-fault";
+
+/// Status payload emitted when an injected outage starts, or ends.
+#[derive(Serialize)]
+struct HealthFaultStatus<'a> {
+    dependency: &'a str,
+    /// `"broken"` while the outage runs, `"restored"` once it is over.
+    state: &'a str,
+    /// Requested outage length. Zero on the restore emission.
+    seconds: u64,
+}
+
+/// Breaks one health-check dependency for a bounded time, then restores it.
+///
+/// This is the guide's fault-injection button. Readiness reports the failure of
+/// a hard dependency while the outage runs, liveness keeps answering `200`, and
+/// the instance returns to rotation on its own once the deadline passes. A
+/// payload of `{"seconds":0}` restores the dependency right away.
+///
+/// NOTE: the wait runs inside the spawned dispatch task. Restoring never depends
+/// on it: the prober treats an expired fault as gone, so a lost task at most
+/// costs the browser its "restored" status line.
+pub async fn health_fault(ctx: &AppsCtx, payload: &str) -> Result<()> {
+    let cfg = HealthFaultConfig::parse(payload)?;
+    let name = cfg.dependency.as_str();
+
+    if cfg.seconds == 0 {
+        ctx.faults.clear(cfg.dependency).await;
+        emit_fault_status(ctx, name, "restored", 0);
+        tracing::info!(dependency = name, "health fault cleared on request");
+        return Ok(());
+    }
+
+    let duration = Duration::from_secs(cfg.seconds);
+    ctx.faults.inject(cfg.dependency, Some(duration)).await;
+    emit_fault_status(ctx, name, "broken", cfg.seconds);
+    tracing::warn!(
+        dependency = name,
+        seconds = cfg.seconds,
+        criticality = ?cfg.dependency.criticality(),
+        "health fault injected: the prober will report this dependency as failed"
+    );
+
+    tokio::time::sleep(duration).await;
+
+    // Only report the restore when this outage is the one that expired; a newer
+    // injection carries a later deadline and stays.
+    if ctx.faults.expire(cfg.dependency).await {
+        emit_fault_status(ctx, name, "restored", 0);
+        tracing::info!(
+            dependency = name,
+            "health fault expired: dependency restored"
+        );
+    }
+    Ok(())
+}
+
+/// Serializes and broadcasts one fault-status change.
+fn emit_fault_status(ctx: &AppsCtx, dependency: &str, state: &str, seconds: u64) {
+    match serde_json::to_string(&HealthFaultStatus {
+        dependency,
+        state,
+        seconds,
+    }) {
+        Ok(payload) => emit_status(ctx, HEALTH_FAULT_STATUS, payload),
+        Err(e) => tracing::error!(error = %e, "failed to serialize health-fault status"),
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -184,6 +184,83 @@ cb-http {
 }
 
 /* ---------------------------------------------------------------------------
+   <cb-health> — live board over the three health endpoints, plus fault injection
+   --------------------------------------------------------------------------- */
+
+cb-health {
+  display: block;
+}
+
+.cb-health-board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cb-health-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.3em 0.7em;
+  border: 1px solid var(--cb-border, #e2e6e8);
+  border-left-width: 4px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.cb-health-chip code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.cb-health-chip b {
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-health-ok {
+  border-left-color: var(--cb-teal-deep, #1f7a70);
+}
+
+.cb-health-fail {
+  border-left-color: #b3261e;
+}
+
+.cb-health-off,
+.cb-health-unknown {
+  border-left-color: var(--cb-grey, #75787b);
+  opacity: 0.75;
+}
+
+.cb-health-detail {
+  margin-top: 0.4rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cb-grey, #75787b);
+}
+
+.cb-health-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+
+.cb-health-select {
+  width: auto;
+  margin-right: 0;
+}
+
+.cb-health-seconds {
+  width: 5rem;
+  margin-right: 0;
+}
+
+/* Restoring is the undo half of the pair; keep it visually secondary. */
+.cb-health-restore {
+  background: var(--cb-grey, #75787b);
+}
+
+/* ---------------------------------------------------------------------------
    Locked widget — dimmed, non-interactive, lock symbol overlay
    --------------------------------------------------------------------------- */
 

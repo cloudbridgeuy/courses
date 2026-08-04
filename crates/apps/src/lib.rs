@@ -8,10 +8,12 @@
 
 mod dev;
 mod error;
+mod faults;
 mod handlers;
 
 pub use dev::{dev_dynamo_client, ensure_table};
 pub use error::{Error, Result};
+pub use faults::HealthFaults;
 
 use std::sync::Arc;
 
@@ -31,6 +33,9 @@ pub struct AppsCtx {
     pub gate: Gate,
     pub table: String,
     pub public_collections: Arc<Vec<String>>,
+    /// Dependency outages injected from the guide. The server's health prober
+    /// reads the same handle.
+    pub faults: HealthFaults,
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +138,7 @@ pub async fn dispatch(ctx: &AppsCtx, event: Event, provided: Option<&str>) -> Ou
             courses_core::HandlerKind::Counter => handlers::counter(&ctx, &payload).await,
             courses_core::HandlerKind::Metric => handlers::metric(&ctx, &payload).await,
             courses_core::HandlerKind::ToastDemo => handlers::toast_demo(&ctx, &event_id).await,
+            courses_core::HandlerKind::HealthFault => handlers::health_fault(&ctx, &payload).await,
         };
         match result {
             Ok(()) => {

@@ -119,6 +119,7 @@ pub enum HandlerKind {
     Counter,
     Metric,
     ToastDemo,
+    HealthFault,
 }
 
 /// Selects a handler for an event type. Unknown types return `None` (200 no-op).
@@ -128,6 +129,7 @@ pub fn select(kind: &str) -> Option<HandlerKind> {
         "counter" => Some(HandlerKind::Counter),
         "metric" => Some(HandlerKind::Metric),
         "toast-demo" => Some(HandlerKind::ToastDemo),
+        "health-fault" => Some(HandlerKind::HealthFault),
         _ => None,
     }
 }
@@ -337,6 +339,7 @@ pub fn parse_gate(secret: Option<&str>, gated: Option<&str>) -> GateConfig {
             "counter" => kinds.push(HandlerKind::Counter),
             "metric" => kinds.push(HandlerKind::Metric),
             "toast-demo" => kinds.push(HandlerKind::ToastDemo),
+            "health-fault" => kinds.push(HandlerKind::HealthFault),
             other => unknown_kinds.push(other.to_string()),
         }
     }

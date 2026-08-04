@@ -6,6 +6,7 @@ mod content;
 mod dev;
 mod echo;
 mod file_apps;
+mod health;
 mod routes;
 mod site;
 
@@ -17,6 +18,7 @@ use color_eyre::eyre::{Result, WrapErr};
 use tokio::sync::broadcast;
 
 use crate::echo::EchoConfig;
+use crate::health::HealthHandle;
 use crate::routes::DevCtx;
 use crate::site::{SiteHandle, SiteState};
 
@@ -48,6 +50,9 @@ enum Command {
     /// Serve an echo server that answers every request with a JSON description
     /// of that request.
     Echo(EchoArgs),
+    /// Probe this server over loopback, and report the result as an exit code.
+    /// This is what the ECS container health check runs.
+    Healthcheck(HealthcheckArgs),
 }
 
 #[derive(Debug, Args)]
@@ -60,6 +65,19 @@ struct EchoArgs {
     /// arrived under this name, or by some other route.
     #[arg(long, env = "CB_ECHO_NAME")]
     name: Option<String>,
+}
+
+#[derive(Debug, Args)]
+struct HealthcheckArgs {
+    /// Path to request.
+    #[arg(long, default_value = "/health/live")]
+    path: String,
+    /// Port this server listens on.
+    #[arg(long, env = "PORT", default_value_t = DEFAULT_PORT)]
+    port: u16,
+    /// Give up after this many milliseconds.
+    #[arg(long, default_value_t = 2_000)]
+    timeout_ms: u64,
 }
 
 /// Runtime configuration, parsed once at the process boundary.
@@ -109,6 +127,33 @@ async fn main() -> Result<()> {
                 public_name: args.name,
             })
             .await
+        }
+        Some(Command::Healthcheck(args)) => healthcheck(args).await,
+    }
+}
+
+/// Requests one path over loopback, and turns the answer into an exit code:
+/// `0` for a success status, `1` for anything else. It exists so the container
+/// health check has a command to run without adding curl to the image.
+async fn healthcheck(args: HealthcheckArgs) -> Result<()> {
+    let url = format!(
+        "http://127.0.0.1:{}/{}",
+        args.port,
+        args.path.trim_start_matches('/')
+    );
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(args.timeout_ms))
+        .build()
+        .wrap_err("failed to build the health check client")?;
+    match client.get(&url).send().await {
+        Ok(response) if response.status().is_success() => Ok(()),
+        Ok(response) => {
+            eprintln!("{url} answered {}", response.status());
+            std::process::exit(1)
+        }
+        Err(e) => {
+            eprintln!("{url} failed: {e}");
+            std::process::exit(1)
         }
     }
 }
@@ -164,13 +209,34 @@ async fn serve_site(config: Config) -> Result<()> {
         ),
     };
 
+    let health = HealthHandle::new(health::settings_from_env());
+
     axum::serve(
         bind(config.port).await?,
-        routes::router(site, dev_ctx).await,
+        routes::router(site, dev_ctx, health.clone()).await,
     )
-    .with_graceful_shutdown(shutdown_signal())
+    .with_graceful_shutdown(drain_then_shutdown(health))
     .await
     .wrap_err("server error")
+}
+
+/// Waits for the shutdown signal, then holds the listener open while readiness
+/// reports `503`, so the load balancer deregisters this target before in-flight
+/// requests would be cut. Without the health feature, it resolves at once, and
+/// the previous behaviour is unchanged.
+async fn drain_then_shutdown(health: HealthHandle) {
+    shutdown_signal().await;
+    let settings = health.settings();
+    if !settings.enabled || settings.drain_secs == 0 {
+        return;
+    }
+    health.begin_draining().await;
+    tracing::info!(
+        drain_secs = settings.drain_secs,
+        "draining: readiness reports 503 while the balancer deregisters this target"
+    );
+    tokio::time::sleep(std::time::Duration::from_secs(settings.drain_secs)).await;
+    tracing::info!("drain window elapsed; closing connections");
 }
 
 /// Resolves on SIGINT (ctrl-c), or SIGTERM (what ECS sends on task stop).

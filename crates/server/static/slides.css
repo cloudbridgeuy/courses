@@ -843,6 +843,24 @@ body {
   color: rgba(255,255,255,0.7);
 }
 
+/* Health board: dark surface, so the chip borders carry the state. */
+.cb-health-chip {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+}
+
+.cb-health-ok {
+  border-left-color: var(--cb-teal);
+}
+
+.cb-health-fail {
+  border-left-color: #ff8a80;
+}
+
+.cb-health-detail {
+  color: rgba(255,255,255,0.7);
+}
+
 /* Unlock toggle: dark-surface style */
 #cb-unlock-toggle {
   border: 1px solid rgba(255,255,255,0.2);
