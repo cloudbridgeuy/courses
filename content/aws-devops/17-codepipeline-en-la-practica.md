@@ -80,8 +80,10 @@ pestaña **Parameters** de cada stack, y copiar los valores que hoy tiene.
 
 :::inline-slide
 ## Práctica guiada: crear el pipeline
+:::add visibility=slide
 :::app
 <cb-goto path="Práctica guiada: crear el pipeline"></cb-goto>
+::: # app
 ::: # add
 :::
 
@@ -530,99 +532,49 @@ vez anterior. Un commit nuevo siempre produce un cambio.
 
 ---
 
-{#ejercicio-14}
-### Ejercicio 14 — Crear y ejecutar el pipeline
-
-Crear un pipeline con etapas Source (CodeCommit `main`), Build (el proyecto de CodeBuild),
-`ChangeSet`, **aprobación manual**, y `Desplegar`. Las dos etapas de CloudFormation llevan
-**dos acciones en paralelo**: la de la aplicación, y la del eco. Subir un commit, revisar
-los change sets, aprobar, y confirmar que la nueva imagen llegó a los dos servicios.
-
-::: solucion
-1. Agregar a `buildspec.yml` la generación de `imagen.json` y la sección `artifacts` con
-   `imagen.json` y `infra/templates/*.yaml`, y subirlo a CodeCommit —desde el editor de la
-   consola (**Code** → `buildspec.yml` → **Edit** → **Commit changes**), con
-   `aws codecommit put-file`, o con `git push codecommit main`.
-2. En IAM, crear el rol `taller-aws-<su-nombre>-cfn-deploy` para el servicio
-   **CloudFormation**, con **PowerUserAccess** y **IAMFullAccess**.
-3. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), pulsar **Create pipeline**. En **Choose
-   creation option**, elegir **Build custom pipeline**, y pulsar **Next**. Nombrar el
-   pipeline `taller-aws-<su-nombre>-pipeline`, y dejar crear un nuevo rol de servicio.
-4. **Add source stage**: **AWS CodeCommit**, repositorio `taller-aws-<su-nombre>`, rama
-   `main`, con **Create EventBridge rule to automatically detect source changes** marcado,
-   y **Output artifact format** en **CodePipeline default** —el build no usa comandos
-   `git`—.
-5. **Add build stage**: **AWS CodeBuild**, proyecto `taller-aws-<su-nombre>-build`.
-   **Skip test stage**, y **Skip deploy stage**. **Review** → **Create pipeline**.
-6. En IAM, agregar al rol `AWSCodePipelineServiceRole-<región>-taller-aws-<su-nombre>-pipeline`
-   una política inline con los permisos de CloudFormation sobre `stack/taller-aws-<su-nombre>-*`
-   y `changeSet/taller-aws-<su-nombre>-*`, y `iam:PassRole` sobre
-   `taller-aws-<su-nombre>-cfn-deploy`. El asistente no los pone, porque la etapa de
-   despliegue se saltó.
-7. **Edit** → **Add stage** `ChangeSet`, con una acción **AWS CloudFormation** en modo
-   **Create or replace a change set**, entrada `BuildArtifact`, stack
-   `taller-aws-<su-nombre>-app`, change set `taller-aws-<su-nombre>-app-cs`, template
-   `infra/templates/taller-aws-devops-semana3-app.yaml`, capacidad `CAPABILITY_IAM`, rol
-   `taller-aws-<su-nombre>-cfn-deploy`, y en **Parameter overrides** el `Fn::GetParam`
-   sobre `imagen.json` más los tres nombres de stack.
-8. **Add stage** `Aprobacion`, con una acción **Manual approval**. **Add stage**
-   `Desplegar`, con una acción en modo **Execute a change set** sobre el mismo stack, y el
-   mismo change set.
-9. En `ChangeSet`, **Add action** a la derecha de la acción existente: misma configuración,
-   con stack `taller-aws-<su-nombre>-eco`, change set `taller-aws-<su-nombre>-eco-cs`,
-   template `infra/templates/taller-aws-devops-semana2-app.yaml` —o el del módulo, si el eco
-   se recreó con él—, y tres overrides más: `ComandoContenedor`, `RutaPath`, y `Prioridad`.
-   Repetir en `Desplegar` con el modo **Execute a change set**. **Save**.
-10. Subir un commit a `main`:
-
-    ```bash
-    git commit -am "Probar el pipeline"
-    git push codecommit main
-    ```
-
-11. Observar Source → Build → `ChangeSet` (dos acciones en paralelo) → pausa en
-    `Aprobacion`. Leer los dos change sets en CloudFormation, y pulsar
-    **Review → Approve**.
-12. La etapa `Desplegar` aplica los dos change sets. Confirmar el despliegue nuevo en los
-    dos servicios de ECS.
-:::
-
-:::slide light
-{{ejercicio-14}}
-:::
-
-:::slide light
+:::inline-slide light
 ## El pipeline, de punta a punta
 
 ```mermaid
-flowchart LR
-  C["commit<br/>(CodeCommit)"] --> B["Build<br/>(CodeBuild)"]
-  B --> R[("imagen<br/>en ECR")]
-  B --> S["Change set<br/>app + eco"]
-  S --> A{"Aprobación<br/>manual"}
-  A -->|Approve| D1["Desplegar app<br/>(CloudFormation)"]
-  A -->|Approve| D2["Desplegar eco<br/>(CloudFormation)"]
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 26, "padding": 8, "subGraphTitleMargin": {"top": 6, "bottom": 14}}, "themeVariables": {"fontSize": "13px", "clusterBkg": "#f8fafc", "clusterBorder": "#94a3b8", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart TB
+    subgraph e1["Source"]
+        src["<img src='/static/aws-codecommit.svg' width='20' height='20' /> <b>Source</b><br/>AWS CodeCommit"]
+    end
+
+    subgraph e2["Build"]
+        bld["<img src='/static/aws-codebuild.svg' width='20' height='20' /> <b>Build</b><br/>AWS CodeBuild"]
+    end
+
+    subgraph e3["ChangeSet"]
+        direction LR
+        cs1["<img src='/static/aws-cloudformation.svg' width='20' height='20' /> <b>app-changeset</b><br/>AWS CloudFormation"]
+        cs2["<img src='/static/aws-cloudformation.svg' width='20' height='20' /> <b>eco-changeset</b><br/>AWS CloudFormation"]
+    end
+
+    subgraph e4["Aprobacion"]
+        apr["✋ <b>revisar-cambios</b><br/>Manual approval"]
+    end
+
+    subgraph e5["Desplegar"]
+        direction LR
+        d1["<img src='/static/aws-cloudformation.svg' width='20' height='20' /> <b>app-deploy</b><br/>AWS CloudFormation"]
+        d2["<img src='/static/aws-cloudformation.svg' width='20' height='20' /> <b>eco-deploy</b><br/>AWS CloudFormation"]
+    end
+
+    src --> bld
+    bld --> cs1
+    bld --> cs2
+    cs1 --> apr
+    cs2 --> apr
+    apr --> d1
+    apr --> d2
+
+    classDef devtools fill:#ffffff,stroke:#c925d1,color:#4a044e
+    classDef cfn fill:#ffffff,stroke:#e7157b,color:#500724
+    classDef manual fill:#ffffff,stroke:#475569,color:#0f172a
+    class src,bld devtools
+    class cs1,cs2,d1,d2 cfn
+    class apr manual
 ```
-:::
-
-:::slide
-## Dos aplicaciones, una sola imagen
-
-```
-Source → Build → ChangeSet → [ Aprobación ] → Desplegar
-                 app  eco         ⏸ espera     app  eco
-                (paralelo)                    (paralelo)
-```
-
-Las acciones con el mismo **run order** corren en paralelo. Cada stack se actualiza con
-**su** template, y con la misma imagen.
-:::
-
-:::slide
-## Aprobación manual
-
-El pipeline se detiene con el change set ya calculado: lo que espera aprobación no es un
-despliegue a ciegas, sino una **lista de cambios** que se puede leer.
-
-Ejecutar un change set no vuelve a calcularlo. Lo que se aprueba es lo que se aplica.
 :::
