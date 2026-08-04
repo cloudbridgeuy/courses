@@ -447,7 +447,14 @@ ese motivo apunta a la aplicación, la respuesta está en los **logs**.
 4. ¿No pasa el health check? → la ruta de salud, o el puerto.
 :::
 
+:::inline-slide light
 ## Práctica guiada: configurar auto scaling
+:::add visibility=slide
+:::app
+<cb-goto path="Práctica guiada: configurar auto scaling"></cb-goto>
+::: #app
+::: #add
+::: #inline-slide
 
 ### Definir la política
 
@@ -467,6 +474,10 @@ ese motivo apunta a la aplicación, la respuesta está en los **logs**.
 1. Abrir [**EC2 → Target Groups**](https://console.aws.amazon.com/ec2/home#TargetGroups:) y seleccionar el target group de la aplicación.
 2. En la pestaña **Targets**, confirmar que las tareas aparecen como **healthy**. Esos
    son los destinos a los que el ALB reparte el tráfico.
+
+:::app
+<cb-cpu-burst seconds="120" intensity="high" label="Generar carga de CPU (120 s)"></cb-cpu-burst>
+:::
 
 ---
 
@@ -488,8 +499,4 @@ registradas como sanas.
    pestaña **Targets**.
 6. Confirmar que las tareas aparecen con estado **healthy** —son los destinos activos
    detrás del balanceador.
-:::
-
-:::slide light
-{{ejercicio-13}}
 :::
