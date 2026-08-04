@@ -472,8 +472,22 @@ SSE bus.
 
 - Client uses **Microsoft Teams**, not Slack. Production path (CodeStar
   Notifications → SNS → AWS Chatbot → Teams) is taught as theory only.
-- Lab mechanism (**built** 2026-06-23): participant pipeline events → SNS HTTPS
-  subscription → `courses_server` → SSE → per-pod toasts in guide + slides.
+- Lab mechanism (**built** 2026-06-23, **wired live** 2026-08-04): participant
+  pipeline events → SNS HTTPS subscription → `courses_server` → SSE → per-pod
+  toasts in guide + slides.
+  - The SNS topic lives in the **participant's own account** — a notification rule
+    can only target a topic in its own account and region, and each pod is an
+    account. Each pod creates the topic through **Create target → SNS topic**, then
+    subscribes the shared endpoint; the subscription is what crosses accounts.
+  - Live endpoint:
+    `https://courses.cloudbridge.com.uy/hooks/notifications?token=cloudbridge`.
+    `CB_HOOK_TOKEN` is set on the task definition in
+    `infra/templates/taller-aws-devops-semana3-app.yaml`. Verified 2026-08-04: no
+    token → `401`, wrong token → `401`, right token → reaches the parser.
+  - Console path: the pipeline's **Notify** button is gone from the redesigned
+    CodePipeline console (AWS docs still describe it). The live path is the
+    pipeline's **Settings → Notifications → Create notification rule**, or
+    Developer Tools → **Settings → Notifications**.
   - Pure parser: `courses_core::notifications` (`parse_sns_message`).
   - Shell: `POST /hooks/notifications` (confirms subscription, broadcasts onto
     `/events/stream` as `type: "notification"`). **SSE endpoint is now
@@ -482,7 +496,9 @@ SSE bus.
   - Auth: shared-secret token via `CB_HOOK_TOKEN` env — required as `?token=` on
     `/hooks/notifications` when set, open (with a startup warning) when unset.
     Emulates the unguessable-URL secret of real chat webhooks; not a hardened
-    signature. Pod attribution prefers a baked-in `pod`, falls back to account id.
+    signature. Pod attribution prefers a baked-in `pod`, falls back to account id —
+    and a CodeStar Notifications rule cannot bake one in (no input transformer), so
+    lab toasts always carry the account id.
   - Topic guide: `.claude/context/notifications.md`. Design:
     `.claude/designs/2026-06-16-lab-notifications-toasts-design.md`.
 

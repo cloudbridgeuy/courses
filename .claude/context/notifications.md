@@ -9,12 +9,18 @@ attributed per pod. Read this before touching the notification path.
 ```
 Participant's CodePipeline / CodeBuild (state change)
   → CodeStar Notifications / EventBridge rule
-  → SNS topic
+  → SNS topic                           (in the participant's own account)
   → POST /hooks/notifications?token=…   (HTTPS subscription on the public server)
   → parse + broadcast
   → GET /events/stream                  (unified SSE bus, one per open guide/slide page)
   → toast in the browser (apps.js)
 ```
+
+A notification rule can only target an SNS topic in **its own account and region**, and
+each participant owns a pod account, so the topic cannot be the instructor's. Each pod
+creates its own topic (**Create target → SNS topic** during rule creation, which applies
+the publish policy for it) and points an HTTPS subscription at the shared endpoint. The
+subscription — not the rule target — is what crosses accounts.
 
 > **Note:** `GET /hooks/stream` is **retired**. All SSE consumers use
 > `GET /events/stream`. Notifications ride the unified bus as
@@ -47,7 +53,11 @@ A shared-secret token gates ingestion, emulating the unguessable-URL secret real
 webhooks use — simple, not hardened.
 
 - Set `CB_HOOK_TOKEN` on the server; subscribe SNS to
-  `https://<host>/hooks/notifications?token=<secret>`.
+  `https://<host>/hooks/notifications?token=<secret>`. Live workshop values: endpoint
+  `https://courses.cloudbridge.com.uy/hooks/notifications?token=cloudbridge`, with the
+  token set on the task definition in
+  `infra/templates/taller-aws-devops-semana3-app.yaml`. The token is published in the
+  guide, so anyone holding the URL can inject toasts — accepted for a workshop.
 - When set, a missing/wrong token → `401`. When unset, the endpoint is open and logs a
   startup warning.
 - The SSE bus `GET /events/stream` is unauthenticated by design (read-only public toasts).
@@ -55,11 +65,21 @@ webhooks use — simple, not hardened.
 ## Pod attribution
 
 Every event should name a pod. Resolution order: a baked-in `pod` field (top level or
-under `detail`, added by the notification rule / EventBridge input transformer) →
-the AWS `account` id → `desconocido`. An unresolved pod still renders (tagged with the
-account/`desconocido`) so misconfiguration is visible rather than silently dropped.
+under `detail`) → the AWS `account` id → `desconocido`. An unresolved pod still renders
+(tagged with the account/`desconocido`) so misconfiguration is visible rather than
+silently dropped.
+
+Only an EventBridge rule with an input transformer can bake in `pod`; a CodeStar
+Notifications rule has no transform step (`create-notification-rule` takes only name,
+event types, resource, targets, status, detail type). The lab uses notification rules,
+so its toasts always fall through to the account id.
 
 ## Open items
 
 - No SNS message-signature verification or topic-ARN allowlist (token only).
 - No persistence/replay: a toast missed while a page was closed is gone.
+- CloudWatch alarm messages parse to an empty toast. An alarm publishes
+  `AlarmName` / `NewStateValue` / `AWSAccountId`, none of which the extractors read, so
+  the result is pod `desconocido`, source `evento`, and empty state and detail.
+  `20-dashboards-y-alarmas` points the alarm at the same topic, so the gap is reachable
+  from the course.
