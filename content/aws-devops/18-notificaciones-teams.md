@@ -134,14 +134,14 @@ es una **suscripción HTTPS** al endpoint del instructor.
    y entrar al pipeline.
 2. Abrir el menu de navegación para ir a la opción **Settings** y luego, hacer
    click en la pestaña **Notifications**, pulsar **Create notification rule**.
-3. En **Notification name**, escribir `taller-pipeline-<su-nombre>`.
+3. En **Notification name**, escribir `taller-aws-<su-nombre>-pipeline-notification`.
 4. En **Detail type**, elegir **Full**. En **Events that trigger notifications**, marcar
    al menos:
    - **Pipeline execution: Succeeded**
    - **Pipeline execution: Failed**
    - **Manual approval: Needed**
 5. En **Targets**, pulsar **Create target → SNS topic** y completar el nombre después del
-   prefijo `codestar-notifications-`: `codestar-notifications-taller-<su-nombre>`. Pulsar
+   prefijo `codestar-notifications-`: `codestar-notifications-taller-aws-<su-nombre>`. Pulsar
    **Create**. Crear el tema desde aquí aplica solo la política que permite a las reglas
    de notificación publicar en él.
 6. Pulsar **Submit**.
@@ -149,19 +149,23 @@ es una **suscripción HTTPS** al endpoint del instructor.
 ::: extra Por qué no se usa un tema del instructor
 Una regla de notificación solo puede apuntar a un tema de SNS de su propia cuenta y
 región. Con un pod por cuenta, el tema del instructor no aparece en la lista de destinos.
-Por eso cada pod publica en su tema, y es la suscripción —no el destino de la regla— la
+Por eso cada pod publica en su tema, y es la suscripción, no el destino de la regla, la
 que cruza hacia la aplicación del taller. En una organización con una sola cuenta, el
 tema compartido sí sería el destino directo.
 :::
 
 ### Suscribir la aplicación del taller al tema
 
-1. Abrir [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics) y entrar al tema `codestar-notifications-taller-<su-nombre>`.
+1. Abrir [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics) y entrar al tema `codestar-notifications-taller-aws-<su-nombre>`.
 2. Pulsar **Create subscription**. En **Protocol**, elegir **HTTPS**.
-3. En **Endpoint**, pegar la URL que indica el instructor, con la forma
-   `https://<host-del-taller>/hooks/notifications?token=<token>`.
-4. Pulsar **Create subscription**. La aplicación confirma la suscripción sola —responde
-   al `SubscribeURL` que envía SNS—, así que basta refrescar hasta que el estado pase de
+3. En **Endpoint**, pegar la URL de la aplicación del taller:
+
+   ```
+   https://courses.cloudbridge.com.uy/hooks/notifications?token=cloudbridge
+   ```
+
+4. Pulsar **Create subscription**. La aplicación confirma la suscripción sola (responde
+   al `SubscribeURL` que envía SNS), así que basta refrescar hasta que el estado pase de
    **Pending confirmation** a **Confirmed**.
 
 ### Disparar la regla y observar el aviso
@@ -173,10 +177,11 @@ tema compartido sí sería el destino directo.
 3. Cuando el pipeline se detenga en la aprobación, se verá el aviso **Manual approval:
    Needed**; al aprobar y completarse, se verá **Succeeded**.
 
-> **Nota:** la recepción de los *toasts* depende de que el instructor haya publicado la
-> aplicación del taller, y entregado el endpoint con su token. Si aún no está disponible,
-> esta sección se sigue como demostración: el flujo, la regla, y el tema son reales; el
-> último salto lo muestra el instructor.
+> **Nota:** la recepción de los *toasts* depende de que la aplicación del taller esté en
+> línea, y de que la suscripción figure como **Confirmed**. Si la suscripción queda en
+> **Pending confirmation**, el aviso no llega; esta sección se sigue igual como
+> demostración: el flujo, la regla, y el tema son reales; el último salto lo muestra el
+> instructor.
 
 ---
 
@@ -190,14 +195,15 @@ aplicación del taller a ese tema. Disparar una ejecución y observar los avisos
 ::: solucion
 1. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), abrir el pipeline, ir a la pestaña
    **Settings** y, en **Notifications**, pulsar **Create notification rule**.
-2. Nombre `taller-pipeline-<su-nombre>`, **Detail type: Full**. Marcar los eventos
-   **Pipeline execution: Succeeded**, **Pipeline execution: Failed**, y **Manual
-   approval: Needed**.
+2. Nombre `taller-aws-<su-nombre>-pipeline-notification`, **Detail type: Full**. Marcar
+   los eventos **Pipeline execution: Succeeded**, **Pipeline execution: Failed**, y
+   **Manual approval: Needed**.
 3. En **Targets**, **Create target → SNS topic**, nombre
-   `codestar-notifications-taller-<su-nombre>`, **Create**. **Submit**.
+   `codestar-notifications-taller-aws-<su-nombre>`, **Create**. **Submit**.
 4. En [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics), abrir el tema y crear una suscripción
-   **HTTPS** hacia `https://<host-del-taller>/hooks/notifications?token=<token>`.
-   Esperar a que el estado sea **Confirmed**.
+   **HTTPS** hacia
+   `https://courses.cloudbridge.com.uy/hooks/notifications?token=cloudbridge`. Esperar a
+   que el estado sea **Confirmed**.
 5. Subir un commit a `main` para disparar el pipeline.
 6. Observar los avisos a medida que el pipeline avanza: el evento de aprobación pendiente,
    y luego el de ejecución exitosa tras aprobar. En el laboratorio aparecen como *toasts*

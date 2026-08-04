@@ -85,7 +85,7 @@ Vigila sola; avisa por el canal que ya usa el equipo.
 3. En la condición, elegir **Greater than** con un umbral de `70` (por ciento), evaluado
    durante un período.
 4. En **Notification**, seleccionar el **tema de SNS** del pod (el mismo
-   `codestar-notifications-taller-<su-nombre>` que recibe las notificaciones del
+   `codestar-notifications-taller-aws-<su-nombre>` que recibe las notificaciones del
    pipeline).
 5. Nombrarlo `cpu-alta-<su-nombre>` y crearlo.
 
@@ -109,7 +109,7 @@ acción publique en el tema de SNS del pod.
 3. Abrir [**CloudWatch → Alarms → Create alarm**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:).
 4. **Select metric**: `CPUUtilization` del servicio de ECS.
 5. Condición: **Greater than**, umbral **70**.
-6. **Notification**: el tema de SNS del pod, `codestar-notifications-taller-<su-nombre>`.
+6. **Notification**: el tema de SNS del pod, `codestar-notifications-taller-aws-<su-nombre>`.
 7. Nombrarlo `cpu-alta-<su-nombre>` y crearlo. Confirmar que arranca en
    `INSUFFICIENT_DATA` y luego pasa a `OK`.
 :::
