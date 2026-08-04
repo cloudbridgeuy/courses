@@ -592,6 +592,14 @@ SSE bus.
   detection (10 × 2 = 20 s), and `StopTimeout` must outlast drain. Both paths are
   parameters, because the echo server has only `/health` and must be deployed with
   `RutaSaludContenedor` empty or it dies in a replace loop.
+- **The task role needs `dynamodb:DescribeTable`.** Week 2 granted only the five
+  item-level actions, which is all the handlers use; the prober calls
+  `DescribeTable`, so Week 3's template adds it to `RolTarea`. Without it the hard
+  dependency fails on `AccessDeniedException`, readiness answers `503` forever,
+  the target never turns healthy, and the ECS service never reaches steady state
+  — the stack rolls back with every task still running and passing liveness,
+  which is the confusing part. Turning the flag on without the grant is the same
+  failure.
 
 ### Dev mode / hot reload
 
