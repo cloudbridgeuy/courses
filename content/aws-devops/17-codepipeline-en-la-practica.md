@@ -391,7 +391,7 @@ un grupo nuevo debajo.
 Quien haya hecho la práctica de módulos de CloudFormation tiene el eco como una instancia de
 `CloudBridge::Taller::App::MODULE`, y para ese stack el template es
 `infra/templates/taller-aws-devops-semana2-eco-modulo.yaml`. Sus valores por omisión ya son
-los del eco (comando, `/eco2/*`, y prioridad `10`), así que los overrides se quedan en los
+los del eco (comando, `/eco/*`, y prioridad `10`), así que los overrides se quedan en los
 cuatro de la aplicación. Apuntarle el template de la aplicación **no** lo actualizaría: los
 recursos del módulo llevan el prefijo `Eco` en el ID lógico, así que CloudFormation crearía
 unos nuevos, borraría los viejos, y las dos reglas chocarían por usar la misma prioridad. Un
