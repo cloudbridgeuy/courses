@@ -64,6 +64,24 @@ full-viewport overlay (click backdrop or Escape to close), shared by guide and s
 On slides, a diagram renders when its slide first becomes active (mermaid must measure
 a visible slide), so diagrams off the first slide appear on navigation, not before.
 
+#### Service icons
+
+Node labels take inline HTML, so a diagram names a service with its icon:
+`node["<img src='/static/aws-sns.svg' width='20' height='20' /> <b>Tema</b><br/>Amazon
+SNS"]`. The house style is icon + bold role + service name, one `classDef` per service
+family whose stroke is that family's icon colour on a white fill (`#c925d1` for the
+Developer Tools icons, `#e7157b` for CloudFormation and SNS, `#ed7100` for ECR), and an
+emoji for anything that is not an AWS service. Compare
+`17-codepipeline-en-la-practica.md` and `18-notificaciones-teams.md`.
+
+Available: `aws-codecommit`, `aws-codebuild`, `aws-codepipeline`,
+`aws-codestar-notifications`, `aws-cloudformation`, `aws-ecr`, `aws-sns`,
+`aws-chatbot`, `docker`. A new icon is **not** just a file: `crates/server/src/routes.rs`
+embeds each asset with its own `include_str!` constant and match arm, so an
+unregistered file answers 404. Icons are binary assets, which `CB_DEV_ROOT` does not
+hot-serve — a running `cargo xtask dev` keeps serving the embedded copy until it is
+rebuilt and restarted.
+
 ### Nesting
 
 `::: solucion`, `::: warning`, `::: info`, `::: extra`, `:::skip`, and `:::add` nest freely — inside

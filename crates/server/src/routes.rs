@@ -521,6 +521,10 @@ async fn static_file(State(state): State<AppState>, Path(file): Path<String>) ->
         "aws-codebuild.svg" => asset("image/svg+xml", AWS_CODEBUILD_SVG),
         "aws-ecr.svg" => asset("image/svg+xml", AWS_ECR_SVG),
         "aws-cloudformation.svg" => asset("image/svg+xml", AWS_CLOUDFORMATION_SVG),
+        "aws-codepipeline.svg" => asset("image/svg+xml", AWS_CODEPIPELINE_SVG),
+        "aws-codestar-notifications.svg" => asset("image/svg+xml", AWS_CODESTAR_NOTIFICATIONS_SVG),
+        "aws-sns.svg" => asset("image/svg+xml", AWS_SNS_SVG),
+        "aws-chatbot.svg" => asset("image/svg+xml", AWS_CHATBOT_SVG),
         "docker.svg" => asset("image/svg+xml", DOCKER_SVG),
         _ => not_found(&state.site.load()),
     }
@@ -553,4 +557,9 @@ const AWS_CODECOMMIT_SVG: &str = include_str!("../static/aws-codecommit.svg");
 const AWS_CODEBUILD_SVG: &str = include_str!("../static/aws-codebuild.svg");
 const AWS_ECR_SVG: &str = include_str!("../static/aws-ecr.svg");
 const AWS_CLOUDFORMATION_SVG: &str = include_str!("../static/aws-cloudformation.svg");
+const AWS_CODEPIPELINE_SVG: &str = include_str!("../static/aws-codepipeline.svg");
+const AWS_CODESTAR_NOTIFICATIONS_SVG: &str =
+    include_str!("../static/aws-codestar-notifications.svg");
+const AWS_SNS_SVG: &str = include_str!("../static/aws-sns.svg");
+const AWS_CHATBOT_SVG: &str = include_str!("../static/aws-chatbot.svg");
 const DOCKER_SVG: &str = include_str!("../static/docker.svg");
