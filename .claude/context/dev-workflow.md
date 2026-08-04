@@ -93,6 +93,11 @@ workspace crates. The widely-shared `debug = "line-tables-only"` /
 do not apply it. The real drivers are stale artifacts from old dependency
 versions and the incremental-compilation cache.
 
+Only `dev` is incremental. `[profile.release] incremental = false`, because a
+container build always starts with an empty incremental cache and pays the cost
+for nothing — so `target/release/incremental` no longer exists. Export
+`CARGO_INCREMENTAL=1` for a faster local `cargo run --release`.
+
 `cargo xtask clean` prunes them. It needs `cargo install cargo-sweep`.
 
 | Command | Effect |

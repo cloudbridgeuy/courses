@@ -33,7 +33,10 @@ needless_pass_by_value = "warn"
 debug = 0
 
 [profile.release]
-incremental = true
+# Off on purpose: container builds start with an empty incremental cache, so
+# incremental only costs extra codegen units and IO. Set CARGO_INCREMENTAL=1 in
+# the shell for a faster local `cargo run --release`.
+incremental = false
 debug = 0
 
 [workspace.dependencies]

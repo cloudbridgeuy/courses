@@ -342,7 +342,16 @@ Week 3.
   `imagen.json` parameter file, with an `artifacts` section shipping it and
   `infra/templates/*.yaml` — see the pipeline entry above) and a multi-stage
   `Dockerfile` that compiles `courses_server` (content embeds at compile time),
-  pinned by base-image digest and apt package versions (hadolint-clean). Exercise 5
+  pinned by base-image digest and apt package versions (hadolint-clean). The
+  `Dockerfile` splits dependency compilation out with `cargo-chef` (stages
+  `chef` → `planner` → `builder` → runtime, reworked 2026-08-04): the cooked
+  dependency layer keys only on `Cargo.toml`/`Cargo.lock`, so a `content/` edit
+  no longer rebuilds the 240+ crates behind the AWS SDK. The shared `chef` base
+  also installs `lld` (`RUSTFLAGS=-C link-arg=-fuse-ld=lld`) and copies
+  `rust-toolchain.toml` to resolve the toolchain once — RUSTFLAGS and toolchain
+  must stay in that shared base, or `chef cook` and `cargo build` disagree and
+  every cooked artifact is invalidated. Measured locally: cold 2m13s → 1m45s,
+  content-only edit → ~10s. Exercise 5
   (session 03) enables CodeBuild local cache. Exercise 6 (session 03) sets up an
   ECR Public pull-through cache (prefix `ecr-public`, inline policy
   `ecr:BatchImportUpstreamImage` + `ecr:CreateRepository` on the CodeBuild role)
