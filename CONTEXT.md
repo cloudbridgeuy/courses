@@ -442,7 +442,10 @@ SSE bus.
     toast renders through the exact path real SNS events use. No AWS call.
 - **Client**: `static/apps.js` — `<cb-cpu-burst>`, `<cb-counter>`, `<cb-metric>`,
   `<cb-toast-demo>`, and the read-only `<cb-file>` source viewer, plus lock UI and
-  multiplexed `EventSource`. `<cb-file>` accepts a repository-relative UTF-8 path;
+  multiplexed `EventSource`. `<cb-cpu-burst>` renders a fixed note on how the burst
+  works plus an editable duration field — `seconds` is only its initial value; the
+  client rounds and clamps it to 1–120 s, and `CpuBurstConfig::parse` caps it at 120 s
+  again server-side (no lower bound there). `<cb-file>` accepts a repository-relative UTF-8 path;
   the server embeds the source during rendering rather than exposing a filesystem
   route. It can start collapsed with `toggleable`, and provides content-size and copy
   controls. `full-path` disables truncation of the slide label. The bundle loads when
