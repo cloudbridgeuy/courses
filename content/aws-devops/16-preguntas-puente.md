@@ -30,7 +30,9 @@ Tres etapas, en este orden:
    commit nuevo en la rama vigilada.
 2. **Build** — ejecutar el proyecto de CodeBuild, que construye la imagen Docker y la
    publica en ECR (el `buildspec.yml` correspondiente).
-3. **Deploy** — actualizar el servicio de ECS para que tome la nueva imagen.
+3. **Deploy** — actualizar el stack de CloudFormation con la nueva imagen, para que el
+   servicio de ECS la tome. Es el mismo dueño que creó el servicio: desplegarlo por fuera
+   dejaría el stack con *drift*.
 
 El orden no es arbitrario: cada etapa consume el artefacto de la anterior. No se puede
 construir sin el código, ni desplegar sin la imagen. Es la misma secuencia que ejecuta

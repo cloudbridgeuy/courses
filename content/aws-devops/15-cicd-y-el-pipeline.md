@@ -43,7 +43,7 @@ o más **acciones**.
 
 ```
 Source        Build          Deploy
-(CodeCommit) → (CodeBuild) → (ECS)
+(CodeCommit) → (CodeBuild) → (CloudFormation)
 ```
 
 - **Stage** — una fase del flujo (Source, Build, Deploy).
@@ -61,5 +61,6 @@ Source        Build          Deploy
   detenida a la espera de una aprobación.
 
 En la próxima sesión se construye un pipeline que automatiza el flujo que hoy se hace a mano:
-Source desde CodeCommit, Build con el proyecto de CodeBuild, y Deploy hacia ECS, con una
-aprobación manual antes de desplegar.
+Source desde CodeCommit, Build con el proyecto de CodeBuild, y Deploy con CloudFormation
+—actualizando los stacks de las dos aplicaciones a la vez—, con una aprobación manual antes
+de desplegar.
