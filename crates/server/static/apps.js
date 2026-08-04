@@ -79,7 +79,12 @@
   // Toast notifications (ported from notifications.js)
   // ---------------------------------------------------------------------------
 
+  var TOAST_TTL_MS = 8000;
+  var TOAST_MAX = 4;
+
   var toastContainer;
+  // Live toasts, oldest first. Each entry: { key, el, count, badge, bump, dismiss }.
+  var toasts = [];
 
   function stage() {
     if (toastContainer) return toastContainer;
@@ -92,43 +97,251 @@
 
   function statusClass(state) {
     var s = (state || "").toUpperCase();
+    // CloudWatch alarm states, which share no vocabulary with the pipeline ones.
+    if (s === "ALARM") return "cb-toast-fail";
+    if (s === "OK") return "cb-toast-ok";
+    if (s === "INSUFFICIENT_DATA") return "cb-toast-warn";
     if (s.indexOf("FAIL") >= 0 || s.indexOf("ERROR") >= 0) return "cb-toast-fail";
     if (s.indexOf("SUCC") >= 0) return "cb-toast-ok";
+    if (s.indexOf("CANCEL") >= 0 || s.indexOf("STOP") >= 0 || s.indexOf("SUPERSEDED") >= 0) {
+      return "cb-toast-warn";
+    }
     return "cb-toast-info";
   }
 
-  function showToast(n) {
-    var el = document.createElement("div");
-    el.className = "cb-toast " + statusClass(n.state);
+  function statusGlyph(cls) {
+    if (cls === "cb-toast-ok") return "✓";
+    if (cls === "cb-toast-fail") return "✕";
+    if (cls === "cb-toast-warn") return "!";
+    return "●";
+  }
 
-    var pod = document.createElement("strong");
-    pod.className = "cb-toast-pod";
-    pod.textContent = "Pod de " + (n.pod || "desconocido");
+  // aws.codepipeline → CodePipeline; anything unknown keeps its own shape.
+  var SOURCE_LABELS = {
+    "aws.codepipeline": "CodePipeline",
+    "aws.codebuild": "CodeBuild",
+    "aws.codecommit": "CodeCommit",
+    "aws.codedeploy": "CodeDeploy",
+    "aws.cloudformation": "CloudFormation",
+    "aws.cloudwatch": "CloudWatch",
+    "aws.ecs": "ECS",
+    "aws.ecr": "ECR",
+  };
 
-    var body = document.createElement("span");
-    body.className = "cb-toast-body";
+  function sourceLabel(source) {
+    var s = (source || "").trim();
+    if (!s) return "";
+    var known = SOURCE_LABELS[s.toLowerCase()];
+    if (known) return known;
+    if (s.toLowerCase().indexOf("aws.") === 0) s = s.slice(4);
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // The event's own timestamp when it carries one, else arrival time.
+  function clockLabel(stamp) {
+    var d = stamp ? new Date(stamp) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    function pad(n) {
+      return n < 10 ? "0" + n : "" + n;
+    }
+    return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  // The one-line answer to "what was this about": where it happened, then why.
+  function contextLine(n) {
     var parts = [];
-    if (n.detail) parts.push(n.detail);
-    if (n.state) parts.push(n.state);
-    if (n.source) parts.push("(" + n.source + ")");
-    body.textContent = parts.join(" · ");
+    if (n.stage) parts.push(n.stage);
+    if (n.action) parts.push(n.action);
+    if (n.phase) parts.push(n.phase);
+    if (n.reason) parts.push(n.reason);
+    return parts.join(" · ");
+  }
 
-    el.appendChild(pod);
-    el.appendChild(body);
+  // Expanded rows, in reading order. Labels are guide-facing, so Spanish.
+  var TOAST_FIELDS = [
+    ["stage", "etapa"],
+    ["action", "acción"],
+    ["provider", "proveedor"],
+    ["phase", "fase"],
+    ["reason", "motivo"],
+    ["execution", "ejecución"],
+    ["region", "región"],
+    ["time", "hora"],
+    ["source", "origen"],
+    ["pod", "pod"],
+  ];
+
+  function detailsPanel(n) {
+    var panel = document.createElement("dl");
+    panel.className = "cb-toast-details";
+    TOAST_FIELDS.forEach(function (field) {
+      var value = n[field[0]];
+      if (!value) return;
+      var dt = document.createElement("dt");
+      dt.textContent = field[1];
+      var dd = document.createElement("dd");
+      dd.textContent = value;
+      panel.appendChild(dt);
+      panel.appendChild(dd);
+    });
+    return panel;
+  }
+
+  function showToast(n) {
+    var cls = statusClass(n.state);
+    var source = sourceLabel(n.source);
+    var pod = n.pod || "desconocido";
+    var title = n.detail || source || n.state || "Notificación";
+    var context = contextLine(n);
+    var key = pod + "|" + n.source + "|" + n.state + "|" + n.detail + "|" + context;
+
+    // Repeated event while its toast is still up: bump the counter, don't stack.
+    for (var i = 0; i < toasts.length; i++) {
+      if (toasts[i].key === key) {
+        toasts[i].bump();
+        return;
+      }
+    }
+
+    var el = document.createElement("div");
+    el.className = "cb-toast " + cls;
+
+    var icon = document.createElement("span");
+    icon.className = "cb-toast-icon";
+    icon.textContent = statusGlyph(cls);
+    icon.setAttribute("aria-hidden", "true");
+
+    var main = document.createElement("div");
+    main.className = "cb-toast-main";
+
+    var head = document.createElement("div");
+    head.className = "cb-toast-head";
+
+    // With a console link the subject becomes the link; the link only works for
+    // whoever is signed into that pod's account, which is the owner.
+    var titleEl = document.createElement(n.url ? "a" : "span");
+    titleEl.className = "cb-toast-title";
+    titleEl.textContent = title;
+    titleEl.title = n.url ? title + " — abrir en la consola AWS" : title;
+    if (n.url) {
+      titleEl.href = n.url;
+      titleEl.target = "_blank";
+      titleEl.rel = "noopener noreferrer";
+    }
+
+    var count = document.createElement("span");
+    count.className = "cb-toast-count";
+    count.hidden = true;
+
+    var time = document.createElement("span");
+    time.className = "cb-toast-time";
+    time.textContent = clockLabel(n.time);
+
+    var close = document.createElement("button");
+    close.className = "cb-toast-close";
+    close.type = "button";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Cerrar aviso");
+
+    head.appendChild(titleEl);
+    head.appendChild(count);
+    head.appendChild(time);
+    head.appendChild(close);
+
+    var meta = document.createElement("div");
+    meta.className = "cb-toast-meta";
+
+    if (n.state) {
+      var badge = document.createElement("span");
+      badge.className = "cb-toast-badge";
+      badge.textContent = n.state;
+      meta.appendChild(badge);
+    }
+    var where = document.createElement("span");
+    where.className = "cb-toast-where";
+    // The source is the title when nothing better was parsed; don't repeat it.
+    var origin = source && source !== title ? source + " · " : "";
+    where.textContent = origin + "pod " + pod;
+    meta.appendChild(where);
+
+    var contextEl;
+    if (context) {
+      contextEl = document.createElement("div");
+      contextEl.className = "cb-toast-context";
+      contextEl.textContent = context;
+      contextEl.title = context;
+    }
+
+    var progress = document.createElement("span");
+    progress.className = "cb-toast-progress";
+
+    main.appendChild(head);
+    main.appendChild(meta);
+    if (contextEl) main.appendChild(contextEl);
+    main.appendChild(detailsPanel(n));
+    el.appendChild(icon);
+    el.appendChild(main);
+    el.appendChild(progress);
     stage().appendChild(el);
+
+    var entry = { key: key, el: el, count: 1, bump: bump, dismiss: dismiss };
+    toasts.push(entry);
+    while (toasts.length > TOAST_MAX) toasts[0].dismiss();
 
     requestAnimationFrame(function () {
       el.classList.add("cb-toast-in");
     });
-    var timer = setTimeout(dismiss, 7000);
-    el.addEventListener("click", dismiss);
+    var open = false;
+    var timer = setTimeout(dismiss, TOAST_TTL_MS);
+    close.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      dismiss();
+    });
+    // The card expands instead of dismissing; the link keeps its own click.
+    el.addEventListener("click", function (ev) {
+      if (ev.target.closest("a")) return;
+      toggle();
+    });
+
+    function restart() {
+      clearTimeout(timer);
+      progress.classList.remove("cb-toast-progress-run");
+      // Force a reflow so the countdown restarts from the top.
+      void progress.offsetWidth;
+      if (open) return;
+      timer = setTimeout(dismiss, TOAST_TTL_MS);
+      progress.classList.add("cb-toast-progress-run");
+    }
+
+    // Expanded toasts stay until dismissed: nobody can read a payload in 8 s.
+    function toggle() {
+      open = !open;
+      el.classList.toggle("cb-toast-open", open);
+      restart();
+    }
+
+    function bump() {
+      entry.count += 1;
+      count.hidden = false;
+      count.textContent = "×" + entry.count;
+      time.textContent = clockLabel(n.time);
+      el.classList.remove("cb-toast-bump");
+      void el.offsetWidth;
+      el.classList.add("cb-toast-bump");
+      restart();
+    }
+
     function dismiss() {
       clearTimeout(timer);
+      var at = toasts.indexOf(entry);
+      if (at >= 0) toasts.splice(at, 1);
       el.classList.remove("cb-toast-in");
       setTimeout(function () {
         if (el.parentNode) el.parentNode.removeChild(el);
-      }, 300);
+      }, 250);
     }
+
+    restart();
   }
 
   // ---------------------------------------------------------------------------
