@@ -1,18 +1,25 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Taller AWS DevOps — Semana 2 · Aplicación
+Description: Taller AWS DevOps · Semana 3 · Aplicación con health checks de tres niveles
 
-# Capa de aplicación del taller: todo lo que ejecuta la imagen y nada más. Es
-# la capa que más cambia y la más descartable. Se puede borrar y recrear en
-# minutos sin perder nada, porque la red vive en el stack de red, los datos en
-# el stack de datos, y el clúster y el balanceador en el de plataforma. Se
-# conecta a los tres vía Fn::ImportValue.
+# Es el template de aplicación de la Semana 2, con una sola diferencia: los
+# health checks dejan de ser una ruta decorativa, y pasan a estar cableados en
+# los tres lugares donde AWS pregunta por la salud de una tarea.
 #
-# Este template es reutilizable: lanzarlo otra vez, con otra imagen, otra ruta,
-# y otra prioridad, agrega una segunda aplicación sobre la misma plataforma.
-# No hay nada que copiar ni que editar — solo parámetros distintos.
+# Se despliega como actualización del mismo stack de la Semana 2. El change set
+# muestra exactamente qué cambia, y esa lista corta es el material de la clase:
+#
+#   1. El target group consulta /health/ready, no /health.
+#   2. El chequeo de contenedor apunta a /health/live, no a /health.
+#   3. El período de gracia del servicio cubre el arranque.
+#   4. La aplicación drena antes de apagarse, y ECS le da tiempo de hacerlo.
+#
+# El chequeo de contenedor ya existía en la Semana 2, contra /health, con el
+# mismo comando. Lo que cambia acá no es el mecanismo, sino la pregunta: /health
+# solo dice si el proceso contesta; /health/live dice si además está sano.
+#
+# Los números no son decorativos: están encadenados entre sí. La sección
+# "Presupuesto de tiempo" más abajo explica de dónde sale cada uno.
 
-# Solo lo lee el formulario de la consola: agrupa los nueve parámetros y les
-# pone etiquetas legibles. El CLI y las APIs lo ignoran.
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -22,6 +29,8 @@ Metadata:
         Parameters: [RedStackName, DatosStackName, PlataformaStackName]
       - Label: { default: "Lugar en el balanceador compartido" }
         Parameters: [NombreHost, RutaPath, Prioridad, UsarHttps]
+      - Label: { default: "Health checks" }
+        Parameters: [RutaSaludBalanceador, RutaSaludContenedor, SegundosDrenaje]
     ParameterLabels:
       ImageUri: { default: "URI de la imagen en ECR" }
       ComandoContenedor: { default: "Comando del contenedor" }
@@ -32,6 +41,9 @@ Metadata:
       RutaPath: { default: "Patrón de ruta" }
       Prioridad: { default: "Prioridad de la regla" }
       UsarHttps: { default: "¿Publicar también en HTTPS?" }
+      RutaSaludBalanceador: { default: "Ruta que consulta el balanceador" }
+      RutaSaludContenedor: { default: "Ruta que consulta ECS" }
+      SegundosDrenaje: { default: "Segundos de drenaje" }
 
 Parameters:
   ImageUri:
@@ -102,6 +114,42 @@ Parameters:
       Publicar también la regla en el listener 443. Solo si el stack de
       plataforma se desplegó con dominio y hosted zone.
 
+  # --- Parámetros nuevos de la Semana 3 ---
+
+  # Los tres son parámetros, y no valores fijos, porque no toda aplicación
+  # implementa los tres niveles. El servidor de eco solo tiene /health, así que
+  # se despliega con RutaSaludBalanceador=/health y RutaSaludContenedor vacío.
+  RutaSaludBalanceador:
+    Type: String
+    Default: /health/ready
+    Description: >-
+      Ruta que consulta el target group. Debe ser la de readiness: una falla
+      saca la tarea de rotación, sin matarla. Para una aplicación que solo
+      tiene la ruta clásica, se indica /health.
+    AllowedPattern: '^/[A-Za-z0-9._~%!$&()*+,;=:@/-]*$'
+    ConstraintDescription: Debe empezar con /.
+
+  RutaSaludContenedor:
+    Type: String
+    Default: /health/live
+    Description: >-
+      Ruta que consulta ECS dentro del contenedor. Debe ser la de liveness: una
+      falla reemplaza la tarea. Vacío desactiva el chequeo de contenedor, que es
+      lo correcto para una aplicación que no distingue liveness de readiness.
+    AllowedPattern: '^$|^/[A-Za-z0-9._~%!$&()*+,;=:@/-]*$'
+    ConstraintDescription: Debe quedar vacío, o empezar con /.
+
+  SegundosDrenaje:
+    Type: Number
+    Default: 25
+    MinValue: 0
+    MaxValue: 100
+    Description: >-
+      Tiempo que la aplicación responde 503 en readiness después de recibir
+      SIGTERM, antes de cerrar conexiones. Debe superar el tiempo que tarda el
+      balanceador en dar de baja el destino, que aquí es intervalo (10) por
+      umbral (2), o sea 20 segundos. 0 desactiva el drenaje.
+
 Conditions:
   ConHttps: !Equals [!Ref UsarHttps, "si"]
 
@@ -111,16 +159,13 @@ Conditions:
 
   ConHost: !Not [!Equals [!Ref NombreHost, ""]]
 
+  ConChequeoContenedor: !Not [!Equals [!Ref RutaSaludContenedor, ""]]
+
 Resources:
   # --- ECS: servicio y task definition ---
 
-  # El clúster no está aquí: lo comparten todas las aplicaciones, y por eso
-  # vive en el stack de plataforma.
   ServicioApp:
     Type: AWS::ECS::Service
-    # El target group debe estar asociado al balanceador antes de que ECS cree
-    # el servicio, y quien lo asocia es la regla del listener. Sin esto, el
-    # stack falla de manera intermitente.
     DependsOn: ReglaHTTP
     Properties:
       Cluster:
@@ -128,7 +173,12 @@ Resources:
       DesiredCount: 1
       LaunchType: FARGATE
       TaskDefinition: !Ref TareaApp
-      HealthCheckGracePeriodSeconds: 60
+      # Ventana en la que el servicio ignora los reportes del balanceador. Cubre
+      # el arranque: sin ella, una tarea que tarda en levantar se da de baja, y
+      # se reemplaza, antes de haber atendido su primer pedido. Supera el
+      # StartPeriod del chequeo de contenedor a propósito; el que manda debe ser
+      # el chequeo más informado, no el reloj del servicio.
+      HealthCheckGracePeriodSeconds: 90
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
@@ -154,9 +204,6 @@ Resources:
       ContainerDefinitions:
         - Name: app
           Image: !Ref ImageUri
-          # Una imagen, varias aplicaciones: el comando decide cuál. Vacío deja
-          # el CMD del Dockerfile, y AWS::NoValue borra la propiedad entera en
-          # vez de mandar una lista vacía, que ECS rechazaría.
           Command: !If
             - ConComando
             - !Ref ComandoContenedor
@@ -164,41 +211,38 @@ Resources:
           PortMappings:
             - ContainerPort: 8080
 
-          # El target group pregunta desde afuera, por la red. Esto pregunta
-          # desde adentro, y responde otra cosa: si el proceso *contesta*, y no
-          # solo si sigue corriendo. Un proceso colgado mantiene el puerto
-          # abierto, así que "el contenedor no salió" no alcanza como señal.
+          # Nivel 1 de 3: liveness. Lo corre ECS, adentro del contenedor, sin
+          # pasar por la red de la VPC. Si falla, la tarea se detiene, y el
+          # servicio levanta otra.
           #
-          # Como corre adentro del contenedor, se configura con un comando, no
-          # con una URL, y ese comando tiene que existir en la imagen. La imagen
-          # del taller es debian-slim, y no trae curl, así que la receta habitual
-          # (CMD-SHELL con curl) fallaría siempre, y ECS reemplazaría la tarea en
-          # bucle. El propio binario trae el subcomando, y no hay que instalar
-          # nada solo para esto. La Semana 3 desarrolla el punto, y cambia esta
-          # ruta por /health/live.
-          HealthCheck:
-            Command: [CMD, courses_server, healthcheck, --path, /health]
-            Interval: 15
-            Timeout: 5
-            Retries: 3
-            # Ventana de arranque: los fallos de acá adentro no cuentan, ni
-            # consumen reintentos.
-            StartPeriod: 60
+          # El comando es el propio binario, con un subcomando que pide la ruta
+          # por loopback, y traduce la respuesta a un código de salida. Evita
+          # instalar curl solo para esto: cada paquete extra en la imagen es
+          # superficie de ataque, y peso en cada despliegue.
+          HealthCheck: !If
+            - ConChequeoContenedor
+            - Command:
+                - CMD
+                - courses_server
+                - healthcheck
+                - --path
+                - !Ref RutaSaludContenedor
+              Interval: 15
+              Timeout: 5
+              Retries: 3
+              # Ventana de arranque. Los fallos de acá adentro no cuentan, y
+              # tampoco consumen reintentos. Es la respuesta de ECS al problema
+              # de una aplicación que tarda en estar lista.
+              StartPeriod: 60
+            - !Ref AWS::NoValue
 
-          # Cuánto espera ECS entre el SIGTERM, y el SIGKILL. El default son 30
-          # segundos, y alcanza mientras la aplicación cierre rápido. La Semana 3
-          # lo sube, porque ahí la aplicación empieza a drenar antes de cerrar.
-          StopTimeout: 30
+          # Cuánto espera ECS entre el SIGTERM, y el SIGKILL, y debe superar el
+          # drenaje, más la última petición en curso. En la Semana 2 alcanzaban
+          # 30, porque no había drenaje. Si es menor, el drenaje se corta a la
+          # mitad, y el trabajo de arriba no sirve de nada. El máximo en
+          # Fargate es 120.
+          StopTimeout: 60
 
-          # Configuración de la aplicación. Dos variables están ausentes a
-          # propósito:
-          #  - CB_APPS_SECRET: un secreto nunca va en texto plano en un
-          #    template. Se agrega en la Semana 2 vía Secrets Manager
-          #    (`Secrets` + `ValueFrom`). Sin él, los handlers corren abiertos
-          #    aunque CB_APPS_GATED diga `all`.
-          #  - CB_HOOK_TOKEN: mismo motivo; solo lo necesita el servidor del
-          #    instructor que recibe los webhooks de SNS.
-          # CB_DEV_ROOT es solo para desarrollo local y no se define aquí.
           Environment:
             - Name: PORT
               Value: "8080"
@@ -209,6 +253,21 @@ Resources:
               Value: counters
             - Name: CB_APPS_GATED
               Value: all
+            # Las tres rutas vienen apagadas en la imagen. Esta variable es la
+            # que las publica; sin ella, /health/ready responde 404, y el target
+            # group da la tarea por muerta.
+            - Name: CB_HEALTH_CHECKS
+              Value: "1"
+            # Cada cuánto verifica sus dependencias la tarea de fondo. Es
+            # independiente del intervalo del balanceador: el endpoint contesta
+            # de memoria, así que veinte tareas no golpean DynamoDB veinte veces
+            # por chequeo.
+            - Name: CB_HEALTH_INTERVAL_SECS
+              Value: "5"
+            - Name: CB_HEALTH_TIMEOUT_MS
+              Value: "2000"
+            - Name: CB_HEALTH_DRAIN_SECS
+              Value: !Ref SegundosDrenaje
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -224,7 +283,6 @@ Resources:
 
   # --- Roles de IAM ---
 
-  # Rol de ejecución: lo usa ECS para descargar la imagen y escribir logs.
   RolEjecucion:
     Type: AWS::IAM::Role
     Properties:
@@ -238,7 +296,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
-  # Rol de tarea: lo usa la aplicación dentro del contenedor.
   RolTarea:
     Type: AWS::IAM::Role
     Properties:
@@ -269,8 +326,6 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: cloudwatch:PutMetricData
-                # PutMetricData no acepta un ARN como recurso; el namespace es
-                # la forma de acotar el permiso.
                 Resource: "*"
                 Condition:
                   StringEquals:
@@ -278,8 +333,20 @@ Resources:
 
   # --- Lugar de esta aplicación en el balanceador compartido ---
 
-  # El balanceador no está aquí, pero el target group sí: describe a *esta*
-  # aplicación —su puerto, su health check— y se borra con ella.
+  # Nivel 2 de 3: readiness. Lo consulta el balanceador, por la red, contra la
+  # IP privada de la tarea. Si falla, la tarea sale de rotación, y sigue viva.
+  #
+  # Presupuesto de tiempo, que es de donde salen los números de este bloque:
+  #
+  #   detectar la falla   = Interval (10) × UnhealthyThreshold (2) = 20 s
+  #   drenar              = SegundosDrenaje, 25 por defecto, mayor que 20
+  #   vaciar en vuelo     = deregistration_delay = 15 s
+  #   margen antes del kill = StopTimeout (60) > 25 + cola de peticiones
+  #
+  # Bajar el intervalo detecta antes, y cuesta más chequeos por minuto. Subir el
+  # umbral tolera mejor un pico aislado, y demora la baja. Cambiar uno obliga a
+  # revisar SegundosDrenaje, porque el drenaje solo sirve si dura más que la
+  # detección.
   GrupoDestino:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -288,18 +355,20 @@ Resources:
       TargetType: ip
       Protocol: HTTP
       Port: 8080
-      HealthCheckPath: /health
+      HealthCheckPath: !Ref RutaSaludBalanceador
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      # Explícito a propósito. El default también es 200, pero acá se lee que
+      # una dependencia blanda caída sigue siendo 200, con el detalle en el
+      # cuerpo, y por eso la tarea no sale de rotación.
+      Matcher:
+        HttpCode: "200"
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: "15"
 
-  # La regla es el contrato inverso: en vez de importar un valor, esta
-  # aplicación *agrega* algo al listener de la plataforma. Es lo que permite
-  # que varias aplicaciones compartan un solo ALB.
-  #
-  # Enruta de una de dos formas, según los parámetros: por nombre de host, si la
-  # aplicación tiene subdominio propio, o por prefijo de ruta. Son excluyentes a
-  # propósito. Mezclarlas en una misma regla exige que se cumplan las dos.
   ReglaHTTP:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -339,10 +408,6 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref GrupoDestino
 
-# La URL ya no sale de aquí: el nombre DNS pertenece al balanceador compartido,
-# y se lee en el output UrlBase del stack de plataforma. Este stack solo publica
-# qué ruta atiende, y su target group, para que un add-on pueda enviarle tráfico
-# sin modificarlo.
 Outputs:
   RutaAtendida:
     Description: Cómo llega el tráfico a esta aplicación en el balanceador compartido
@@ -356,3 +421,9 @@ Outputs:
     Value: !Ref GrupoDestino
     Export:
       Name: !Sub "${AWS::StackName}-grupo-destino-arn"
+
+  ChequeosDeSalud:
+    Description: Qué ruta consulta cada nivel, y cuánto dura el drenaje
+    Value: !Sub
+      - "balanceador ${RutaSaludBalanceador} · contenedor ${Contenedor} · drenaje ${SegundosDrenaje}s"
+      - Contenedor: !If [ConChequeoContenedor, !Ref RutaSaludContenedor, "sin chequeo"]

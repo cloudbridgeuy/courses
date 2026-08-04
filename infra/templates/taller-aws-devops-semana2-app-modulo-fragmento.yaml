@@ -189,6 +189,20 @@ Resources:
             - !Ref AWS::NoValue
           PortMappings:
             - ContainerPort: 8080
+
+          # Chequeo de contenedor: corre adentro, así que es un comando, no una
+          # URL, y ese comando tiene que existir en la imagen. La imagen es
+          # debian-slim, y no trae curl; el propio binario trae el subcomando.
+          # Queda fijo, como el puerto: es estructural de esta imagen, no una
+          # decisión de cada instancia del módulo.
+          HealthCheck:
+            Command: [CMD, courses_server, healthcheck, --path, /health]
+            Interval: 15
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+          StopTimeout: 30
+
           # Configuración de la aplicación. Lo estructural queda fijo (PORT va
           # atado al puerto del target group, CB_APPS_TABLE a la tabla que
           # entra por propiedad); lo demás se expone como propiedades del
