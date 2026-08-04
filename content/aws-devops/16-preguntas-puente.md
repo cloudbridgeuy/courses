@@ -2,9 +2,10 @@
 title = "Preguntas puente"
 +++
 
-Estas preguntas cierran la sesión presencial y abren la remota. En la sesión de hoy se operó el workload
-—red, escalado, fallas— y se vio qué es un pipeline. Conviene reflexionarlas antes de la sesión remota,
-donde se construye el pipeline, se conecta a las notificaciones, y se abre la
+Estas preguntas cierran la sesión presencial y abren la remota. En la sesión de
+hoy se operó el workload (red, escalado, fallas) y se menciono brevemente qué
+es un pipeline. Conviene reflexionarlas antes de la sesión remota, donde se
+construye el pipeline, se conecta a las notificaciones, y se abre la
 observabilidad.
 
 :::slide
@@ -59,16 +60,16 @@ delante de los pasos internos y repetibles.
 
 ## Pregunta 3
 
-Cuando el build termina —en éxito o en error— ¿quién debería enterarse, y por qué medio?
+Cuando el build termina (en éxito o en error) ¿quién debería enterarse, y por qué medio?
 
 ::: solucion
-Debe enterarse **el equipo**, por el canal donde ya conversa —en esta organización,
-**Microsoft Teams**— sin tener que mirar la consola. Un build exitoso confirma que el
+Debe enterarse **el equipo**, por el canal donde ya conversa (por ejemplo,
+**Microsoft Teams**) sin tener que mirar la consola. Un build exitoso confirma que el
 cambio avanzó; uno fallido necesita atención rápida, y cuanto antes se detecte, antes se
 corrige.
 
 El mecanismo que lo hace posible es el que adelantamos en la Semana 1: el evento del
 build lo capturan las reglas de notificación, lo publican en SNS, y AWS Chatbot lo
 entrega a Teams. En el laboratorio lo veremos como un *toast* en la guía del instructor,
-que es un espejo de ese mismo flujo. Lo construimos en la próxima sesión.
+que es un espejo de ese mismo flujo.
 :::

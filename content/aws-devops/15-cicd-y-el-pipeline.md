@@ -12,6 +12,7 @@ para que tome la nueva imagen.
 Funciona, pero depende de que alguien recuerde los pasos, los ejecute en orden, y no se
 saltee ninguno. **CI/CD** automatiza exactamente esa secuencia.
 
+:::inline-slide light
 ## Qué es CI/CD
 
 - **Integración continua** (CI): cada cambio se integra y se construye automáticamente.
@@ -19,19 +20,26 @@ saltee ninguno. **CI/CD** automatiza exactamente esa secuencia.
 - **Entrega continua** (CD): cada cambio que pasa el build avanza automáticamente hacia
   el despliegue, con las verificaciones y aprobaciones que el equipo defina.
 
+:::skip
 La idea central no es la velocidad por sí misma, sino la **reproducibilidad**: el camino
 del código a producción es siempre el mismo, descrito una vez y ejecutado igual cada vez.
 El mismo principio que vio en git (`push` en lugar de subir archivos) y en CloudFormation
-(lanzar un template en lugar de clicar recursos), ahora aplicado al flujo entero.
+(lanzar un template en lugar de hacer click sobre recursos), ahora aplicado al flujo entero.
+:::
 
+:::add visibility=slide
+La idea central no es la velocidad, sino la **reproducibilidad**.
+::: #add
+::: #inline-slide
+
+:::inline-slide light
 ## El pipeline
 
 Un **pipeline** es la descripción de ese flujo automatizado. **AWS CodePipeline**
 modela el camino como una secuencia de **etapas** (*stages*), y cada etapa contiene una
 o más **acciones**.
 
-:::inline-slide light
-## Anatomía de un pipeline
+### Anatomía de un pipeline
 
 ```
 Source        Build          Deploy
@@ -51,24 +59,6 @@ Source        Build          Deploy
   código, la etapa Build entrega la imagen.
 - Una **transición** conecta una etapa con la siguiente; puede ser automática o estar
   detenida a la espera de una aprobación.
-
-## Leer un pipeline existente
-
-Antes de crear uno, conviene saber leerlo —en un equipo real, lo habitual es heredar
-pipelines, no empezarlos de cero. La vista de CodePipeline muestra las etapas de
-izquierda a derecha, cada una con el estado de su última ejecución: en curso, exitosa, o
-fallida. Al leer un pipeline ajeno, las preguntas útiles son: ¿qué dispara la primera
-etapa?, ¿qué produce cada etapa?, ¿dónde hay aprobaciones manuales?, y ¿en qué etapa
-falla cuando falla?
-
-:::slide
-## Leer un pipeline
-
-1. ¿Qué **dispara** la primera etapa?
-2. ¿Qué **artefacto** produce cada etapa?
-3. ¿Dónde hay **aprobaciones** manuales?
-4. ¿En qué **etapa** falla?
-:::
 
 En la próxima sesión se construye un pipeline que automatiza el flujo que hoy se hace a mano:
 Source desde CodeCommit, Build con el proyecto de CodeBuild, y Deploy hacia ECS, con una

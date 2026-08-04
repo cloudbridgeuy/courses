@@ -48,5 +48,10 @@ phases:
   post_build:
     commands:
       - echo Verificando la imagen publicada en ECR...
-      - aws ecr describe-images --repository-name "$IMAGE_REPO_NAME" --image-ids imageTag="$IMAGE_TAG"
+      - aws ecr describe-images --repository-name "$IMAGE_REPO_NAME" --image-ids imageTag="$GIT_SHA_SHORT"
+      - printf '[{"name":"app","imageUri":"%s"}]' "$IMAGE_URI:$GIT_SHA_SHORT" > imagedefinitions.json
       - echo Build completado.
+
+artifacts:
+  files:
+    - imagedefinitions.json

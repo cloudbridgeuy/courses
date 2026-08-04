@@ -2,41 +2,60 @@
 title = "Construir el pipeline"
 +++
 
+:::inline-slide
 ## Automatizar el flujo de punta a punta
 
 Se va a construir el pipeline que automatiza lo que hoy se hace a mano: un commit en
-CodeCommit dispara un build en CodeBuild, y la imagen resultante se despliega en ECS
-—con una pausa de aprobación manual antes del despliegue.
+CodeCommit dispara un build en CodeBuild, y la imagen resultante se despliega en ECS,
+con una pausa de aprobación manual antes del despliegue.
+:::
 
-## Lo que la etapa de Deploy necesita
+:::inline-slide light
+### Lo que la etapa de Deploy necesita
 
+:::skip
 La acción de despliegue a ECS de CodePipeline no toma la imagen directamente: toma un
 pequeño archivo, `imagedefinitions.json`, que indica qué contenedor actualizar y con qué
 imagen. Ese archivo lo produce el build. Antes de crear el pipeline, hay que agregar a
-`buildspec.yml` una fase que lo genere y lo declare como artefacto:
+`buildspec.yml` una línea que lo genere, y una sección `artifacts` que lo declare:
+:::
 
 ```yaml
   post_build:
     commands:
-      - echo Publicando la imagen en ECR...
-      - docker push $IMAGE_URI:$IMAGE_TAG
+      - echo Verificando la imagen publicada en ECR...
+      - aws ecr describe-images --repository-name "$IMAGE_REPO_NAME" --image-ids imageTag="$IMAGE_TAG"
       - printf '[{"name":"app","imageUri":"%s"}]' "$IMAGE_URI:$IMAGE_TAG" > imagedefinitions.json
+      - echo Build completado.
 
 artifacts:
   files:
     - imagedefinitions.json
 ```
+:::
+
+La imagen ya se publicó en la fase `build` con `docker buildx build --push`, así que
+`post_build` solo agrega el archivo. `$IMAGE_URI` y `$IMAGE_TAG` siguen disponibles: las
+variables definidas en `pre_build` se conservan durante todo el build.
 
 El nombre `app` debe coincidir con el nombre del contenedor en la task definition (el que
-se leyó en la Semana 2). Subir este cambio a CodeCommit antes de continuar —el pipeline
-tomará la versión más reciente.
+se implemento en la Semana 2). Subir este cambio a CodeCommit antes de continuar.
 
 ::: warning
 Si el nombre del contenedor en `imagedefinitions.json` no coincide exactamente con el de
-la task definition, la etapa de Deploy falla. Verificarlo antes de lanzar el pipeline.
+la task definition, la etapa de Deploy falla.
 :::
 
+::: info
+Utilizamos `GIT_SHA_SHORT` como `IMAGE_TAG` para contar con una tag inmutable.
+:::
+
+:::inline-slide
 ## Práctica guiada: crear el pipeline
+:::app
+<cb-goto path="Práctica guiada: crear el pipeline"></cb-goto>
+::: # add
+:::
 
 ### Iniciar la creación
 
@@ -62,7 +81,10 @@ la task definition, la etapa de Deploy falla. Verificarlo antes de lanzar el pip
 
 1. En **Deploy provider**, seleccionar **Amazon ECS**.
 2. Elegir el **clúster** y el **servicio**.
-3. Pulsar **Next**, revisar, y pulsar **Create pipeline**.
+3. Dejar **Input artifacts** en `BuildArtifact` —la salida de la etapa de Build— y
+   **Image definitions file** vacío: por omisión busca `imagedefinitions.json`, el archivo
+   que se acaba de declarar en `buildspec.yml`.
+4. Pulsar **Next**, revisar, y pulsar **Create pipeline**.
 
 CodePipeline ejecuta el pipeline por primera vez de inmediato: se verán las tres etapas
 correr de izquierda a derecha.
@@ -107,7 +129,9 @@ llegó a ECS.
 
 ::: solucion
 1. Agregar a `buildspec.yml` la generación de `imagedefinitions.json` y la sección
-   `artifacts`, y subirlo a CodeCommit.
+   `artifacts`, y subirlo a CodeCommit —desde el editor de la consola (**Code** →
+   `buildspec.yml` → **Edit** → **Commit changes**), con `aws codecommit put-file`, o con
+   `git push codecommit main`.
 2. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), pulsar **Create pipeline** y nombrarlo
    `taller-aws-<su-nombre>-pipeline`. Dejar crear un nuevo rol de servicio.
 3. **Source**: **AWS CodeCommit**, repositorio `taller-aws-<su-nombre>`, rama `main`,
