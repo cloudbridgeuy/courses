@@ -297,6 +297,58 @@ Las dos series salen del mismo gesto, y llegan por caminos distintos. La de
 línea de log, y después CloudWatch extrae el número de ahí. Esa misma línea se ve llegar
 en la Live Tail de la sección anterior, si quedó una sesión abierta.
 
+::: extra ¿Por qué una línea de log se convierte en métrica?
+La línea que la aplicación imprime no tiene nada de mágico: es un objeto JSON en una
+sola línea, escrito en la salida estándar como cualquier otro log. Lo que la convierte
+en métrica es una clave reservada, `_aws`. Ese formato se llama **EMF** (*Embedded
+Metric Format*), y la línea que llega a CloudWatch se ve así:
+
+```json
+{
+  "_aws": {
+    "Timestamp": 1785946073636,
+    "CloudWatchMetrics": [
+      {
+        "Namespace": "Taller/Custom",
+        "Dimensions": [["method"]],
+        "Metrics": [{ "Name": "CustomValue" }]
+      }
+    ]
+  },
+  "method": "emf",
+  "CustomValue": 41
+}
+```
+
+El bloque `_aws` no lleva los datos: lleva las **instrucciones de lectura**. Declara
+dónde publicar (`Namespace`), qué campos del objeto son valores (`Metrics`), cuáles son
+etiquetas (`Dimensions`), y a qué instante corresponden (`Timestamp`, en milisegundos
+desde epoch). Los datos están afuera, en el nivel superior del mismo objeto:
+`CustomValue` vale `41`, y `method` vale `emf`. CloudWatch cruza las dos partes, cada
+nombre declarado con el campo homónimo, y publica un dato de `CustomValue` = 41, con la
+dimensión `method=emf`, en el namespace `Taller/Custom`.
+
+Ese cruce ocurre en la ingesta del grupo de logs, no en la aplicación. De ahí salen las
+propiedades de la vía:
+
+- **No hace falta SDK ni permisos.** La aplicación solo imprime; no abre una conexión a
+  la API de CloudWatch, así que no necesita `cloudwatch:PutMetricData` en el rol de la
+  tarea. Funciona desde cualquier cosa que ya envíe sus logs a CloudWatch (el
+  contenedor con el driver `awslogs`, una función Lambda), sin tocar el código de red.
+- **La línea sigue siendo un log.** Los campos que no se declaran en `_aws` no viajan a
+  métricas, pero quedan en el log, consultables con Logs Insights al lado del número.
+  Un dato de métrica no tiene contexto, y un log no se grafica: EMF da las dos vistas
+  del mismo hecho, y de una sola escritura.
+- **Por eso tarda.** La línea tiene que salir del contenedor, llegar al grupo de logs y
+  pasar por el parser antes de que exista el punto en la gráfica. La vía de API entrega
+  el número directamente, y por eso aparece antes.
+- **Se paga dos veces.** La ingesta del log, y la métrica personalizada que sale de él.
+  «Sin permisos» no quiere decir «sin costo».
+
+Para verlo, abrir la línea en la Live Tail, o en Logs Insights, y desplegar el campo
+`_aws`: es exactamente el bloque de arriba, con el valor que se acaba de enviar.
+:::
+
 Al terminar, pulsar **Pausar** en los dos controles. El envío automático sigue mientras la
 página esté abierta, y cada punto es una llamada a `PutMetricData`, o una línea de log
 más: dejarlo corriendo toda la tarde se paga.
@@ -309,16 +361,16 @@ y versionado.
 La vía de log ata a Ops con Dev de forma silenciosa y continua: el monitoreo depende
 del formato de una línea que el equipo de desarrollo controla y puede cambiar en
 cualquier `commit`. Una alarma sostenida sobre ese log puede callar sin que nadie lo
-note. Aun así, la vía de log es, con diferencia, la más sencilla —no toca el código, no
-pide dependencias ni permisos nuevos, porque la línea ya existe—. Esa simplicidad es
+note. Aun así, la vía de log es, con diferencia, la más sencilla (no toca el código, no
+pide dependencias ni permisos nuevos, porque la línea ya existe). Esa simplicidad es
 real, y muchas veces es la decisión correcta cuando el log es estable y el costo de una
 alarma rota es bajo.
 
 La vía de API invierte el balance: más ingeniería, permisos
 (`cloudwatch:PutMetricData`) y, a veces, una dependencia más en la aplicación, a cambio
 de un contrato explícito, versionado y resiliente al cambio. Como todo, se elige la
-opción que mejor sirve a la situación —ninguna gana siempre—. Esa conversación, y no la
-herramienta, es DevOps: obliga a la pregunta que define al equipo de desarrollo, ¿qué
+opción que mejor sirve a la situación. Esa conversación, y no la herramienta, es
+DevOps: obliga a la pregunta que define al equipo de desarrollo, ¿qué
 significa, para quienes construyen la aplicación, que esté funcionando como corresponde?
 :::
 
@@ -374,7 +426,7 @@ Se pasó de operar a mano a tener un sistema que se entrega y se reporta solo.
 La última semana cierra la observabilidad y el curso. Se va a:
 
 - Construir **dashboards** que reúnan las métricas clave en una sola vista, y
-  **alarmas** que avisen —por el mismo camino a Teams— cuando un umbral se cruza.
+  **alarmas** que avisen, por el mismo camino a Teams, cuando un umbral se cruza.
 - Explotar **Container Insights** para ver el detalle por tarea y por servicio, e
   introducir la **trazabilidad operacional**: seguir un síntoma desde la métrica hasta la
   línea de log que lo explica.
@@ -382,5 +434,5 @@ La última semana cierra la observabilidad y el curso. Se va a:
   extremo.
 
 Se llegará al final con el ciclo entero en la cabeza: del código a la imagen, al despliegue,
-a la operación, y a la observación —y las herramientas para diagnosticar cuando algo se
-sale de lo esperado.
+a la operación, y a la observación, con las herramientas para diagnosticar cuando algo
+se sale de lo esperado.

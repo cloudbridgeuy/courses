@@ -337,7 +337,12 @@ minute while Insights bills per scanned volume. **Live Tail moved before
 «Métricas personalizadas»**, so the custom-metric section can point back at it to
 watch the EMF line arrive; that section also gained the steps for finding
 `Taller/Custom` under **Custom namespaces** with `Maximum` / 1 minute / 1 h, and
-the reason the `api` series shows up before the `emf` one. `19` also explains the
+the reason the `api` series shows up before the `emf` one. An `::: extra`
+deep-dive («¿Por qué una línea de log se convierte en métrica?») dissects the EMF
+line itself: the `_aws` block as reading instructions (Namespace / Metrics /
+Dimensions / Timestamp) versus the top-level fields that hold the values, the
+ingestion-time extraction that explains no-SDK/no-IAM, the log keeping its extra
+context for Insights, the lag, and the double billing. `19` also explains the
 two `<cb-metric>` buttons — **Enviar** for one point, **Auto (5 s)** / **Pausar**
 for a random value every five seconds — tells students to start both automatic
 runs before opening the console, reads the statistic/period step against a live
