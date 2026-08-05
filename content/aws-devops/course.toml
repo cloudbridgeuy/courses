@@ -29,8 +29,8 @@ sections = [
 ]
 
 [[session]]
-slug = "los-primeros-contenedores"
-title = "Los primeros contenedores"
+slug = "buenas-practicas-con-cf-ecs"
+title = "Buenas prácticas con CF y ECS"
 sections = [
   "11-buenas-practicas-troubleshooting.md",
   "12-separar-stacks.md",
