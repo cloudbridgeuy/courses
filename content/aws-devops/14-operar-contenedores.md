@@ -401,7 +401,7 @@ Nunca mirar la carga: para eso está el auto scaling.
 
 ## Escalar el servicio
 
-En la Semana 2 cambió `DesiredCount` a mano. En producción la carga varía, y ajustarla
+En la Semana 2 se cambió `DesiredCount` a mano. En producción la carga varía, y ajustarla
 manualmente no escala. El **auto scaling** del servicio ajusta el número de tareas según
 una métrica.
 
@@ -413,12 +413,454 @@ mínimo definido.
 :::slide light
 ## Auto scaling por seguimiento de objetivo
 
-Fije una métrica objetivo (ej. **CPU 50%**).
+Se fija una métrica objetivo (ej. **CPU 50%**).
 
 - CPU sube → ECS **agrega** tareas.
 - CPU baja → ECS **quita** tareas (hasta el mínimo).
 
 El número de tareas sigue la carga, sin intervención.
+:::
+
+Ese es el ejemplo de manual, y es el que se configura en la práctica guiada. Pero "CPU al
+50%" es, en la mayoría de las aplicaciones reales, la respuesta equivocada. Vale la pena
+entender por qué antes de aplicarlo a un sistema propio.
+
+### Qué hace útil a una métrica de escalado
+
+Una métrica sirve para escalar solo si cumple **dos** condiciones:
+
+1. **Está correlacionada con la demanda.** Con la capacidad fija, si la demanda sube, la
+   métrica sube; si la demanda baja, la métrica baja.
+2. **Es proporcional a la capacidad.** Con la demanda fija, al **duplicar** el número de
+   tareas la métrica debe caer **a la mitad**.
+
+La segunda condición es la que casi nadie verifica, y es la que rompe la mayoría de las
+políticas. El escalado automático es un lazo de control: calcula cuántas tareas hacen
+falta dividiendo el valor actual por el objetivo. Si la métrica no responde en proporción
+al número de tareas, esa cuenta no significa nada.
+
+:::inline-slide light
+### El lazo de control
+
+```mermaid
+flowchart LR
+  R["Referencia<br/>objetivo = 50 %"] -->|"+"| S(("Σ"))
+  S -->|"Error medido"| K["Controlador<br/>Application Auto Scaling"]
+  K -->|"Entrada del sistema<br/>DesiredCount = N"| P["Sistema<br/>Servicio ECS"]
+  P -->|"Salida del sistema<br/>utilización real"| T((" "))
+  T --> OUT[" "]
+  T --> SEN["Sensor<br/>CloudWatch · 1 min"]
+  SEN -->|"− Medida de la salida"| S
+  classDef punto fill:#fff,stroke:#333,stroke-width:1px
+  classDef fantasma fill:none,stroke:none
+  class T punto
+  class OUT fantasma
+```
+
+La segunda condición dice que **el sistema tiene ganancia**: mover la entrada debe mover
+la salida. Sin ganancia, el controlador no tiene autoridad sobre nada.
+
+:::skip
+Cada bloque del diagrama tiene un nombre concreto en ECS:
+
+| Bloque del lazo | En ECS |
+| --- | --- |
+| Referencia | El valor objetivo de la política |
+| Error medido | La diferencia entre el objetivo y lo que informa el sensor |
+| Controlador | Application Auto Scaling: convierte el error en una cantidad de tareas |
+| Entrada del sistema | El `DesiredCount` que se le pide al servicio |
+| Sistema | El servicio: atiende la demanda con las tareas que tiene |
+| Salida del sistema | La utilización real del recurso |
+| Sensor | CloudWatch, que publica esa utilización cada minuto |
+
+
+Falta un bloque que el diagrama clásico no dibuja, y que acá es el protagonista: la
+**perturbación**. El tráfico de los usuarios entra directo al sistema, sin pasar por el
+controlador. El lazo no existe para seguir una referencia que alguien mueve: existe para
+rechazar esa perturbación.
+
+Con ganancia nula, el error nunca se cierra: la política escala hasta el máximo
+persiguiendo un valor inalcanzable, o no escala nunca. Y conviene retener el **sensor**:
+mide cada minuto, así que el lazo siempre actúa sobre información vieja. Ese retardo es
+el motivo de los cooldowns, y reaparece al final de la sección.
+:::
+:::
+
+La forma de comprobarlo es una prueba de carga: sostener un ritmo de peticiones constante,
+anotar la métrica, duplicar las tareas sin tocar la carga, y volver a anotar. Si el valor
+se partió por dos, la métrica sirve. Si quedó igual, no sirve, por más que suba y baje con
+la carga.
+
+:::inline-slide light
+### La prueba de las dos condiciones
+
+Con carga constante, **duplicar** las tareas.
+
+| Resultado | Veredicto |
+| --- | --- |
+| La métrica cae a la mitad | Sirve para target tracking |
+| La métrica casi no cambia | **No** sirve: mide un cuello de botella externo |
+
+:::skip
+Una métrica que sube con la carga pero no baja con la capacidad describe el problema, no
+la solución. Sirve como alarma; no sirve como señal de escalado.
+:::
+:::
+
+:::inline-slide light
+### Por qué la CPU miente
+
+:::skip
+La CPU cumple las dos condiciones en **un** tipo de aplicación: la que hace todo su
+trabajo dentro del proceso (cálculo, serialización, compresión) y no espera a nadie. Ahí
+la CPU se satura antes que cualquier otro recurso, y agregar tareas la reparte.
+
+La mayoría de los servicios de negocio no son así. Son lo que la documentación de AWS
+llama **el servidor que espera**: cada petición hace una o varias llamadas a una base de
+datos, a una API interna, o a un tercero, y pasa la mayor parte de su vida **bloqueada**.
+Esperar no consume CPU. Una aplicación con la latencia por las nubes y todas las peticiones
+encoladas puede mostrar 12% de CPU, porque literalmente no está haciendo nada: está
+esperando.
+:::
+
+Los cuellos de botella típicos que la CPU no ve:
+
+
+| Cuello de botella | Qué pasa realmente | Qué muestra la CPU |
+| --- | --- | --- |
+| Base de datos saturada | Las consultas tardan 10× más; el tiempo se va en `wait` | Baja |
+| Pool de conexiones agotado | Las peticiones hacen cola *dentro* de la aplicación esperando una conexión libre | Baja |
+| API de un tercero lenta | El cliente HTTP espera el timeout | Baja |
+| Contención de locks | Los hilos se serializan sobre un recurso compartido | Baja |
+| Límite de workers alcanzado | El servidor acepta la conexión y la deja en backlog | Baja |
+
+
+:::skip
+En todos esos casos una política de CPU al 50% **nunca dispara**. El servicio se degrada,
+los usuarios ven timeouts, y el gráfico de escalado está plano. La política existe, está
+"configurada", y no hace nada.
+:::
+
+::: warning
+Y hay un caso peor: que **sí** dispare. Si el cuello de botella es la base de datos, agregar
+tareas agrega conexiones y consultas a un motor que ya no da abasto. El auto scaling
+multiplica la carga sobre la dependencia saturada, y acelera la caída. Escalar hacia
+afuera no arregla una dependencia agotada; la termina de romper.
+:::
+:::
+
+:::inline-slide
+### Métricas que sí representan la carga
+
+:::skip
+La métrica correcta es la del **recurso que se agota primero**. Identificarlo es el
+trabajo previo, y es una conversación con el equipo de desarrollo, porque la respuesta
+está en el código, no en la consola.
+:::
+
+:::add visibility=slide
+La métrica correcta es la del **recurso que se agota primero**.
+:::
+
+
+| Patrón de aplicación | Recurso que se agota primero | Métrica de escalado |
+| --- | --- | --- |
+| Cómputo puro | CPU | `ECSServiceAverageCPUUtilization` |
+| Memoria por petición, liberada al terminar | RAM | `ECSServiceAverageMemoryUtilization` |
+| Límite de workers, o de pool | Ranuras de concurrencia | Concurrencia promedio por tarea (métrica propia) |
+| El que espera (I/O) | Conexiones del pool | Saturación del pool (métrica propia) |
+| Throughput parejo, peticiones homogéneas | — | `ALBRequestCountPerTarget` |
+| Consumidor de cola | Trabajo pendiente | Backlog por tarea (ver más abajo) |
+
+:::
+
+Dos observaciones prácticas sobre esta tabla:
+
+- **La concurrencia y la saturación del pool casi siempre hay que publicarlas.** No existen
+  como métrica de AWS: viven dentro de la aplicación. Publicar cada minuto "conexiones en
+  uso / tamaño del pool" es una línea de código, y es la métrica que de verdad describe a
+  un servidor que espera. Un valor cercano a 1 significa que las peticiones están haciendo
+  cola aunque la CPU esté ociosa.
+- **`ALBRequestCountPerTarget` es la métrica de arranque más honesta** para un servicio
+  HTTP genérico. La publica el balanceador, cumple las dos condiciones (al duplicar tareas
+  el ALB reparte y el valor cae a la mitad), y no requiere tocar la aplicación. Su límite
+  es que asume que todas las peticiones cuestan parecido; con una mezcla de peticiones
+  baratas y carísimas, deja de representar la carga.
+
+::: info
+No siempre hace falta publicar una métrica nueva. CloudWatch permite componer métricas
+existentes con **metric math**, y Application Auto Scaling acepta el resultado como
+métrica de una política. `RequestCount / RunningTaskCount` es una división que se escribe
+en la política, sin escribir código ni pagar por una métrica propia.
+:::
+
+:::inline-slide with-title
+#### Latencia y tasa de errores: alarmas, no políticas
+
+La tentación es escalar por el tiempo de respuesta, o por la relación entre `5xx` y `2xx`.
+Suena razonable porque es lo que le duele al usuario, pero rompe la segunda condición:
+
+- **`TargetResponseTime` no baja en proporción a la capacidad.** Si la latencia viene de la
+  base de datos, duplicar las tareas no la mueve. AWS lo dice explícitamente: la latencia
+  del balanceador no sirve para target tracking.
+- **La tasa de errores es un síntoma, y puede ser catastróficamente engañosa.** Un
+  despliegue malo lleva los `5xx` a 100%. Una política que escala por errores responde
+  lanzando más copias de la versión rota, más rápido.
+:::
+
+El lugar de estas dos señales es el otro: son las **alarmas de SLO**, las que despiertan a
+alguien y las que definen si el sistema cumple su compromiso. Sirven además como
+disparador de una política de **step scaling** con escalones explícitos (donde uno decide
+cuánto agregar) pero no como objetivo de un lazo proporcional.
+
+:::inline-slide light with-title
+#### Colas y streams: la profundidad no alcanza
+
+Los consumidores de colas (SQS, Kinesis, Kafka) son el caso donde la métrica obvia falla
+de la forma más clara. El número de mensajes en la cola sube con la demanda (condición 1),
+pero **no cambia en proporción al número de consumidores** (condición 2): 5.000 mensajes
+son 5.000 mensajes con 2 tareas o con 20.
+
+La métrica correcta es el **backlog por tarea**, y su objetivo se deriva del compromiso de
+latencia:
+
+```
+backlog por tarea  = mensajes pendientes / tareas en ejecución
+backlog aceptable  = latencia tolerada / tiempo promedio por mensaje
+```
+
+Con 1.500 mensajes pendientes, 10 tareas, 0,1 s de proceso por mensaje, y una latencia
+tolerada de 10 segundos: el valor actual es `1500 / 10 = 150` mensajes por tarea, y el
+objetivo es `10 / 0,1 = 100`. **Ese 100 es el valor que se configura** como `TargetValue`
+de la política, sobre una métrica de metric math
+`ApproximateNumberOfMessagesVisible / RunningTaskCount`. Con ese objetivo la política lleva
+el servicio a 15 tareas (`1500 / 100`). La cuenta es proporcional, y por eso funciona.
+:::
+
+::: extra Por qué esta fórmula, y no otra
+El objetivo de un consumidor no es "tener la cola vacía": es **no atrasarse más de lo
+tolerable**. Una cola con 10.000 mensajes que se vacía en 3 segundos está sana; una con
+50 mensajes atascados hace 20 minutos está rota. La fórmula traduce el compromiso de
+negocio ("ningún mensaje espera más de 10 segundos") a un número de tareas, pasando por lo
+único que la aplicación conoce de sí misma: cuánto tarda en procesar un mensaje.
+
+Ese tiempo promedio hay que medirlo, y hay que revisarlo. Si el proceso por mensaje se
+duplica porque se agregó una llamada a otro servicio, el objetivo de la política quedó
+obsoleto y el sistema se atrasa sin que ninguna alarma lo note.
+:::
+
+:::inline-slide with-title light
+Alrededor de esa métrica principal conviene tener otras dos, que **no** son objetivos de
+escalado sino señales:
+
+| Señal | Qué dice | Uso |
+| --- | --- | --- |
+| Edad del mensaje más viejo (`ApproximateAgeOfOldestMessage`, `MillisBehindLatest`, *consumer lag*) | Cuánto se atrasó el trabajo más antiguo | **Alarma de SLO.** Es la verdad sobre el atraso. No sirve como objetivo: un mensaje envenenado que falla en bucle la hace crecer para siempre, y ninguna cantidad de tareas la baja |
+| Ritmo de llegada (`NumberOfMessagesSent`) | Cuánto trabajo entra por minuto | **Indicador adelantado.** Sube *antes* que el backlog. Útil como disparador de step scaling para anticipar un pico conocido |
+
+::: warning
+En Kafka, el número de consumidores útiles está limitado por el número de **particiones**
+del topic. Escalar a 20 tareas sobre un topic de 6 particiones deja 14 consumidores
+ociosos, pagando. El techo de la política (`MaxCapacity`) debe ser el número de
+particiones, no un número redondo elegido a ojo.
+::: #warning
+::: #inline-slide
+
+### Los mecanismos, y cuándo usar cada uno
+
+Application Auto Scaling —el servicio que ECS usa por debajo— ofrece cuatro mecanismos.
+No compiten: se combinan.
+
+| Mecanismo | Cómo decide | Cuándo conviene |
+| --- | --- | --- |
+| **Target tracking** | Mantiene una métrica en un valor objetivo; AWS calcula el ajuste | El caso por defecto, si la métrica es proporcional a la capacidad |
+| **Step scaling** | Escalones explícitos según **cuánto** se pasó del umbral de una alarma | La métrica no es proporcional, o hace falta controlar exactamente cuánto se agrega y cuánto se quita |
+| **Scheduled** | Reloj: cambia mínimo y máximo a una hora fija | Patrón conocido: apertura de sucursales, cierre de mes, campaña anunciada |
+| **Predictive** | Historia: detecta ciclos diarios o semanales y adelanta la capacidad | Tráfico cíclico. Se combina con uno dinámico, que cubre lo imprevisto |
+
+
+#### Target tracking: cómodo, y deliberadamente asimétrico
+
+Vale conocer dos detalles del comportamiento, porque explican quejas frecuentes.
+
+**Escala hacia afuera con ganas, y hacia adentro con desconfianza.** Cuando la métrica pasa
+el objetivo, la política asume que la aplicación está sufriendo y agrega capacidad
+proporcional al desvío, lo más rápido que puede. Cuando la métrica baja, en cambio, no
+quita nada si calcula que quitar una tarea volvería a pasar el objetivo, y espera a que el
+valor esté bastante por debajo (del orden de un 10%) antes de reducir. Esa asimetría es
+intencional: prioriza disponibilidad sobre costo, y evita la oscilación.
+
+**Los cooldowns existen, y su valor por omisión en ECS es 300 segundos.** El *scale-out
+cooldown* no bloquea: si hace falta un escalado **mayor**, la política lo hace igual, y
+cuenta lo ya agregado como parte del total. El *scale-in cooldown* sí bloquea, y se cancela
+si aparece una razón para escalar hacia afuera.
+
+Con varias políticas de target tracking sobre el mismo servicio (por ejemplo, CPU y
+`ALBRequestCountPerTarget`), la regla es: escala hacia afuera si **alguna** lo pide, y hacia
+adentro solo si **todas** lo permiten. Eso hace que combinar dos métricas sea seguro, y es
+la forma recomendada de cubrir una aplicación con dos cuellos de botella posibles.
+
+#### Step scaling: cuando hace falta decidir a mano
+
+Step scaling separa las dos piezas que target tracking une: la **alarma** de CloudWatch, que
+se define y se administra manualmente, y los **escalones**, que dicen cuánto ajustar según
+el tamaño de la infracción. Los límites de cada escalón se expresan **relativos al umbral de
+la alarma**, no en valor absoluto:
+
+Alarma de salida: `CPU > 60%`
+
+
+| Límite inferior | Límite superior | Ajuste | Se aplica cuando |
+| --- | --- | --- | --- |
+| `0` | `10` | `+1` | CPU entre 60% y 70% |
+| `10` | `20` | `+2` | CPU entre 70% y 80% |
+| `20` | *(nulo)* | `+4` | CPU 80% o más |
+
+
+Alarma de entrada: `CPU < 40%`
+
+| Límite inferior | Límite superior | Ajuste | Se aplica cuando |
+| --- | --- | --- | --- |
+| `-10` | `0` | `0` | CPU entre 30% y 40% |
+| *(nulo)* | `-10` | `-1` | CPU menos de 30% |
+
+
+El ajuste puede expresarse como `ChangeInCapacity` (± un número de tareas),
+`PercentChangeInCapacity` (± un porcentaje, con un mínimo opcional), o `ExactCapacity` (un
+número fijo). Los rangos no pueden solaparse ni dejar huecos.
+
+Ese ejemplo muestra el motivo principal para elegir step scaling: **la asimetría explícita**.
+Sube de a 4, baja de a 1. Y con un margen ancho entre los dos umbrales (60% y 40%) para que
+un escalado no active inmediatamente al del sentido contrario.
+
+::: warning
+Mezclar target tracking y step scaling sobre el mismo servicio requiere cuidado: son dos
+lazos que no se conocen. Un step scaling que reduce capacidad antes de que el target
+tracking considere que corresponde reducir no queda bloqueado, y el target tracking puede
+volver a agregar lo que el otro acaba de quitar. La combinación segura es usar target
+tracking **con scale-in desactivado** para crecer, y step scaling solo para reducir.
+:::
+
+:::slide light
+## Tres mecanismos
+
+| | Decide por | Uso |
+| --- | --- | --- |
+| **Target tracking** | Un valor objetivo | Métrica proporcional a la capacidad |
+| **Step scaling** | Escalones por tamaño del desvío | Control explícito, asimetría |
+| **Scheduled** | El reloj | Patrón conocido de antemano |
+
+Se combinan. Scheduled fija el piso; el dinámico cubre lo imprevisto.
+:::
+
+### El costo de escalar
+
+Hasta acá el escalado se trató como si fuera gratis. No lo es, y ese costo es la causa de
+la falla más difícil de diagnosticar en un sistema con auto scaling.
+
+**Agregar una tarea cuesta tiempo.** Bajar la imagen, arrancar el proceso, llenar el pool
+de conexiones, calentar cachés, registrarse en el target group, y pasar los health checks:
+en Fargate, entre 30 y 90 segundos antes de recibir su primera petición. Durante esa
+ventana la capacidad no subió, pero el escalado ya ocurrió.
+
+**Quitar una tarea también cuesta.** Hay que drenar las peticiones en vuelo (de ahí el
+apartado de health checks de más arriba) y, si la tarea era un consumidor, el trabajo que
+tenía a medio hacer vuelve a la cola.
+
+**Y en algunos sistemas, escalar detiene el trabajo.** Es el caso de los consumidores de
+Kafka: cuando un consumidor entra o sale del grupo, se dispara un **rebalanceo**, y las
+particiones se reparten de nuevo entre los miembros. El rebalanceo es un evento *stop the
+world*: **nadie consume** mientras dura. Kinesis tiene el equivalente con la reasignación
+de leases.
+
+#### El espiral
+
+Aca es cuando el modelo como lazo de control es más evidente.
+
+Supongemos que la política escala por *consumer lag* (el atraso del grupo de
+consumidores), y escalar aumenta el lag:
+
+1. Llega un pico. El lag sube y cruza el umbral.
+2. La política agrega consumidores. Eso dispara un rebalanceo, y el consumo **se detiene**
+   unos segundos.
+3. Durante la pausa siguen llegando mensajes y **ninguno se procesa**: el lag sube más que
+   antes del escalado.
+4. La política ve el lag más alto y agrega **más** consumidores. Nuevo rebalanceo, nueva
+   pausa, nuevo salto del lag.
+5. El ciclo se repite hasta el máximo de la política.
+6. Ahora hay capacidad de sobra. El backlog se drena de golpe y el lag cae muy por debajo
+   del objetivo.
+7. La política reduce. Rebalanceo, pausa, el lag salta, y arranca de nuevo el ciclo, esta
+   vez hacia arriba.
+
+El resultado es un servicio que oscila entre el mínimo y el máximo indefinidamente, con la
+peor latencia y el costo más alto posibles, y con métricas que parecen mostrar un tráfico
+errático que en realidad nunca existió.
+
+:::inline-slide light
+### El lazo que se alimenta solo
+
+```mermaid
+flowchart LR
+  A["📈 Sube el lag"] --> B["➕ Escala hacia afuera"]
+  B --> C["🔄 Rebalanceo<br/>(nadie consume)"]
+  C --> D["📈 El lag sube <b>más</b>"]
+  D --> B
+  D --> E["🚧 Tope máximo"]
+  E --> F["📉 Se drena todo<br/>el lag se desploma"]
+  F --> G["➖ Escala hacia adentro"]
+  G --> C
+```
+
+:::skip
+La forma general: **el acto de escalar perturba la métrica que dispara el escalado**. No es
+exclusivo de Kafka. Ocurre con cachés que arrancan frías (la latencia sube al agregar
+tareas), con pools que se llenan de golpe contra la base de datos, y con cualquier arranque
+lento medido por una métrica de latencia.
+:::
+
+:::add visibility=slide
+::: info
+El acto de escalar perturba la métrica que dispara el escalado
+::: #info
+::: #add
+::: #inline-slide
+
+:::inline-slide with-title
+#### Cómo se rompe la espiral
+
+No hace falta otra herramienta. El auto scaling tiene los controles; hace falta conocer el
+problema y elegir los valores a conciencia.
+
+| Ajuste | Por qué funciona |
+| --- | --- |
+| **Cooldown de salida ≥ arranque + estabilización** | La métrica medida mientras el sistema todavía se acomoda no cuenta como una razón nueva para escalar |
+| **Ventana de evaluación más larga para reducir que para crecer** | Crecer con 3 minutos de evidencia, reducir con 15. Es exactamente lo que hace target tracking por omisión |
+| **Escalones asimétricos** (`+4` / `-1`) | Cada reducción perturba menos: un rebalanceo de una partición, no de todas |
+| **Margen ancho entre umbrales** (salir a 60%, entrar a 30%) | Después de un escalado, la métrica cae dentro de la zona muerta y no dispara el sentido contrario |
+| **Mínimo y máximo cercanos** | Limita la amplitud de la oscilación. `1..50` permite una espiral enorme; `4..12`, una pequeña |
+| **Métrica promediada sobre una ventana mayor que la perturbación** | Si el rebalanceo dura 20 segundos, una métrica de 5 minutos lo suaviza en vez de amplificarlo |
+| **Suspender el escalado durante los despliegues** | ECS ya desactiva el scale-in mientras hay un despliegue en curso, por esta misma razón |
+| **Protección de instancia en trabajos largos** | Evita matar un worker a mitad de un mensaje, y que ese trabajo vuelva a la cola |
+| **Membresía estática y rebalanceo cooperativo** (Kafka) | Reduce el costo del evento en el origen: un rebalanceo que no detiene a todo el grupo rompe el lazo desde la raíz |
+
+De todo eso, la regla que resume el resto:
+
+> **El período de decisión del escalado debe ser bastante mayor que el tiempo que tarda un
+> escalado en surtir efecto.** Si una acción cuesta 40 segundos de degradación y la política
+> decide cada 60, la espiral está garantizada.
+:::
+
+Como referencia, un cooldown de tres a cinco veces el tiempo de estabilización es un punto
+de partida razonable, que después se ajusta mirando el historial de actividades de
+escalado.
+
+::: info
+Y la pregunta que hay que hacerse antes de tocar cualquier política: **¿el problema se
+resuelve con más tareas?** Si el cuello de botella es la base de datos, un tercero lento, o
+un lock, la respuesta es no, y el auto scaling solo va a empeorarlo. Ahí el trabajo es
+otro: límites de concurrencia, caché, backpressure, o un pool compartido. El escalado
+automático multiplica capacidad; no fabrica la que falta aguas abajo.
 :::
 
 ## Cuando una tarea no arranca
