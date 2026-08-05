@@ -221,9 +221,11 @@ cb-metric.cb-app-locked {
 
 /* ---------------------------------------------------------------------------
    <cb-http> — in-page HTTP client
+   <cb-eco> — the same console, plus the echo service's query controls
    --------------------------------------------------------------------------- */
 
-cb-http {
+cb-http,
+cb-eco {
   display: block;
 }
 
@@ -237,7 +239,9 @@ cb-http {
 .cb-http-method,
 .cb-http-domain,
 .cb-http-url,
-.cb-http-body {
+.cb-http-body,
+.cb-eco-status-input,
+.cb-eco-query-input {
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--cb-border, #e2e6e8);
   border-radius: 4px;
@@ -290,6 +294,41 @@ cb-http {
 
 .cb-http-response[hidden] {
   display: none;
+}
+
+.cb-eco-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.cb-eco-field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--cb-grey, #75787b);
+}
+
+.cb-eco-status-input {
+  width: 6rem;
+}
+
+.cb-eco-query-input {
+  flex: 1;
+  min-width: 9rem;
+}
+
+/* The URL the controls build, so the query string stays visible. */
+.cb-eco-preview {
+  margin-top: 0.4rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cb-grey, #75787b);
 }
 
 /* ---------------------------------------------------------------------------

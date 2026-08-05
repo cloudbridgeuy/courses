@@ -240,6 +240,16 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   with `Access-Control-Allow-{Origin,Methods,Headers}: *`, so a guide served
   elsewhere (e.g. locally) can still call a deployed eco. No server handler, no
   gate: it never locks.
+- `<cb-eco domain="eco.example.com" endpoint="/eco/prueba" status="503"
+  query="x=1&y=2" method="GET" body="…" label="Enviar">` is the same console
+  aimed at the echo service, plus the two controls that service reads from the
+  query string: `status`, the code it answers with, and `query`, extra pairs it
+  reports back under `request.query`. A preview line under the fields shows the
+  URL those controls build, so the query string stays visible. An empty
+  `status` field sends no `status` parameter, which leaves the service on its
+  default `200`. Both elements share one factory (`httpConsole` in `apps.js`)
+  and the `cb-http-*` classes, so they also share the response panel, and the
+  Shiki injection rule.
 - A single multiplexed `EventSource('/events/stream')` demultiplexed by `type`.
 - Toast renderer for `type: "notification"` events (replaces `notifications.js`).
 

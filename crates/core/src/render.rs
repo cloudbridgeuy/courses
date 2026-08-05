@@ -259,6 +259,7 @@ pub fn render_slideshow_page(
         slide.html.contains("<code class=\"language-")
             || slide.html.contains("<cb-file")
             || slide.html.contains("<cb-http")
+            || slide.html.contains("<cb-eco")
     });
     let shiki_script = if uses_syntax_highlighting {
         format!("<script defer src=\"{SHIKI_INIT_JS_PATH}\"></script>\n")

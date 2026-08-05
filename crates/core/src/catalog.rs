@@ -97,10 +97,12 @@ fn assemble_session(
         uses_syntax_highlighting |= rendered.html.contains("<code class=\"language-")
             || rendered.html.contains("<cb-file")
             || rendered.html.contains("<cb-http")
+            || rendered.html.contains("<cb-eco")
             || rendered.slide_html.iter().any(|slide| {
                 slide.html.contains("<code class=\"language-")
                     || slide.html.contains("<cb-file")
                     || slide.html.contains("<cb-http")
+                    || slide.html.contains("<cb-eco")
             });
         uses_file_apps |= rendered.html.contains("<cb-file")
             || rendered
@@ -154,8 +156,8 @@ fn assemble_session(
     }
     // `cb-file` creates its code block when apps.js runs, so apps must be
     // registered before Shiki scans the document for language-tagged blocks.
-    // `cb-http` needs Shiki too — its response panel highlights on demand
-    // through the `window.cbShiki` helper shiki-init.js exposes.
+    // `cb-http`, and `cb-eco`, need Shiki too — their response panel highlights
+    // on demand through the `window.cbShiki` helper shiki-init.js exposes.
     if uses_syntax_highlighting {
         assets.push_script(SHIKI_INIT_JS_PATH);
     }
@@ -530,6 +532,25 @@ mod tests {
         let input = CourseInput {
             slug: "course-http",
             manifest: &make_manifest_one_session("Course Http", &["01-http.md"]),
+            files: &files,
+        };
+
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&SHIKI_INIT_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn section_with_an_eco_app_injects_shiki() {
+        // <cb-eco> is the same console, and shares the response panel.
+        let body = ":::app\n<cb-eco status=\"503\"></cb-eco>\n:::\n";
+        let files = make_files(&[("01-eco.md", make_section("Eco", body))]);
+        let input = CourseInput {
+            slug: "course-eco",
+            manifest: &make_manifest_one_session("Course Eco", &["01-eco.md"]),
             files: &files,
         };
 

@@ -1357,17 +1357,220 @@
   );
 
   // ---------------------------------------------------------------------------
+  // In-page HTTP console — the machinery behind <cb-http> and <cb-eco>
+  //
+  // Method selector, editable domain + endpoint fields, optional body, and a
+  // response panel with status, latency, and the body (JSON pretty-printed).
+  // The authored attributes are only the defaults — every field stays editable
+  // in the page. An empty domain keeps the request same-origin (the guide and
+  // the echo service share the ALB); a domain without a scheme inherits the
+  // page's, which also avoids mixed content. The request is a plain browser
+  // fetch(); no server handler is involved, so it never locks.
+  //
+  // Options: defaultEndpoint, extraQuery (called on every send, and returns the
+  // pairs the widget adds on top of what the endpoint field carries), onChange
+  // (called whenever a field changes, so a caller can refresh its own preview).
+  // Nothing is in the DOM until mount() runs, which lets a caller build its own
+  // controls against the returned handles first.
+  // ---------------------------------------------------------------------------
+
+  var HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+
+  // Joins the domain and the endpoint into the fetch target. An empty domain
+  // keeps the endpoint relative (same origin); a domain without a scheme gets
+  // the page's own, so a plain host works from http and https alike.
+  function joinUrl(base, endpoint) {
+    base = (base || "").trim();
+    endpoint = (endpoint || "").trim() || "/";
+    if (!base) return endpoint;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(base)) {
+      base = location.protocol + "//" + base;
+    }
+    base = base.replace(/\/+$/, "");
+    return base + (endpoint.charAt(0) === "/" ? "" : "/") + endpoint;
+  }
+
+  // Appends `key=value` pairs to a URL that may already carry a query string.
+  function withQuery(url, pairs) {
+    var extra = (pairs || [])
+      .filter(function (pair) {
+        return pair;
+      })
+      .join("&");
+    if (!extra) return url;
+    return url + (url.indexOf("?") === -1 ? "?" : "&") + extra;
+  }
+
+  function httpConsole(host, options) {
+    var opts = options || {};
+    var initialMethod = (host.getAttribute("method") || "GET").toUpperCase();
+    var label = host.getAttribute("label") || "Enviar";
+
+    var row = document.createElement("div");
+    row.className = "cb-http-row";
+
+    var select = document.createElement("select");
+    select.className = "cb-http-method";
+    HTTP_METHODS.forEach(function (m) {
+      var opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      select.appendChild(opt);
+    });
+    if (HTTP_METHODS.indexOf(initialMethod) !== -1) select.value = initialMethod;
+
+    var domain = document.createElement("input");
+    domain.type = "text";
+    domain.className = "cb-http-domain";
+    domain.value = host.getAttribute("domain") || "";
+    domain.placeholder = "mismo origen";
+    domain.spellcheck = false;
+
+    var url = document.createElement("input");
+    url.type = "text";
+    url.className = "cb-http-url";
+    url.value = host.getAttribute("endpoint") || opts.defaultEndpoint || "/";
+    url.spellcheck = false;
+
+    var btn = makeAppBtn(label);
+
+    row.appendChild(select);
+    row.appendChild(domain);
+    row.appendChild(url);
+    row.appendChild(btn);
+
+    function buildUrl() {
+      var target = joinUrl(domain.value, url.value);
+      return opts.extraQuery ? withQuery(target, opts.extraQuery()) : target;
+    }
+
+    var body = document.createElement("textarea");
+    body.className = "cb-http-body";
+    body.rows = 3;
+    body.placeholder = "Cuerpo del pedido (opcional)";
+    body.spellcheck = false;
+    body.value = host.getAttribute("body") || "";
+
+    var statusLine = document.createElement("div");
+    statusLine.className = "cb-http-status";
+    statusLine.hidden = true;
+
+    var responsePre = document.createElement("pre");
+    var responseCode = document.createElement("code");
+    responsePre.className = "cb-http-response";
+    responsePre.appendChild(responseCode);
+    responsePre.hidden = true;
+
+    // Response render: plain text first (always correct), then swapped
+    // for Shiki tokens when the page ships the highlighter (shiki-init.js
+    // exposes window.cbShiki). The sequence guard drops a slow highlight
+    // that finishes after a newer send already replaced the panel.
+    var renderSeq = 0;
+    function showResponse(text, isJson) {
+      renderSeq++;
+      responseCode.textContent = text;
+      responsePre.style.removeProperty("background-color");
+      responsePre.style.removeProperty("color");
+      responsePre.hidden = false;
+      if (!isJson || !window.cbShiki) return;
+      var seq = renderSeq;
+      window.cbShiki.highlight(text, "json").then(function (highlighted) {
+        var code = highlighted && highlighted.querySelector("code");
+        if (!code || seq !== renderSeq) return;
+        responseCode.innerHTML = code.innerHTML;
+        responsePre.style.backgroundColor = highlighted.style.backgroundColor || "";
+        responsePre.style.color = highlighted.style.color || "";
+      });
+    }
+
+    function changed() {
+      if (opts.onChange) opts.onChange();
+    }
+
+    // GET and HEAD cannot carry a body — fetch() rejects the request.
+    function syncBody() {
+      body.hidden = select.value === "GET" || select.value === "HEAD";
+    }
+    select.addEventListener("change", function () {
+      syncBody();
+      changed();
+    });
+    syncBody();
+
+    function send() {
+      var init = { method: select.value };
+      if (!body.hidden && body.value) init.body = body.value;
+      btn.disabled = true;
+      statusLine.hidden = false;
+      statusLine.className = "cb-http-status";
+      statusLine.textContent = "Enviando…";
+      responsePre.hidden = true;
+      var started = performance.now();
+      fetch(buildUrl(), init)
+        .then(function (r) {
+          return r.text().then(function (text) {
+            var ms = Math.round(performance.now() - started);
+            statusLine.textContent =
+              "HTTP " + r.status +
+              (r.statusText ? " " + r.statusText : "") +
+              " · " + ms + " ms";
+            statusLine.classList.add(r.ok ? "cb-http-ok" : "cb-http-fail");
+            if (text) {
+              var isJson = false;
+              try {
+                text = JSON.stringify(JSON.parse(text), null, 2);
+                isJson = true;
+              } catch (_) {}
+              showResponse(text, isJson);
+            } else {
+              responseCode.textContent = "";
+              statusLine.textContent += " · sin cuerpo";
+            }
+          });
+        })
+        .catch(function (e) {
+          statusLine.classList.add("cb-http-fail");
+          statusLine.textContent =
+            "Error de red: " + (e && e.message ? e.message : e);
+        })
+        .then(function () {
+          btn.disabled = false;
+        });
+    }
+
+    function sendOnEnter(e) {
+      if (e.key === "Enter") send();
+    }
+
+    btn.addEventListener("click", send);
+    domain.addEventListener("keydown", sendOnEnter);
+    url.addEventListener("keydown", sendOnEnter);
+    domain.addEventListener("input", changed);
+    url.addEventListener("input", changed);
+
+    return {
+      method: select,
+      buildUrl: buildUrl,
+      send: send,
+      sendOnEnter: sendOnEnter,
+      // Puts the widget in the page. `extras` are the caller's own controls,
+      // which sit between the request row and the body box.
+      mount: function (extras) {
+        host.appendChild(row);
+        (extras || []).forEach(function (node) {
+          host.appendChild(node);
+        });
+        host.appendChild(body);
+        host.appendChild(statusLine);
+        host.appendChild(responsePre);
+        changed();
+      },
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // Custom element: <cb-http>
   // Attributes: method, domain, endpoint, body, label
-  //
-  // In-page HTTP client: method selector, editable domain + endpoint fields,
-  // optional body, and a response panel with status, latency, and the body
-  // (JSON pretty-printed). The authored attributes are only the defaults —
-  // both fields stay editable in the page. An empty domain keeps the request
-  // same-origin (the guide and the echo service share the ALB); a domain
-  // without a scheme inherits the page's, which also avoids mixed content.
-  // The request is a plain browser fetch(); no server handler is involved,
-  // so it never locks.
   // ---------------------------------------------------------------------------
 
   customElements.define(
@@ -1376,159 +1579,112 @@
       connectedCallback() {
         if (this._rendered) return;
         this._rendered = true;
-
-        var METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
-        var initialMethod = (this.getAttribute("method") || "GET").toUpperCase();
-        var label = this.getAttribute("label") || "Enviar";
-
-        var row = document.createElement("div");
-        row.className = "cb-http-row";
-
-        var select = document.createElement("select");
-        select.className = "cb-http-method";
-        METHODS.forEach(function (m) {
-          var opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
-          select.appendChild(opt);
-        });
-        if (METHODS.indexOf(initialMethod) !== -1) select.value = initialMethod;
-
-        var domain = document.createElement("input");
-        domain.type = "text";
-        domain.className = "cb-http-domain";
-        domain.value = this.getAttribute("domain") || "";
-        domain.placeholder = "mismo origen";
-        domain.spellcheck = false;
-
-        var url = document.createElement("input");
-        url.type = "text";
-        url.className = "cb-http-url";
-        url.value = this.getAttribute("endpoint") || "/";
-        url.spellcheck = false;
-
-        var btn = makeAppBtn(label);
-
-        row.appendChild(select);
-        row.appendChild(domain);
-        row.appendChild(url);
-        row.appendChild(btn);
-
-        // Joins the two fields into the fetch target. An empty domain keeps
-        // the endpoint relative (same origin); a domain without a scheme gets
-        // the page's own, so a plain host works from http and https alike.
-        function buildUrl() {
-          var base = domain.value.trim();
-          var endpoint = url.value.trim() || "/";
-          if (!base) return endpoint;
-          if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(base)) {
-            base = location.protocol + "//" + base;
-          }
-          base = base.replace(/\/+$/, "");
-          return base + (endpoint.charAt(0) === "/" ? "" : "/") + endpoint;
-        }
-
-        var body = document.createElement("textarea");
-        body.className = "cb-http-body";
-        body.rows = 3;
-        body.placeholder = "Cuerpo del pedido (opcional)";
-        body.spellcheck = false;
-        body.value = this.getAttribute("body") || "";
-
-        var statusLine = document.createElement("div");
-        statusLine.className = "cb-http-status";
-        statusLine.hidden = true;
-
-        var responsePre = document.createElement("pre");
-        var responseCode = document.createElement("code");
-        responsePre.className = "cb-http-response";
-        responsePre.appendChild(responseCode);
-        responsePre.hidden = true;
-
-        // Response render: plain text first (always correct), then swapped
-        // for Shiki tokens when the page ships the highlighter (shiki-init.js
-        // exposes window.cbShiki). The sequence guard drops a slow highlight
-        // that finishes after a newer send already replaced the panel.
-        var renderSeq = 0;
-        function showResponse(text, isJson) {
-          renderSeq++;
-          responseCode.textContent = text;
-          responsePre.style.removeProperty("background-color");
-          responsePre.style.removeProperty("color");
-          responsePre.hidden = false;
-          if (!isJson || !window.cbShiki) return;
-          var seq = renderSeq;
-          window.cbShiki.highlight(text, "json").then(function (highlighted) {
-            var code = highlighted && highlighted.querySelector("code");
-            if (!code || seq !== renderSeq) return;
-            responseCode.innerHTML = code.innerHTML;
-            responsePre.style.backgroundColor = highlighted.style.backgroundColor || "";
-            responsePre.style.color = highlighted.style.color || "";
-          });
-        }
-
-        // GET and HEAD cannot carry a body — fetch() rejects the request.
-        function syncBody() {
-          body.hidden = select.value === "GET" || select.value === "HEAD";
-        }
-        select.addEventListener("change", syncBody);
-        syncBody();
-
-        function send() {
-          var init = { method: select.value };
-          if (!body.hidden && body.value) init.body = body.value;
-          btn.disabled = true;
-          statusLine.hidden = false;
-          statusLine.className = "cb-http-status";
-          statusLine.textContent = "Enviando…";
-          responsePre.hidden = true;
-          var started = performance.now();
-          fetch(buildUrl(), init)
-            .then(function (r) {
-              return r.text().then(function (text) {
-                var ms = Math.round(performance.now() - started);
-                statusLine.textContent =
-                  "HTTP " + r.status +
-                  (r.statusText ? " " + r.statusText : "") +
-                  " · " + ms + " ms";
-                statusLine.classList.add(r.ok ? "cb-http-ok" : "cb-http-fail");
-                if (text) {
-                  var isJson = false;
-                  try {
-                    text = JSON.stringify(JSON.parse(text), null, 2);
-                    isJson = true;
-                  } catch (_) {}
-                  showResponse(text, isJson);
-                } else {
-                  responseCode.textContent = "";
-                  statusLine.textContent += " · sin cuerpo";
-                }
-              });
-            })
-            .catch(function (e) {
-              statusLine.classList.add("cb-http-fail");
-              statusLine.textContent =
-                "Error de red: " + (e && e.message ? e.message : e);
-            })
-            .then(function () {
-              btn.disabled = false;
-            });
-        }
-
-        btn.addEventListener("click", send);
-        var sendOnEnter = function (e) {
-          if (e.key === "Enter") send();
-        };
-        domain.addEventListener("keydown", sendOnEnter);
-        url.addEventListener("keydown", sendOnEnter);
-
-        this.appendChild(row);
-        this.appendChild(body);
-        this.appendChild(statusLine);
-        this.appendChild(responsePre);
+        httpConsole(this).mount();
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Custom element: <cb-eco>
+  // Attributes: method, domain, endpoint, status, query, body, label
+  //
+  // The <cb-http> console pointed at the echo service, with the two controls
+  // that service reads from the query string: the status code it answers with
+  // (`?status=503`), and any extra pairs, which come back parsed under
+  // `request.query`. A preview line shows the URL those controls build, so the
+  // query string stays visible instead of hiding inside the widget.
+  // ---------------------------------------------------------------------------
+
+  // Codes the workshop asks for. The field stays editable: these are shortcuts,
+  // not the whole set the echo service accepts (200 to 599).
+  var ECO_STATUS_CODES = [
+    "200", "201", "204", "301", "400", "401", "403", "404",
+    "418", "429", "500", "502", "503", "504",
+  ];
+
+  customElements.define(
+    "cb-eco",
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this._rendered) return;
+        this._rendered = true;
+
+        var status = document.createElement("input");
+        status.type = "text";
+        status.className = "cb-eco-status-input";
+        status.value = this.getAttribute("status") || "";
+        status.placeholder = "200";
+        status.spellcheck = false;
+        status.setAttribute("aria-label", "Código de respuesta");
+        status.setAttribute("list", "cb-eco-codes");
+
+        // One shared datalist for every widget in the page.
+        if (!document.getElementById("cb-eco-codes")) {
+          var codes = document.createElement("datalist");
+          codes.id = "cb-eco-codes";
+          ECO_STATUS_CODES.forEach(function (code) {
+            var opt = document.createElement("option");
+            opt.value = code;
+            codes.appendChild(opt);
+          });
+          document.body.appendChild(codes);
+        }
+
+        var query = document.createElement("input");
+        query.type = "text";
+        query.className = "cb-eco-query-input";
+        query.value = this.getAttribute("query") || "";
+        query.placeholder = "clave=valor&otra=2";
+        query.spellcheck = false;
+        query.setAttribute("aria-label", "Parámetros extra");
+
+        var preview = document.createElement("div");
+        preview.className = "cb-eco-preview";
+
+        var client = httpConsole(this, {
+          defaultEndpoint: "/eco/prueba",
+          // `status` is only sent when the field holds something: an empty
+          // field must leave the service on its own default, not send
+          // `status=`, which the service would report as invalid.
+          extraQuery: function () {
+            var extra = query.value.trim().replace(/^[?&]+/, "");
+            var code = status.value.trim();
+            return [code ? "status=" + encodeURIComponent(code) : "", extra];
+          },
+          onChange: function () {
+            preview.textContent =
+              client.method.value + " " + client.buildUrl();
+          },
+        });
+
+        var row = document.createElement("div");
+        row.className = "cb-eco-row";
+        row.appendChild(makeFieldLabel("status", status));
+        row.appendChild(makeFieldLabel("query", query));
+
+        [status, query].forEach(function (field) {
+          field.addEventListener("keydown", client.sendOnEnter);
+          field.addEventListener("input", function () {
+            preview.textContent =
+              client.method.value + " " + client.buildUrl();
+          });
+        });
+
+        client.mount([row, preview]);
+      }
+    }
+  );
+
+  // A named field: the caption sits with its input, so the two wrap together.
+  function makeFieldLabel(text, field) {
+    var label = document.createElement("label");
+    label.className = "cb-eco-field";
+    var caption = document.createElement("span");
+    caption.textContent = text;
+    label.appendChild(caption);
+    label.appendChild(field);
+    return label;
+  }
 
   // ---------------------------------------------------------------------------
   // Custom element: <cb-goto>

@@ -560,7 +560,10 @@ SSE bus.
   body, response panel with status + latency + body): a plain browser `fetch`; empty
   domain = same origin (reaches the echo through the shared ALB), scheme-less domain
   inherits the page's — no server handler, never locks. Used in `12` next to the eco
-  `curl` example.
+  `curl` example. `<cb-eco>` is the same client aimed at the echo app, with two extra
+  controls — a `status` field (with a datalist of common codes) and a free `query`
+  field — plus a preview of the URL they build; both elements share one factory in
+  `apps.js`, and the `cb-http-*` classes.
 - **Lock UI**: when `/events/config` reports gated, emitting widgets render dimmed
   behind a 🔒 overlay; clicking opens an unlock modal that validates the secret
   against `/events/verify` before storing it in `sessionStorage`. A stored secret
@@ -666,8 +669,8 @@ SSE bus.
     has no three-tier routes, so a Week-3 deploy must set
     `RutaSaludBalanceador=/health` and leave `RutaSaludContenedor` empty.
   - Every answer carries `Access-Control-Allow-{Origin,Methods,Headers}: *`, so
-    the in-guide `<cb-http>` client can call a deployed eco cross-origin (e.g.
-    from a locally served guide). The fallback route answers the preflight
+    the in-guide `<cb-http>`, and `<cb-eco>`, clients can call a deployed eco
+    cross-origin (e.g. from a locally served guide). The fallback route answers the preflight
     OPTIONS like any other request.
 - **Content and static assets are embedded at build time** (`include_dir!` for
   `content/`, `include_str!` for CSS/JS, and a generated `include_str!` registry
