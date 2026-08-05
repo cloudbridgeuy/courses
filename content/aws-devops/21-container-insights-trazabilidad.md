@@ -125,8 +125,8 @@ observabilidad de mirar gráficas.
 1. En Container Insights, observar la CPU **por tarea** del servicio de la aplicación
    —la vista lista los dos servicios del clúster por separado—.
 2. Anotar la ventana de tiempo de cualquier pico (o del período reciente).
-3. Abrir [**Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccionar el grupo de logs del contenedor, y consultar las
-   líneas de esa ventana:
+3. Abrir [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:), en **Logs Insights**; seleccionar el grupo de logs
+   del contenedor, y consultar las líneas de esa ventana:
 
    ```
    fields @timestamp, @message
@@ -153,8 +153,8 @@ líneas del contenedor en esa ventana.
    el clúster.
 3. Observar la métrica de **CPU por tarea** del servicio y anotar una ventana de tiempo
    reciente.
-4. Abrir [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights), seleccionar el grupo de logs del
-   contenedor, y ejecutar:
+4. Abrir [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:), en **Logs Insights**; seleccionar el grupo de logs
+   del contenedor, y ejecutar:
 
    ```
    fields @timestamp, @message

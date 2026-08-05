@@ -10,6 +10,7 @@ errores, o una tarea se reinicia, la respuesta no está en el código. Está en 
 sistema emite mientras opera. Esa es la observabilidad, y en AWS empieza con dos fuentes:
 **métricas** y **logs** de CloudWatch.
 
+:::inline-slide
 ## Métricas: la salud en números
 
 Una **métrica** es una serie de valores numéricos en el tiempo: uso de CPU, número de
@@ -28,6 +29,7 @@ Las que importan para la aplicación:
 
 Estas cinco, leídas juntas, cuentan una historia: cuánta carga llega, cuán rápido se
 responde, cuántos errores hay, y cuántos recursos se consumen.
+:::
 
 ## Logs: el detalle de cada evento
 
@@ -36,8 +38,8 @@ salida de su contenedor —todo lo que la aplicación escribe a la consola— a 
 CloudWatch Logs**, el mismo que se identificó en la Semana 2. Ahí está el detalle de cada
 petición, cada error, cada arranque.
 
-:::inline-slide light
 ## Métricas vs. logs
+:::inline-slide light with-title
 
 | Métricas | Logs |
 | --- | --- |
@@ -46,6 +48,7 @@ petición, cada error, cada arranque.
 | Tendencias y umbrales | Diagnóstico evento por evento |
 :::
 
+:::inline-slide light with-title
 ### Logs Insights
 
 Buscar a mano en miles de líneas no escala. **CloudWatch Logs Insights** permite
@@ -59,12 +62,33 @@ fields @timestamp, @message
 
 O contar errores en una ventana de tiempo filtrando por una palabra. La consulta se
 ejecuta sobre el grupo de logs y devuelve resultados en segundos.
+:::
 
+:::inline-slide
 ## Práctica guiada: leer métricas y logs
+:::add visibility=slide
+:::app
+<cb-goto path="Práctica guiada: leer métricas y logs"></cb-goto>
+::: #app
+::: #add
+::: #inline-slide
 
 ### Ver una métrica del servicio
 
-1. Abrir [**CloudWatch → Metrics → All metrics**](https://console.aws.amazon.com/cloudwatch/home).
+El menú **Metrics** de CloudWatch tiene cuatro entradas, y conviene saber cuál es cuál
+antes de buscar:
+
+| Entrada | Qué hace |
+| --- | --- |
+| **Query Studio** | La pantalla nueva: se **escribe** la consulta, en PromQL o en Metrics Insights, y la métrica se busca por nombre y por etiqueta, incluso entre varias cuentas y regiones. |
+| **Classic metrics** | El árbol de siempre: se **navega** namespace → dimensión → métrica, y se marca lo que se quiere graficar. Es lo que usa el taller, porque enseña dónde vive cada métrica. |
+| **Explorer** | Tableros automáticos que agrupan un mismo conjunto de métricas por etiqueta o por tipo de recurso. |
+| **Streams** | Exportación continua de métricas hacia afuera de CloudWatch (S3, Firehose, un tercero). No sirve para mirar, sirve para sacar. |
+
+Query Studio y Classic metrics leen exactamente los mismos datos. Cambia si se pide la
+métrica escribiéndola, o si se llega a ella navegando.
+
+1. Abrir [**CloudWatch → Metrics → Classic metrics**](https://console.aws.amazon.com/cloudwatch/home#metricsV2:).
 2. Entrar a **ECS → por servicio**, y seleccionar `CPUUtilization` para el servicio.
 3. Observar la gráfica. Ajustar el rango temporal (última hora, último día) en la esquina
    superior.
@@ -80,20 +104,30 @@ task de ECS, y el pico aparece en CloudWatch.
 ### Más detalle: activar Container Insights
 
 `CPUUtilization` del servicio es un **promedio**. Con una sola tarea alcanza; con varias
-esconde justo lo que interesa —un promedio del 60 % puede ser tres tareas trabajando
-igual, o una al 100 % y dos dormidas—.
+esconde justo lo que interesa. Un promedio del 60% puede ser tres tareas trabajando
+igual, o una al 100% y dos dormidas.
 
-**Container Insights** es la capa que agrega ese detalle: recolecta métricas **por
-servicio, por tarea, y por contenedor** (CPU, memoria, red, disco), las publica en el
-namespace `ECS/ContainerInsights`, y arma vistas listas para usar. Se activa **por
-clúster**, y viene apagada.
+**Container Insights** es la capa que agrega ese detalle: recolecta métricas de CPU,
+memoria, red, y disco con más granularidad que las básicas, las publica en el namespace
+`ECS/ContainerInsights`, y arma vistas listas para usar. Viene apagada en la
+configuración de la cuenta (**Account Settings**), y se decide **por clúster** —el ajuste
+del clúster sobrescribe el de la cuenta.
 
 Desde la consola:
 
 1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster del taller.
-2. Pulsar **Update cluster**, y en **Monitoring** activar **Container Insights**. La
-   variante **with enhanced observability** agrega el desglose por contenedor; la básica
-   llega hasta el nivel de tarea.
+2. Pulsar **Actions -> Update cluster**, y en **Monitoring** elegir el nivel de
+   observabilidad. Son tres, y la diferencia está en hasta dónde baja el detalle:
+
+| Opción | Qué recolecta | Cuándo sirve |
+| --- | --- | --- |
+| **Turned off** | Nada extra: solo las métricas que ECS ya publica en `AWS/ECS`, promediadas por clúster y por servicio. | Es el valor por defecto. |
+| **Container Insights** | Métricas agregadas **por clúster y por servicio** en `ECS/ContainerInsights`, con logs de rendimiento consultables desde Logs Insights. | Ver la salud del servicio con más dimensiones que las básicas, al costo más bajo. |
+| **Container Insights with enhanced observability** | Todo lo anterior, **más el detalle por tarea y por contenedor**, y navegación desde el agregado hasta la tarea concreta. | Aislar un problema: bajar del promedio a la tarea que se sale de lo normal. |
+
+   Para el taller se elige **with enhanced observability**: sin el nivel de tarea, el
+   promedio del servicio sigue escondiendo justo lo que se quiere ver.
+
 3. Guardar. Las primeras métricas aparecen en unos minutos en
    [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:).
 
@@ -119,29 +153,107 @@ servicio a la tarea concreta que se sale de lo normal.
 
 ### Consultar los logs
 
-1. Abrir [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights).
-2. En el selector de grupos, elegir el grupo de logs del contenedor (el que se vio en la
-   task definition).
-3. Pegar la consulta de las veinte líneas recientes y pulsar **Run query**. Leer la salida
-   de la aplicación.
+En la consola, el menú **Logs** de CloudWatch tiene tres entradas:
+
+| Entrada | Qué hay ahí |
+| --- | --- |
+| **Log Management** | El inventario: los grupos de logs y sus streams, con su retención, su clase, y su tamaño. Es *dónde vive* el log. |
+| **Log Analytics** | La sala de consulta: reúne **Logs Insights**, **Live Tail**, y **Contributor Insights** en una sola pantalla, con varias consultas en pestañas. Es *cómo se lee* el log. |
+| **Log Anomalies** | Lo que CloudWatch detecta solo: patrones que se salen del comportamiento histórico del grupo de logs. |
+
+Consultar el pasado es Logs Insights, y Logs Insights vive dentro de Log Analytics. Una
+consulta ahí se arma con tres piezas —**qué grupo**, **qué ventana de tiempo**, y **qué
+comandos**—, y las tres viven en la misma pantalla:
+
+1. Abrir [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:).
+2. **Grupo.** En la fila del selector, **Query by: All log groups**, escribir el nombre
+   del grupo del contenedor en **Search log groups...** (el de la task definition), o
+   pulsar **Browse** para elegirlo de la lista.
+
+   La fila de arriba, con **Log group tags** y **Data sources**, es otra cosa: son
+   **facetas**, filtros que acotan el universo de grupos antes de elegir. Como los grupos
+   del taller los crea CloudFormation, llegan etiquetados solos, y en **Log group tags**
+   aparece `aws:cloudformation:stack-name` con un valor por stack
+   (`taller-aws-<su-nombre>-app` y `taller-aws-<su-nombre>-eco`). Filtrar por ahí es el
+   atajo cuando la cuenta tiene cientos de grupos y no se recuerda el nombre exacto.
+3. **Ventana.** Arriba a la derecha, fijar el rango: los atajos **5m**, **30m**,
+   **1h**, **3h**, **12h**, o un rango propio. No es un adorno —marca cuánto log se
+   escanea, y el escaneo es lo que se cobra—.
+4. **Comandos.** El editor ya trae una primera línea que empieza con `SOURCE
+   logGroups(...)`: es la traducción literal de los dos pasos anteriores, y se reescribe
+   sola al cambiar el grupo o el rango. Debajo van los comandos. Pegar la consulta de las
+   veinte líneas recientes, y pulsar **Run** (o `⌘+Enter`):
+
+   ```
+   fields @timestamp, @message
+   | sort @timestamp desc
+   | limit 20
+   ```
+
+5. Leer la salida de la aplicación en los resultados.
+
+La misma pantalla trae el resto del instrumental: **Saved queries** y **Query History**
+para no reescribir lo de siempre, **Discovered fields** con los campos que CloudWatch
+reconoció solo en el log, **Analyze patterns** para agrupar las líneas que se repiten,
+**Top N** para ver qué valores dominan, y una barra **Ask AI to write a query** que
+redacta la consulta a partir de una descripción en lenguaje natural.
+
+::: info
+**Log Analytics** es la experiencia por defecto, y es reciente. Si la cuenta se dio de
+baja de ella, las mismas tres herramientas aparecen como entradas sueltas del menú
+(**Logs Insights**, **Live tail**, y **Contributor Insights**). El motor, el lenguaje de
+consulta, y los precios son los mismos; cambia solo dónde se pulsa.
+:::
 
 Al pulsar los botones de arriba, las acciones dejan rastro en los logs. Buscar líneas
 como `cpu-burst started`, `counter incremented`, o `ignoring duplicate event id`: cada
 una nombra el evento, el handler, y el resultado. Así se ve un log *útil* —cuenta qué
 pasó, con qué datos, y cómo terminó— y eso es justo lo que se consulta con Logs Insights.
 
+### Seguir los logs en vivo (Live Tail)
+
+Logs Insights consulta el pasado. Cuando lo que importa es **ahora** (reproducir un
+problema y verlo aparecer) sirve **CloudWatch Logs Live Tail**: una cola en vivo del
+grupo de logs, línea a línea, a medida que la aplicación las emite. No es otra pantalla:
+es un botón de la misma Log Analytics.
+
+1. Abrir [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:) y pulsar **Live tail**, arriba a la derecha del editor.
+2. Elegir el grupo de logs del contenedor, y arrancar la sesión. Opcionalmente, filtrar
+   por un texto, o resaltar un término.
+3. Dejar la cola corriendo en una pestaña del navegador.
+
+::: warning
+Una sesión de Live Tail se cobra **por minuto de sesión**, a diferencia de Logs Insights
+que se cobra por volumen de log escaneado. Pulsar **Stop** al terminar la práctica.
+:::
+
+Para tener algo que ver, se fabrican líneas de log a demanda con el contador de abajo. Cada
+incremento dispara un evento `counter` en el pod, que escribe en DynamoDB y emite la
+línea `counter incremented`, que aparece en la cola casi al instante. El valor a la
+derecha se actualiza en vivo por SSE, aunque viva en otra parte de la página: misma
+acción, dos vistas del mismo flujo de eventos.
+
+:::app
+<cb-counter key="demo" mode="increment" label="Incrementar contador"></cb-counter>
+<cb-counter key="demo" mode="view" label="Contador demo"></cb-counter>
+:::
+
+Pulsar el botón unas cuantas veces y observar las líneas `counter incremented` llegar en
+orden a la Live Tail. Eso es tailing de logs: el mismo grupo que se consulta con Insights,
+visto en tiempo real mientras se genera la actividad.
+
 ### Métricas personalizadas
 
 Las métricas que AWS publica solas describen la infraestructura: CPU, latencia,
 peticiones. Una **métrica personalizada** la publica la propia aplicación, y mide lo
-que el equipo define como salud del negocio —pedidos procesados, ítems en una cola,
-reintentos— más allá de lo que el contenedor revela por fuera.
+que el equipo define como salud del negocio: pedidos procesados, ítems en una cola,
+reintentos. Van más allá de lo que el contenedor revela por fuera.
 
 Hay dos vías para llevar un número a CloudWatch:
 
 | Vía | Cómo llega | Permisos |
 | --- | --- | --- |
-| **Log / EMF** | La aplicación escribe una línea en formato EMF; CloudWatch extrae la métrica del grupo de logs. | Ninguno extra —usa el log que ya existe. |
+| **Log / EMF** | La aplicación escribe una línea en formato EMF; CloudWatch extrae la métrica del grupo de logs. | Ninguno extra, usa el log que ya existe. |
 | **API / PutMetricData** | La aplicación llama directamente a la API de CloudWatch. | Requiere `cloudwatch:PutMetricData` en el rol de la tarea. |
 
 Enviar un valor por cada vía con los controles de abajo. Ambos publican en el namespace
@@ -156,9 +268,24 @@ distingue su origen. El valor se acota a 0–100 (límite del taller, no de Clou
 <cb-metric mode="api" label="Enviar métrica (PutMetricData)"></cb-metric>
 :::
 
-Abrir [**CloudWatch → Metrics → Taller/Custom**](https://console.aws.amazon.com/cloudwatch/home#metricsV2:)
-y observar `CustomValue` con sus dos valores de dimensión. El envío por EMF, además,
-aparece como una línea de log —se la ve llegar en la Live Tail de la sección siguiente.
+Una métrica personalizada no aparece junto a las de ECS: vive en su propio namespace, y
+hay que ir a buscarla.
+
+1. Abrir [**CloudWatch → Metrics → Classic metrics**](https://console.aws.amazon.com/cloudwatch/home#metricsV2:).
+2. En la pestaña **Browse**, mirar el bloque **Custom namespaces**, arriba del de
+   **AWS namespaces**, y entrar a **Taller/Custom**. El namespace no existe hasta el
+   primer envío: lo crea el primer dato que llega, así que si no está, pulsar el botón de
+   arriba y esperar un minuto.
+3. Entrar a la agrupación **method**: es la dimensión con la que la aplicación publica.
+   Aparecen dos filas de `CustomValue`, una por vía (`emf` y `api`). Marcar las dos.
+4. La gráfica sale vacía o plana si el rango es ancho. En **Graphed metrics**, poner el
+   estadístico en **Maximum** y el período en **1 minute**, y arriba fijar el rango en
+   **1h**: son valores sueltos y espaciados, y el promedio de cinco minutos los borra.
+
+Las dos series salen del mismo botón conceptual, y llegan por caminos distintos. La de
+`api` aparece casi de inmediato. La de `emf` tarda un poco más: primero se escribe la
+línea de log, y después CloudWatch extrae el número de ahí. Esa misma línea se ve llegar
+en la Live Tail de la sección anterior, si quedó una sesión abierta.
 
 ::: extra ¿Y esto qué tiene que ver con DevOps?
 Las dos vías exigen colaboración entre quienes operan y quienes construyen la
@@ -181,31 +308,6 @@ herramienta, es DevOps: obliga a la pregunta que define al equipo de desarrollo,
 significa, para quienes construyen la aplicación, que esté funcionando como corresponde?
 :::
 
-### Seguir los logs en vivo (Live Tail)
-
-Logs Insights consulta el pasado. Cuando lo que importa es **ahora** —reproducir un
-problema y verlo aparecer— sirve **CloudWatch Logs Live Tail**: una cola en vivo del
-grupo de logs, línea a línea, a medida que la aplicación las emite.
-
-1. Abrir [**CloudWatch → Logs → Live Tail**](https://console.aws.amazon.com/cloudwatch/home#logsV2:live-tail).
-2. Seleccionar el grupo de logs del contenedor y pulsar **Start**.
-3. Dejar la cola corriendo en una pestaña.
-
-Para tener algo que ver, se fabrican líneas de log a demanda con el contador de abajo. Cada
-incremento dispara un evento `counter` en el pod, que escribe en DynamoDB y emite la
-línea `counter incremented` —que aparece en la cola casi al instante. El valor a la
-derecha se actualiza en vivo por SSE, aunque viva en otra parte de la página: misma
-acción, dos vistas del mismo flujo de eventos.
-
-:::app
-<cb-counter key="demo" mode="increment" label="Incrementar contador"></cb-counter>
-<cb-counter key="demo" mode="view" label="Contador demo"></cb-counter>
-:::
-
-Pulsar el botón unas cuantas veces y observar las líneas `counter incremented` llegar en
-orden a la Live Tail. Eso es tailing de logs: el mismo grupo que se consulta con Insights,
-visto en tiempo real mientras se genera la actividad.
-
 ---
 
 {#ejercicio-16}
@@ -215,13 +317,13 @@ Para la aplicación, abrir la métrica `CPUUtilization` del servicio en CloudWat
 consultar las líneas de log más recientes del contenedor con Logs Insights.
 
 ::: solucion
-1. Abrir [**CloudWatch → Metrics → All metrics**](https://console.aws.amazon.com/cloudwatch/home).
+1. Abrir [**CloudWatch → Metrics → Classic metrics**](https://console.aws.amazon.com/cloudwatch/home#metricsV2:).
 2. Navegar a **ECS → por servicio** y seleccionar `CPUUtilization` para el servicio.
    Observar la gráfica y ajustar el rango temporal.
-3. Abrir [**CloudWatch → Logs → Logs Insights**](https://console.aws.amazon.com/cloudwatch/home#logsV2:logs-insights).
+3. Abrir [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:), en la herramienta **Logs Insights**.
 4. Seleccionar el grupo de logs del contenedor (el de la task definition de la Semana
-   2).
-5. Ejecutar la consulta:
+   2) en **Search log groups...**, y fijar el rango de tiempo arriba a la derecha.
+5. Escribir la consulta debajo de la línea `SOURCE`, y pulsar **Run**:
 
    ```
    fields @timestamp, @message

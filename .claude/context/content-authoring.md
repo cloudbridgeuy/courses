@@ -118,16 +118,25 @@ Example: `## Práctica guiada: crear el repositorio` → `#practica-guiada-crear
 ## Console-action links
 
 When an instruction tells the student to **open a specific AWS console screen**
-("Abra **CloudWatch → Logs → Live Tail**"), link the screen name to that window:
+("Abra **CloudWatch → Logs → Log Analytics**"), link the screen name to that window:
 
 ```
-Abra [**CloudWatch → Logs → Live Tail**](https://console.aws.amazon.com/cloudwatch/home#logsV2:live-tail).
+Abra [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/cloudwatch/home#logsV2:).
 ```
 
-- Prefer deep-link fragments to the exact window: `#logsV2:logs-insights`,
-  `#logsV2:live-tail`, `#alarmsV2:`, `#container-insights:` (CloudWatch),
-  `#TargetGroups:` (EC2). Use region-less service landings (`ecs/home`,
-  `ec2/home`, `ecr/home`, `codesuite/codebuild/home`) when no stable fragment fits.
+- Prefer deep-link fragments to the exact window: `#logsV2:` (Logs, which opens
+  Log Analytics), `#logsV2:log-groups` (Log Management), `#metricsV2:` (Metrics,
+  which opens Classic metrics), `#alarmsV2:`, `#container-insights:`
+  (CloudWatch), `#TargetGroups:` (EC2). Use region-less service landings
+  (`ecs/home`, `ec2/home`, `ecr/home`, `codesuite/codebuild/home`) when no stable
+  fragment fits.
+- **Use the console's current menu names.** CloudWatch reorganised both menus:
+  Logs holds **Log Management**, **Log Analytics** (Logs Insights, Live Tail, and
+  Contributor Insights in one screen), and **Log Anomalies**; Metrics holds
+  **Query Studio**, **Classic metrics**, **Explorer**, and **Streams**. The old
+  per-tool fragments (`#logsV2:logs-insights`, `#logsV2:live-tail`) and the old
+  names ("Log groups", "All metrics") are retired — a tool that now lives inside
+  a screen is named as such: "**Log Analytics**, en **Logs Insights**".
 - Link only true "open this window" instructions. Leave **sub-navigation inside an
   already-open screen** as bold text — e.g. `Entre a **ECS → por servicio**` is the
   metric picker inside the CloudWatch Metrics window, and form fields like

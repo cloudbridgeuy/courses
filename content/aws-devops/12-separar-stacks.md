@@ -959,7 +959,7 @@ Lo que hay que mirar después vale más que el despliegue en sí:
   ```
 :::
 
-- En **CloudWatch → Log groups** hay dos grupos, `/ecs/taller-aws-<su-nombre>-app` y
+- En **CloudWatch → Logs → Log Management** hay dos grupos, `/ecs/taller-aws-<su-nombre>-app` y
   `/ecs/taller-aws-<su-nombre>-eco`. Salen separados solos, porque el template los
   nombra con `!Sub "/ecs/${AWS::StackName}"`.
 

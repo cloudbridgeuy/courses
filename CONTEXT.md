@@ -314,13 +314,32 @@ question to ask first: **does more tasks solve it at all?**
 **Container Insights moves up to Week 3 (2026-08-05).** `19` gained «Más detalle:
 activar Container Insights» right after the CPU-burst widget, because the service's
 `CPUUtilization` is an average and hides the one hot task. It carries the console
-steps, `enhanced` (per container) versus `enabled` (per task), the **drift**
-warning — the cluster comes from CloudFormation, so the durable form is
+steps (**Actions → Update cluster → Monitoring**), a table of the three levels
+offered there — *Turned off*, *Container Insights* (per cluster and per service),
+and *with enhanced observability* (adds per task and per container) — with the
+workshop choosing **enhanced**, the fact that the default lives in the account's
+**Account Settings** and the cluster setting overrides it, the **drift** warning
+— the cluster comes from CloudFormation, so the durable form is
 `ClusterSettings: containerInsights` in the platform template — and the note that
 this collection bills, hence the per-cluster decision. Week 4's `21` keeps its own
 activation steps but tells students to skip them if Week 3 already turned it on.
 `18` lost **Ejercicio 15**: its steps repeated the section's own walkthrough
 (notification rule → SNS topic → HTTPS subscription → trigger) line for line.
+
+**CloudWatch's reorganised console (2026-08-05).** `19` and `21` were rewritten
+for the current menus: Logs is **Log Management** / **Log Analytics** /
+**Log Anomalies**, Metrics is **Query Studio** / **Classic metrics** /
+**Explorer** / **Streams**. `19` explains both menus in a table, then walks the
+Logs Insights query as three pieces (group, window, commands) inside Log
+Analytics, notes the rest of that screen (saved queries, discovered fields,
+patterns, Top N, the AI query bar), and warns that Live Tail bills per session
+minute while Insights bills per scanned volume. **Live Tail moved before
+«Métricas personalizadas»**, so the custom-metric section can point back at it to
+watch the EMF line arrive; that section also gained the steps for finding
+`Taller/Custom` under **Custom namespaces** with `Maximum` / 1 minute / 1 h, and
+the reason the `api` series shows up before the `emf` one. Link fragments and
+menu names follow `.claude/context/content-authoring.md`. `20` still links to the
+bare `cloudwatch/home` landing — unconverted.
 
 **Known inconsistency:** `12`'s module practice names the recreated eco stack
 `taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification

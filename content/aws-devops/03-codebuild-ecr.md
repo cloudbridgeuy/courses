@@ -815,7 +815,7 @@ de cada build queda guardado en **CloudWatch Logs**:
 
 1. Encima del log, pulsar el enlace **View entire log**. Se abre el *log stream* de
     ese build en CloudWatch Logs.
-2. El mismo destino se alcanza desde [**CloudWatch → Log groups**](https://console.aws.amazon.com/cloudwatch/home#logsV2:log-groups):
+2. El mismo destino se alcanza desde [**CloudWatch → Logs → Log Management**](https://console.aws.amazon.com/cloudwatch/home#logsV2:log-groups):
     CodeBuild crea un grupo por proyecto (`/aws/codebuild/taller-aws-<su-nombre>-build`)
     y, dentro, un *stream* por build, identificado por el ID del build. En el stream,
     el campo **Filter events** busca texto en todo el log. Por ejemplo,
