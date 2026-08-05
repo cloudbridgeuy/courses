@@ -65,7 +65,7 @@ CodePipeline → CloudWatch**.
 | 1 | 5 | Del código a la imagen desplegada | Intro DevOps · CodeCommit (repos, branching, git) · CodeBuild+ECR (build Docker, versionado) · despliegue inicial con CloudFormation como caja negra |
 | 2 | 5 | Infraestructura como código y los primeros contenedores | CloudFormation (templates YAML, deploy/update, buenas prácticas, troubleshooting) · separación de stacks por ciclo de vida + resource import (migración de la tabla) · cierra con ECS/Fargate: task definitions y services |
 | 3 | 5 | Operar, automatizar y observar | ECS/Fargate restante (networking, escalabilidad, troubleshooting) · CodePipeline (rol, leer pipelines, stages, integración, pipeline básico, aprobación manual + trigger) · inicio de Observabilidad (CloudWatch metrics y logs, activación de Container Insights) |
-| 4 | 3 | Observabilidad y cierre del curso | Termina Observabilidad (dashboards, alarmas) · cierre: el taller releído bajo los mandamientos DevOps y las tres vías, método de diagnóstico, próximos pasos, teardown |
+| 4 | 3 | Observabilidad y cierre del curso | Termina Observabilidad (dashboards, alarmas) · cierre: los mandamientos DevOps, los principios personales del instructor, los doce factores, próximos pasos, teardown |
 
 **Content status.** Written (Week 1): `01`–`06`. Written (Week 2):
 `07-cloudformation-anatomia`, `08-leer-el-template`, `09-actualizar-stacks`,
@@ -73,45 +73,61 @@ CodePipeline → CloudWatch**.
 `13-primeros-contenedores` (ej. 12). Written (Week 3): `14-operar-contenedores`,
 `15-cicd-y-el-pipeline`, `16-preguntas-puente`, `17-codepipeline-en-la-practica`,
 `18-notificaciones-teams`, `19-observabilidad-metrics-logs` (ej. 13, 16). Written
-(Week 4): `20-dashboards-y-alarmas`, `21-cierre-del-curso` (optional capstone
-ej. 19). **All 4 weeks authored.**
+(Week 4): `20-dashboards-y-alarmas`, `21-cierre-del-curso`. **All 4 weeks
+authored.**
 
 `21-container-insights-trazabilidad` was **deleted** on 2026-08-05 (user
 decision), and the closer moved from `22-cierre-del-curso` to
 `21-cierre-del-curso`. Container Insights survives in `19` (Week 3); the
 `X-Amzn-Trace-Id` / ALB-access-log / X-Ray correlation material went with the
 deleted file and is **not** covered anywhere else. Ejercicio 18 went with it, and
-Ejercicio 17 left `20` in commit `4d3293e`, so the shipped set is now
-1–8, 12, 13, 16, 19.
+Ejercicio 17 left `20` in commit `4d3293e`, and Ejercicio 19 left `21` when the
+closer was rewritten, so the shipped set is now 1–8, 12, 13, 16.
 
-**Exercise numbering has gaps**: the shipped exercises are 1–8, 12, 13, 16, 19.
-Numbers 9–11, 14, 15, 17, and 18 are unused. Nothing is renumbered; a new
+**Exercise numbering has gaps**: the shipped exercises are 1–8, 12, 13, 16.
+Numbers 9–11, 14, 15, and 17–19 are unused. Nothing is renumbered; a new
 exercise takes a free number.
 
-**The closer is now framed by the DevOps commandments (2026-08-05).**
-`21-cierre-del-curso` no longer recaps service by service. It opens with the
-18 «mandamientos DevOps» from
-[madrid.devops.es](https://madrid.devops.es/mandamientos-devops) — presented
-honestly as a community list with no author and no canonical source, in an
-`::: info` — then a dated-and-attributed lineage table (Goldratt 1984/1997 ·
-Manifiesto Ágil 2001 · CAMS, Edwards & Willis 2010 · Twelve-Factor, Wiggins
-2011 · **las tres vías**, Gene Kim 2012 · *The Phoenix Project* 2013 ·
-*The DevOps Handbook* 2016). **Gene Kim's Three Ways are the spine**, chosen
-over the commandments because they are attributed and fit what was actually
-built: *flujo* (Weeks 1–3: ship it, process, CI, CD, bottlenecks — the
-`cargo-chef` build fix and auto scaling's proportional-to-capacity rule are the
-two worked bottleneck examples), *retroalimentación* (Weeks 3–4: the
-instrumentation ladder as a table, one row per question, with the alarm as the
-only row that is monitoring rather than instrumentation; operational
-requirements as the health-check lesson; one SNS topic = one on-call), and
-*aprendizaje continuo* (teardown/recreate as rehearsal, change sets as failing
-cheaply, and «do what works» as the permission to keep the manual approval).
-Four commandments (3, 6, 7, 9) get their own section as the ones a console
-cannot teach. Kept from the old `22`: the full-flow recap, the five-step
-diagnostic method, «Qué sigue» (now grouped by vía), the `::: extra` on
-SAM/CDK/Terraform (user asked for it explicitly), Ejercicio 19, and all of
-«Desarmar el ambiente». New `::: extra`: the twelve factors mapped column by
-column onto what the workshop built.
+**The closer is a list of manifestos, ending in the instructor's own
+(2026-08-05).** `21-cierre-del-curso` does not recap service by service, and it
+no longer runs on Gene Kim's Three Ways: the *flujo* /
+*retroalimentación* / *aprendizaje continuo* sections, the Three Ways mermaid
+diagram, the full-flow recap, the five-step diagnostic method, and the
+«cuatro mandamientos que una consola no enseña» section were all **cut**. What
+runs now, in order, is six `:::inline-slide` blocks plus the teardown:
+
+1. **Mandamientos DevOps** — the 18 community commandments from
+   [madrid.devops.es](https://madrid.devops.es/mandamientos-devops), as a
+   two-column table. The Spanish-original `::: extra` with the English wording
+   is gone.
+2. **De dónde vienen estas frases** — the dated-and-attributed lineage table
+   (Goldratt 1984/1997 · Manifiesto Ágil 2001 · CAMS, Edwards & Willis 2010 ·
+   Twelve-Factor, Wiggins 2011 · las tres vías, Gene Kim 2012 ·
+   *The Phoenix Project* 2013 · *The DevOps Handbook* 2016). The Three Ways
+   survive here as one row of history, not as the spine.
+3. Guide-only prose: DevOps has no Agile-style manifesto, the xkcd-927
+   «standards» image, «Este es el mío».
+4. **Principios de DevOps Personales** — the instructor's own nine principles;
+   the payoff the whole opening builds to.
+5. **Las doce reglas de una aplicación** — the twelve factors as a
+   `| # | Factor | La regla |` table (promoted out of an `::: extra`, where the
+   plain-text list collapsed into one paragraph inside the slide).
+6. **En el curso** — the same twelve mapped onto what the workshop built, same
+   table shape so the two slides read in parallel. Factor names follow the
+   corrected wording, not 12factor.net/es: «Configuración» (not
+   «Configuraciones»), «Construir, publicar, ejecutar» (the *release* stage was
+   missing), «Registros» (not «Historiales»), «Procesos de administración» (not
+   «Administración de procesos»).
+
+Kept unchanged: «Qué sigue, más allá del taller» (no longer grouped by vía),
+the `::: extra` on SAM/CDK/Terraform (user asked for it explicitly), and all of
+«Desarmar el ambiente». The closing slide is "Muchas Gracias".
+
+**Missing asset**: the closer references `../assets/standards.png`, which does
+not exist — there is no `content/assets/` directory, and images are served only
+from `/static/<name>` through an explicit match arm in
+`crates/server/src/routes.rs`. The image 404s until both the file and its route
+exist.
 
 **CloudFormation coverage (2026-08-01).** A gap audit compared sections `07`–`12`
 against the features actually used in `infra/templates/*.yaml`. Eleven features
