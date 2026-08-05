@@ -58,6 +58,7 @@ autor y fecha. Conocer el linaje evita tratarlas como dogma:
 
 :::
 
+:::inline-slide with-title
 A diferencia del manifiesto Agile, no existe un equivalente para DevOps
 
 Asi, que.
@@ -68,6 +69,7 @@ casos. Ahora hay 15 estándares en competencia.](/static/standards.png)
 [Fuente: xkcd 927 — *Standards*](https://xkcd.com/927/) (CC BY-NC 2.5)
 
 Este es el mío.
+:::
 
 :::inline-slide
 ## Principios de DevOps Personales
@@ -76,7 +78,7 @@ Este es el mío.
 2. Todos nuestros procesos tienen que tener la capacidad de ser automatizados.
 3. Operaciones y desarrollo deben trabajar juntos.
 4. Los clientes de Operaciones son los desarrolladores y el negocio.
-5. Es mejor contar con tres tests en CI analizando camnios criticos que 1000 unit tests que miden nada.
+5. Es mejor contar con tres tests en CI analizando caminos criticos que 1000 unit tests que miden nada.
 6. Es importante demistificar la salida a producción.
 7. Priorizar tareas que no atacan el cuello de botella actual es una perdida de tiempo.
 8. El personal de DevOps debe saber programar.
