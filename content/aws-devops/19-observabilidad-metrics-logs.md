@@ -6,7 +6,7 @@ title = "Observabilidad — métricas y logs"
 
 El sistema ya se construye, se despliega, y se notifica solo. Falta la última dimensión:
 **saber qué hace mientras corre**. Cuando la aplicación responde lento, o devuelve
-errores, o una tarea se reinicia, la respuesta no está en el código —está en lo que el
+errores, o una tarea se reinicia, la respuesta no está en el código. Está en lo que el
 sistema emite mientras opera. Esa es la observabilidad, y en AWS empieza con dos fuentes:
 **métricas** y **logs** de CloudWatch.
 
@@ -76,6 +76,46 @@ task de ECS, y el pico aparece en CloudWatch.
 :::app
 <cb-cpu-burst seconds="60" intensity="high" label="Generar carga de CPU"></cb-cpu-burst>
 :::
+
+### Más detalle: activar Container Insights
+
+`CPUUtilization` del servicio es un **promedio**. Con una sola tarea alcanza; con varias
+esconde justo lo que interesa —un promedio del 60 % puede ser tres tareas trabajando
+igual, o una al 100 % y dos dormidas—.
+
+**Container Insights** es la capa que agrega ese detalle: recolecta métricas **por
+servicio, por tarea, y por contenedor** (CPU, memoria, red, disco), las publica en el
+namespace `ECS/ContainerInsights`, y arma vistas listas para usar. Se activa **por
+clúster**, y viene apagada.
+
+Desde la consola:
+
+1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster del taller.
+2. Pulsar **Update cluster**, y en **Monitoring** activar **Container Insights**. La
+   variante **with enhanced observability** agrega el desglose por contenedor; la básica
+   llega hasta el nivel de tarea.
+3. Guardar. Las primeras métricas aparecen en unos minutos en
+   [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:).
+
+::: warning
+El clúster lo crea CloudFormation, así que este cambio en la consola es *drift*: el
+template y la realidad dejan de coincidir, y la próxima actualización del stack puede
+revertirlo. La forma durable es declararlo en el template del stack de plataforma:
+
+```yaml
+ClusterCompartido:
+  Type: AWS::ECS::Cluster
+  Properties:
+    ClusterName: !Ref AWS::StackName
+    ClusterSettings:
+      - Name: containerInsights
+        Value: enhanced   # enabled = básico, disabled = apagado
+```
+:::
+
+A diferencia de las métricas básicas, esta recolección tiene costo, y por eso se decide
+clúster por clúster. En la Semana 4 se usa esta vista para bajar del promedio del
+servicio a la tarea concreta que se sale de lo normal.
 
 ### Consultar los logs
 
@@ -219,7 +259,7 @@ La última semana cierra la observabilidad y el curso. Se va a:
 
 - Construir **dashboards** que reúnan las métricas clave en una sola vista, y
   **alarmas** que avisen —por el mismo camino a Teams— cuando un umbral se cruza.
-- Activar **Container Insights** para ver el detalle por tarea y por servicio, e
+- Explotar **Container Insights** para ver el detalle por tarea y por servicio, e
   introducir la **trazabilidad operacional**: seguir un síntoma desde la métrica hasta la
   línea de log que lo explica.
 - Cerrar con un **repaso del flujo completo** y un ejercicio integrador de extremo a

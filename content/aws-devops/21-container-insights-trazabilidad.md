@@ -115,7 +115,8 @@ observabilidad de mirar gráficas.
 ### Activar Container Insights
 
 1. Abrir [**ECS → Clusters**](https://console.aws.amazon.com/ecs/home) y seleccionar el clúster.
-2. En **Update cluster**, activar **Container Insights**. Guardar.
+2. En **Update cluster**, activar **Container Insights**. Guardar. Si ya quedó activado
+   en la Semana 3, saltar al paso siguiente.
 3. Tras unos minutos, abrir [**CloudWatch → Insights → Container Insights**](https://console.aws.amazon.com/cloudwatch/home#container-insights:) y seleccionar el
    clúster: se verán las métricas por servicio y por tarea.
 
