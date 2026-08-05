@@ -64,18 +64,23 @@ CodePipeline → CloudWatch**.
 |-----|-----|--------|-----------|
 | 1 | 5 | Del código a la imagen desplegada | Intro DevOps · CodeCommit (repos, branching, git) · CodeBuild+ECR (build Docker, versionado) · despliegue inicial con CloudFormation como caja negra |
 | 2 | 5 | Infraestructura como código y los primeros contenedores | CloudFormation (templates YAML, deploy/update, buenas prácticas, troubleshooting) · separación de stacks por ciclo de vida + resource import (migración de la tabla) · cierra con ECS/Fargate: task definitions y services |
-| 3 | 5 | Operar, automatizar y observar | ECS/Fargate restante (networking, escalabilidad, troubleshooting) · CodePipeline (rol, leer pipelines, stages, integración, pipeline básico, aprobación manual + trigger) · inicio de Observabilidad (CloudWatch metrics y logs) |
-| 4 | 3 | Observabilidad y cierre del curso | Termina Observabilidad (dashboards, alarmas, Container Insights, trazabilidad) · cierre: repaso del flujo CI/CD, troubleshooting operacional, próximos pasos |
+| 3 | 5 | Operar, automatizar y observar | ECS/Fargate restante (networking, escalabilidad, troubleshooting) · CodePipeline (rol, leer pipelines, stages, integración, pipeline básico, aprobación manual + trigger) · inicio de Observabilidad (CloudWatch metrics y logs, activación de Container Insights) |
+| 4 | 3 | Observabilidad y cierre del curso | Termina Observabilidad (dashboards, alarmas, explotación de Container Insights, trazabilidad) · cierre: repaso del flujo CI/CD, troubleshooting operacional, próximos pasos |
 
 **Content status.** Written (Week 1): `01`–`06`. Written (Week 2):
 `07-cloudformation-anatomia`, `08-leer-el-template`, `09-actualizar-stacks`,
 `10-preguntas-puente`, `11-buenas-practicas-troubleshooting`, `12-separar-stacks`,
-`13-primeros-contenedores` (ej. 9–12). Written (Week 3): `14-operar-contenedores`,
+`13-primeros-contenedores` (ej. 12). Written (Week 3): `14-operar-contenedores`,
 `15-cicd-y-el-pipeline`, `16-preguntas-puente`, `17-codepipeline-en-la-practica`,
-`18-notificaciones-teams`, `19-observabilidad-metrics-logs` (ej. 13–16). Written
+`18-notificaciones-teams`, `19-observabilidad-metrics-logs` (ej. 13, 16). Written
 (Week 4): `20-dashboards-y-alarmas`, `21-container-insights-trazabilidad`,
 `22-cierre-del-curso` (ej. 17–18 + optional capstone ej. 19). **All 4 weeks
 authored.**
+
+**Exercise numbering has gaps**: the shipped exercises are 1–8, 12, 13, 16, 17, 18,
+19. Numbers 9–11, 14, and 15 are unused — the last one dropped on 2026-08-05
+because its steps repeated the section's own walkthrough. Nothing is renumbered;
+a new exercise takes a free number.
 
 **CloudFormation coverage (2026-08-01).** A gap audit compared sections `07`–`12`
 against the features actually used in `infra/templates/*.yaml`. Eleven features
@@ -270,6 +275,52 @@ Template artifact/file, Capabilities, then Role name and Advanced → Parameter
 overrides). **Execute a change set** has **no** Role name, template, capabilities,
 or parameters — the form shortens by itself, since the change set already carries
 them. `15` and `16` follow: Deploy is CloudFormation, not ECS.
+
+**Auto scaling beyond «CPU al 50 %» (2026-08-05).** `14` used to teach target
+tracking as one screen of console steps. It now frames the whole thing as a
+**control loop** (reference = target value, controller = Application Auto Scaling,
+input = `DesiredCount`, sensor = CloudWatch at 1 min, and the traffic as an
+unmeasured **perturbation**) and derives which metric may sit in that loop. A metric
+qualifies only if it meets **two conditions**: correlated with demand, and
+**proportional to capacity** — doubling the tasks at constant load must halve it.
+The second one is the section's spine: the load-test check (double the tasks, read
+the metric), why CPU lies for «the server that waits» (blocked on a database or a
+third party burns no CPU), a metric-per-pattern table (CPU · memory ·
+concurrency · pool saturation · `ALBRequestCountPerTarget` · backlog per task),
+metric math as the way to avoid publishing one (`RequestCount / RunningTaskCount`),
+and latency plus error rate as **SLO alarms, never policy targets** (a bad deploy
+takes `5xx` to 100 %, and an error-driven policy ships more copies of the broken
+version). Queue consumers get the full derivation: backlog per task = pending /
+tasks, acceptable backlog = tolerated latency / time per message, so the configured
+`TargetValue` is `10 / 0,1 = 100` over metric math
+`ApproximateNumberOfMessagesVisible / RunningTaskCount`;
+`ApproximateAgeOfOldestMessage` / `MillisBehindLatest` / consumer lag (defined in
+place as the consumer group's backlog) stay as alarms (a poison message
+makes them grow forever), `NumberOfMessagesSent` as the leading indicator, and in
+Kafka `MaxCapacity` = number of partitions. Then the four mechanisms (target
+tracking, step, scheduled, predictive), target tracking's deliberate asymmetry and
+its 300 s default cooldowns, step scaling with bounds **relative to the alarm
+threshold**, and the rule for mixing them (target tracking with scale-in disabled to
+grow, step scaling to shrink). It closes on the **cost of scaling** — 30–90 s before
+a Fargate task takes its first request, drain on the way out, and Kafka's rebalance
+as a stop-the-world event — and on the **scaling spiral**: scaling perturbs the very
+metric that triggers it, so the service oscillates between min and max. The remedy
+table (cooldown ≥ warm-up + settling, longer evaluation window for scale-in,
+asymmetric steps, wide threshold margin, close min/max, suspend during deploys,
+instance protection, static membership) reduces to one rule — *the decision period
+must be well above the time a scaling action needs to take effect* — plus the
+question to ask first: **does more tasks solve it at all?**
+
+**Container Insights moves up to Week 3 (2026-08-05).** `19` gained «Más detalle:
+activar Container Insights» right after the CPU-burst widget, because the service's
+`CPUUtilization` is an average and hides the one hot task. It carries the console
+steps, `enhanced` (per container) versus `enabled` (per task), the **drift**
+warning — the cluster comes from CloudFormation, so the durable form is
+`ClusterSettings: containerInsights` in the platform template — and the note that
+this collection bills, hence the per-cluster decision. Week 4's `21` keeps its own
+activation steps but tells students to skip them if Week 3 already turned it on.
+`18` lost **Ejercicio 15**: its steps repeated the section's own walkthrough
+(notification rule → SNS topic → HTTPS subscription → trigger) line for line.
 
 **Known inconsistency:** `12`'s module practice names the recreated eco stack
 `taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification
