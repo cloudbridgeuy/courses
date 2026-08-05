@@ -351,6 +351,15 @@ widgets because every point costs a `PutMetricData` call or a log line. `20` now
 deep-links its two Dashboards steps to `#dashboards:`. Link fragments and menu
 names follow `.claude/context/content-authoring.md`.
 
+**The echo app becomes a teaching target for failure (2026-08-05).** Two
+additions, both aimed at the sessions that react to failure rather than cause
+it: a request picks the status of the answer with `?status=`, so an ALB health
+check, an alarm, or a retry has something to fire against; and every request
+writes one access line to stdout, so a Logs Insights query, or a metric filter,
+has something to read — neither needs a content change to become an exercise.
+The shapes live in **Server / build notes** below. In the guide, **`<cb-eco>`**
+is the widget over the first one. No content section uses it yet.
+
 **Known inconsistency:** `12`'s module practice names the recreated eco stack
 `taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification
 commands in the same practice — and `17` — use `taller-aws-<su-nombre>-eco`. The
@@ -613,10 +622,16 @@ SSE bus.
   `serve`, so the `Dockerfile` `CMD` and every existing task definition keep
   working). `courses_server echo [--port|PORT] [--name|CB_ECHO_NAME]` starts an
   echo server: an axum `fallback` route that answers **every** request with a
-  pretty JSON description of it. Five top-level keys — `received_at`, `server`
+  pretty JSON description of it. Six top-level keys — `received_at`, `server`
   (identity, and whether `Host` matched `--name`), `request` (method, URI, path
-  segments, decoded query, grouped headers), `network`, and `body` (json / text
+  segments, decoded query, grouped headers), `response` (the status the answer
+  carries, and where that status came from), `network`, and `body` (json / text
   / base64 / omitted over 64 KiB; 413 over 1 MiB).
+  - `?status=<200..599>` picks the status of the answer. `response` reports
+    `status`, `source` (`query` or `default`), `requested`, and an `error`
+    naming a value the service could not use — out of range, or not a whole
+    number, falls back to `200` rather than refusing the request, so a typo
+    still returns a readable echo.
   - `network` holds `local` and `peer` (each split into address + port),
     `client_ip` (first `x-forwarded-for` hop, else the peer address), the
     forwarded headers, and `ecs`. `local` matters because in `awsvpc` mode it is
@@ -628,10 +643,22 @@ SSE bus.
     revision, launch type, AZ, network mode, private IPv4 and DNS name, MAC,
     subnet CIDR, subnet gateway, VPC resolvers. Needs no IAM and no VPC
     endpoint — it is a link-local address.
+  - Every served request writes one `info` access line to **stdout**, which is
+    what the `awslogs` driver ships to the log group:
+    `GET /eco?status=503 -> 503 client=… peer=… host=… bytes=… ms=… trace=…`.
+    `client` and `peer` are both there because behind the ALB they differ;
+    `trace` is `X-Amzn-Trace-Id`. Whitespace, and control characters, inside
+    any client-controlled value are replaced, so a header cannot forge a second
+    record or paint the terminal of whoever reads the log. A body over the 1 MiB
+    limit never becomes an `EchoRequest`, so it writes a `warn` instead.
   - All of the shaping is pure in `courses_core::echo` (`EchoRequest` /
-    `EchoServer` / `EcsNetwork` → `echo_json`, plus `parse_ecs_task_metadata`,
-    and hand-rolled RFC 3339, percent-decode, base64, and host:port splitting —
-    37 unit tests); `crates/server/src/echo.rs` is a thin shell.
+    `EchoServer` / `EcsNetwork` → `echo_answer`, which returns the status and
+    the body together so the shell cannot drift; plus `access_log_line`,
+    `parse_ecs_task_metadata`, and hand-rolled RFC 3339, percent-decode, base64,
+    and host:port splitting — 56 unit tests, with the status decision in
+    `echo::status`, the log line in `echo::log`, and the clock in `echo::time`,
+    split out to hold the 1000-line file cap);
+    `crates/server/src/echo.rs` is a thin shell that only times the request.
   - It is the workshop's **second app**: same image,
     `Command: [courses_server, echo]`. `/health` returns 200 like any other
     path, so both the target group check and the Week-2 container check

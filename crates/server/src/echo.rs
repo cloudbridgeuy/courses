@@ -1,13 +1,14 @@
 //! Imperative shell for the `echo` subcommand.
 //!
 //! Every request, whatever its method or path, is captured into a
-//! [`EchoRequest`] and handed to `courses_core::echo_json`, which decides what
-//! the answer looks like. Nothing in this file inspects a header, or a body: it
-//! only copies data out of axum's types, reads the clock, and writes the result.
+//! [`EchoRequest`] and handed to `courses_core::echo_answer`, which decides what
+//! the answer looks like, and which status code it carries. Nothing in this file
+//! inspects a header, a query string, or a body: it only copies data out of
+//! axum's types, reads the clock, and writes the result.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::Router;
 use axum::extract::connect_info::Connected;
@@ -16,7 +17,9 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::serve::IncomingStream;
 use color_eyre::eyre::{Result, WrapErr};
-use courses_core::{EchoRequest, EchoServer, EcsNetwork, echo_json, parse_ecs_task_metadata};
+use courses_core::{
+    EchoRequest, EchoServer, EcsNetwork, access_log_line, echo_answer, parse_ecs_task_metadata,
+};
 use serde_json::json;
 use tokio::net::TcpListener;
 
@@ -136,12 +139,17 @@ async fn echo(
     ConnectInfo(sockets): ConnectInfo<Sockets>,
     request: Request,
 ) -> Response {
+    let started = Instant::now();
     let (parts, body) = request.into_parts();
 
     let body = match axum::body::to_bytes(body, MAX_BODY_BYTES).await {
         Ok(bytes) => bytes,
         Err(e) => {
-            tracing::warn!("rejected a request body: {e}");
+            // The request never becomes an `EchoRequest`, so this is the one
+            // answer the core does not write the log line for. Method and URI
+            // are safe to print as they are: axum rejects a request target
+            // that holds whitespace, or a control character.
+            tracing::warn!("{} {} -> 413 rejected body: {e}", parts.method, parts.uri);
             return json_response(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 &json!({
@@ -177,7 +185,26 @@ async fn echo(
         received_at_nanos,
     };
 
-    json_response(StatusCode::OK, &echo_json(&server, &captured))
+    let answer = echo_answer(&server, &captured);
+    // One line per request, on stdout, which is where the container runtime
+    // reads them from: `awslogs` sends them straight to the log group.
+    tracing::info!(
+        "{}",
+        access_log_line(&captured, answer.status, elapsed_ms(started))
+    );
+    json_response(status_code(answer.status), &answer.body)
+}
+
+/// How long the request took, in whole milliseconds. Anything a request can
+/// plausibly take fits; a saturating conversion keeps the handler panic-free.
+fn elapsed_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Turns the code the core decided on into axum's type. The core keeps it in
+/// range, so the fallback is unreachable, and still cannot panic.
+fn status_code(code: u16) -> StatusCode {
+    StatusCode::from_u16(code).unwrap_or(StatusCode::OK)
 }
 
 /// Reads the wall clock as seconds, and nanoseconds, since the Unix epoch.

@@ -49,7 +49,8 @@ enum Command {
     /// Serve the course guides, and the scenario console. This is the default.
     Serve,
     /// Serve an echo server that answers every request with a JSON description
-    /// of that request.
+    /// of that request. A request chooses the status code of the answer with
+    /// `?status=503`.
     Echo(EchoArgs),
     /// Probe this server over loopback, and report the result as an exit code.
     /// This is what the ECS container health check runs.

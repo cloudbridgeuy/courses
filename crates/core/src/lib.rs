@@ -30,8 +30,9 @@ pub use catalog::{CourseInput, LoadedCourse, parse_course};
 pub use course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 pub use dev::{DEV_RELOAD_SCRIPT_TAG, TextAsset, is_reload_trigger, text_asset, with_dev_script};
 pub use echo::{
-    EchoRequest, EchoServer, EcsNetwork, MAX_ECHOED_BODY, echo_json, format_rfc3339_utc,
-    parse_ecs_task_metadata,
+    DEFAULT_ECHO_STATUS, EchoAnswer, EchoRequest, EchoServer, EchoStatus, EcsNetwork,
+    MAX_ECHO_STATUS, MAX_ECHOED_BODY, MIN_ECHO_STATUS, STATUS_QUERY_KEY, access_log_line,
+    echo_answer, echo_json, echo_status, format_rfc3339_utc, parse_ecs_task_metadata,
 };
 pub use error::{Error, Result};
 pub use events::{

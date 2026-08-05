@@ -28,6 +28,17 @@ the `Dockerfile` `CMD` and existing ECS task definitions are unaffected.
   `./target/debug/courses_server echo --port 8099 --name echo.example.com` and a
   `curl -s localhost:8099/a/b?x=1`. The shaping lives in `courses_core::echo`;
   `crates/server/src/echo.rs` only copies out of axum's types.
+  `?status=<200..599>` chooses the code the answer carries
+  (`curl -i "localhost:8099/eco?status=503"`); the `response` block of the body
+  reports the code, where it came from, and, for a value the service cannot
+  use, why it fell back to `200`. `courses_core::echo::status` holds that
+  decision, and `<cb-eco>` is the widget over it.
+  Every served request also writes one `info` access line to stdout —
+  `GET /eco?status=503 -> 503 client=… peer=… host=… bytes=… ms=… trace=…` —
+  built by `courses_core::echo::log::access_log_line`, which replaces
+  whitespace, and control characters, inside client-controlled values, so a
+  header cannot forge a second record or paint a terminal. A body over
+  `MAX_BODY_BYTES` never becomes an `EchoRequest`, so it logs a `warn` instead.
 - `courses_server healthcheck [--path <p>] [--port <n>] [--timeout-ms <ms>]` —
   requests one path over loopback (`127.0.0.1`, never `localhost`) and exits `0`
   on a success status, `1` otherwise, printing the status or the transport error

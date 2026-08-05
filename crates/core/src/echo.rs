@@ -3,12 +3,25 @@
 //!
 //! The shell captures a request into [`EchoRequest`] and hands it here; every
 //! decision about what the answer looks like — how a query string is decoded,
-//! how a binary body is represented, how a timestamp is written — is made by
-//! the pure functions in this module.
+//! how a binary body is represented, how a timestamp is written, which status
+//! code it carries — is made by the pure functions in this module.
 
 use std::collections::BTreeMap;
 
 use serde_json::{Map, Value, json};
+
+mod log;
+mod status;
+mod time;
+
+pub use log::access_log_line;
+pub use status::{
+    DEFAULT_ECHO_STATUS, EchoStatus, MAX_ECHO_STATUS, MIN_ECHO_STATUS, STATUS_QUERY_KEY,
+    echo_status,
+};
+pub use time::format_rfc3339_utc;
+
+use status::status_json;
 
 /// Static facts about the running echo server, fixed at startup.
 #[derive(Debug, Clone, Default)]
@@ -72,16 +85,34 @@ pub struct EchoRequest {
 /// so a large upload cannot be reflected into an equally large response.
 pub const MAX_ECHOED_BODY: usize = 64 * 1024;
 
+/// The complete answer to one request: the status code to write, and the body.
+#[derive(Debug, Clone)]
+pub struct EchoAnswer {
+    pub status: u16,
+    pub body: Value,
+}
+
 // --- Pure core -------------------------------------------------------------
 
+/// Decides everything about the answer to one request, so the shell only writes
+/// what it is given.
+pub fn echo_answer(server: &EchoServer, request: &EchoRequest) -> EchoAnswer {
+    let status = echo_status(request.query_string.as_deref());
+    EchoAnswer {
+        status: status.code(),
+        body: echo_json(server, request, &status),
+    }
+}
+
 /// Builds the complete JSON answer for one request.
-pub fn echo_json(server: &EchoServer, request: &EchoRequest) -> Value {
+pub fn echo_json(server: &EchoServer, request: &EchoRequest, status: &EchoStatus) -> Value {
     let headers = group_headers(&request.headers);
     let host = first_header(&headers, "host");
 
     json!({
         "received_at": format_rfc3339_utc(request.received_at_unix_secs, request.received_at_nanos),
         "server": server_json(server, host.as_deref()),
+        "response": status_json(status),
         "network": network_json(server, request, &headers),
         "request": {
             "method": request.method,
@@ -465,102 +496,21 @@ pub fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
-/// Formats a Unix timestamp as RFC 3339 in UTC, with milliseconds.
-///
-/// Hand-written rather than pulled from a date crate: the calendar arithmetic
-/// is a pure function of two integers, and it is the only date handling the
-/// crate needs.
-pub fn format_rfc3339_utc(unix_secs: i64, nanos: u32) -> String {
-    let days = unix_secs.div_euclid(86_400);
-    let seconds_of_day = unix_secs.rem_euclid(86_400);
-    let (year, month, day) = civil_from_days(days);
-    let millis = nanos / 1_000_000;
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{millis:03}Z",
-        seconds_of_day / 3600,
-        (seconds_of_day % 3600) / 60,
-        seconds_of_day % 60,
-    )
-}
-
-/// Converts days since the Unix epoch into a proleptic Gregorian date, by
-/// Howard Hinnant's `civil_from_days`.
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    // Shift the epoch to 0000-03-01, so leap days land at the end of the cycle.
-    let shifted = days + 719_468;
-    let era = if shifted >= 0 {
-        shifted
-    } else {
-        shifted - 146_096
-    } / 146_097;
-    let day_of_era = shifted - era * 146_097; // [0, 146_096]
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365; // [0, 399]
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100); // [0, 365]
-    let month_prime = (5 * day_of_year + 2) / 153; // [0, 11], March is 0
-    let day = day_of_year - (153 * month_prime + 2) / 5 + 1; // [1, 31]
-    let month = if month_prime < 10 {
-        month_prime + 3
-    } else {
-        month_prime - 9
-    };
-    let year = year + i64::from(month <= 2);
-    // Both fit their ranges by construction, so the casts cannot truncate.
-    (year, month as u32, day as u32)
-}
-
 // --- Tests -----------------------------------------------------------------
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        EchoRequest, EchoServer, EcsNetwork, MAX_ECHOED_BODY, base64_encode, body_json, client_ip,
-        echo_json, format_rfc3339_utc, group_headers, host_matches_name, parse_ecs_task_metadata,
-        parse_query, path_segments, percent_decode, split_forwarded_for, split_host_port,
+        DEFAULT_ECHO_STATUS, EchoRequest, EchoServer, EcsNetwork, MAX_ECHOED_BODY, base64_encode,
+        body_json, client_ip, echo_answer, group_headers, host_matches_name,
+        parse_ecs_task_metadata, parse_query, path_segments, percent_decode, split_forwarded_for,
+        split_host_port,
     };
     use serde_json::{Value, json};
 
     fn header(name: &str, value: &str) -> (String, String) {
         (name.to_owned(), value.to_owned())
-    }
-
-    #[test]
-    fn formats_the_epoch() {
-        assert_eq!(format_rfc3339_utc(0, 0), "1970-01-01T00:00:00.000Z");
-    }
-
-    #[test]
-    fn formats_a_known_instant_with_millis() {
-        // 2025-01-01T00:00:00Z
-        assert_eq!(
-            format_rfc3339_utc(1_735_689_600, 123_456_789),
-            "2025-01-01T00:00:00.123Z"
-        );
-    }
-
-    #[test]
-    fn formats_a_leap_day() {
-        // 2000-02-29T12:34:56Z — 2000 is a leap year despite ending a century.
-        assert_eq!(
-            format_rfc3339_utc(951_827_696, 0),
-            "2000-02-29T12:34:56.000Z"
-        );
-    }
-
-    #[test]
-    fn formats_the_end_of_a_non_leap_february() {
-        // 2100 is not a leap year: 2100-03-01 follows 2100-02-28.
-        assert_eq!(
-            format_rfc3339_utc(4_107_542_400, 0),
-            "2100-03-01T00:00:00.000Z"
-        );
-    }
-
-    #[test]
-    fn formats_a_timestamp_before_the_epoch() {
-        assert_eq!(format_rfc3339_utc(-1, 0), "1969-12-31T23:59:59.000Z");
     }
 
     #[test]
@@ -720,7 +670,7 @@ mod tests {
     #[test]
     fn describes_a_whole_request() {
         let (server, request) = sample();
-        let answer = echo_json(&server, &request);
+        let answer = echo_answer(&server, &request).body;
 
         assert_eq!(answer["received_at"], json!("2025-01-01T00:00:00.000Z"));
         assert_eq!(answer["request"]["method"], json!("POST"));
@@ -746,7 +696,7 @@ mod tests {
     fn reports_that_the_request_arrived_under_the_configured_name() {
         let (server, request) = sample();
         assert_eq!(
-            echo_json(&server, &request)["server"]["matched_public_name"],
+            echo_answer(&server, &request).body["server"]["matched_public_name"],
             json!(true)
         );
     }
@@ -756,7 +706,7 @@ mod tests {
         let (server, mut request) = sample();
         request.headers = vec![header("Host", "taller-alb-123.elb.amazonaws.com")];
         assert_eq!(
-            echo_json(&server, &request)["server"]["matched_public_name"],
+            echo_answer(&server, &request).body["server"]["matched_public_name"],
             json!(false)
         );
     }
@@ -765,20 +715,56 @@ mod tests {
     fn leaves_the_match_unknown_when_no_name_is_configured() {
         let (mut server, request) = sample();
         server.public_name = None;
-        let answer = echo_json(&server, &request);
+        let answer = echo_answer(&server, &request).body;
         assert_eq!(answer["server"]["matched_public_name"], Value::Null);
         assert_eq!(answer["server"]["public_name"], Value::Null);
     }
 
     #[test]
     fn omits_nothing_when_the_request_is_bare() {
-        let answer = echo_json(&EchoServer::default(), &EchoRequest::default());
+        let answer = echo_answer(&EchoServer::default(), &EchoRequest::default()).body;
         assert_eq!(answer["request"]["host"], Value::Null);
         assert_eq!(answer["request"]["query"], json!({}));
         assert_eq!(answer["network"]["forwarded_for"], Value::Null);
         assert_eq!(answer["network"]["peer"], Value::Null);
         assert_eq!(answer["network"]["client_ip"], Value::Null);
         assert_eq!(answer["body"]["encoding"], json!("empty"));
+    }
+
+    // --- Status code from the query string ---
+
+    #[test]
+    fn reports_a_requested_status_in_the_answer() {
+        let (server, mut request) = sample();
+        request.query_string = Some("status=503".to_owned());
+        let answer = echo_answer(&server, &request);
+        assert_eq!(answer.status, 503);
+        assert_eq!(answer.body["response"]["status"], json!(503));
+        assert_eq!(answer.body["response"]["source"], json!("query"));
+        assert_eq!(answer.body["response"]["requested"], json!("503"));
+    }
+
+    #[test]
+    fn reports_the_default_status_in_the_answer() {
+        let (server, request) = sample();
+        let answer = echo_answer(&server, &request);
+        assert_eq!(answer.status, DEFAULT_ECHO_STATUS);
+        assert_eq!(answer.body["response"]["source"], json!("default"));
+        assert_eq!(answer.body["response"]["requested"], Value::Null);
+    }
+
+    #[test]
+    fn answers_a_broken_status_with_the_default_and_an_explanation() {
+        let (server, mut request) = sample();
+        request.query_string = Some("status=teapot".to_owned());
+        let answer = echo_answer(&server, &request);
+        assert_eq!(answer.status, DEFAULT_ECHO_STATUS);
+        assert_eq!(answer.body["response"]["requested"], json!("teapot"));
+        assert!(
+            answer.body["response"]["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("status"))
+        );
     }
 
     // --- Networking ---
@@ -897,7 +883,7 @@ mod tests {
     fn reports_the_task_network_in_the_answer() {
         let (mut server, request) = sample();
         server.ecs = parse_ecs_task_metadata(TASK_METADATA);
-        let answer = echo_json(&server, &request);
+        let answer = echo_answer(&server, &request).body;
         assert_eq!(
             answer["network"]["ecs"]["availability_zone"],
             json!("us-east-1b")
