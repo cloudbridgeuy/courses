@@ -183,33 +183,3 @@ tema compartido sí sería el destino directo.
 > demostración: el flujo, la regla, y el tema son reales; el último salto lo muestra el
 > instructor.
 
----
-
-{#ejercicio-15}
-### Ejercicio 15 — Notificar los eventos del pipeline
-
-Crear una regla de notificación sobre el pipeline que publique los eventos de ejecución
-exitosa, fallida, y de aprobación pendiente en un tema de SNS del pod, y suscribir la
-aplicación del taller a ese tema. Disparar una ejecución y observar los avisos.
-
-::: solucion
-1. En [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home), abrir el pipeline, ir a la pestaña
-   **Settings** y, en **Notifications**, pulsar **Create notification rule**.
-2. Nombre `taller-aws-<su-nombre>-pipeline-notification`, **Detail type: Full**. Marcar
-   los eventos **Pipeline execution: Succeeded**, **Pipeline execution: Failed**, y
-   **Manual approval: Needed**.
-3. En **Targets**, **Create target → SNS topic**, nombre
-   `codestar-notifications-taller-aws-<su-nombre>`, **Create**. **Submit**.
-4. En [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics), abrir el tema y crear una suscripción
-   **HTTPS** hacia
-   `https://courses.cloudbridge.com.uy/hooks/notifications?token=cloudbridge`. Esperar a
-   que el estado sea **Confirmed**.
-5. Subir un commit a `main` para disparar el pipeline.
-6. Observar los avisos a medida que el pipeline avanza: el evento de aprobación pendiente,
-   y luego el de ejecución exitosa tras aprobar. En el laboratorio aparecen como *toasts*
-   en la guía; en producción llegarían a un canal de Teams.
-:::
-
-:::slide light
-{{ejercicio-15}}
-:::
