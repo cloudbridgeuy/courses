@@ -72,7 +72,7 @@ Vigila sola; avisa por el canal que ya usa el equipo.
 
 ### Crear el dashboard
 
-1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home) y pulsar **Create dashboard**. Nombrarlo
+1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home#dashboards:) y pulsar **Create dashboard**. Nombrarlo
    `taller-aws-<su-nombre>`.
 2. Agregar un *widget* de línea con la métrica `CPUUtilization` del servicio de ECS.
 3. Agregar otro widget con `TargetResponseTime` del ALB.
@@ -102,7 +102,7 @@ y los errores 5XX. Luego crear una alarma sobre la CPU del servicio (umbral 70%)
 acción publique en el tema de SNS del pod.
 
 ::: solucion
-1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home), pulsar **Create dashboard** y nombrarlo
+1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home#dashboards:), pulsar **Create dashboard** y nombrarlo
    `taller-aws-<su-nombre>`.
 2. Agregar widgets de línea para `CPUUtilization` (ECS, el servicio),
    `TargetResponseTime` y `HTTPCode_Target_5XX_Count` (ALB). Guardar.

@@ -260,6 +260,13 @@ Enviar un valor por cada vía con los controles de abajo. Ambos publican en el n
 `Taller/Custom`, métrica `CustomValue`, con la dimensión `method` (`emf` o `api`) que
 distingue su origen. El valor se acota a 0–100 (límite del taller, no de CloudWatch).
 
+Cada control tiene dos botones. **Enviar** manda el número del campo, una sola vez.
+**Auto (5 s)** arranca un envío repetido: un valor al azar cada cinco segundos, con la
+cuenta regresiva del próximo a la derecha, hasta pulsar **Pausar**. La diferencia importa
+al mirar la gráfica: un punto suelto no dibuja nada, y un período, un estadístico, o una
+alarma necesitan una serie para tener de qué agarrarse. Arrancar el envío automático en
+las dos vías ahora, y dejarlo corriendo mientras se busca la métrica en la consola.
+
 :::app
 <cb-metric mode="emf" label="Enviar métrica (log/EMF)"></cb-metric>
 :::
@@ -278,14 +285,21 @@ hay que ir a buscarla.
    arriba y esperar un minuto.
 3. Entrar a la agrupación **method**: es la dimensión con la que la aplicación publica.
    Aparecen dos filas de `CustomValue`, una por vía (`emf` y `api`). Marcar las dos.
-4. La gráfica sale vacía o plana si el rango es ancho. En **Graphed metrics**, poner el
-   estadístico en **Maximum** y el período en **1 minute**, y arriba fijar el rango en
-   **1h**: son valores sueltos y espaciados, y el promedio de cinco minutos los borra.
+4. Ajustar la lectura en **Graphed metrics**: el estadístico en **Maximum**, el período
+   en **1 minute**, y arriba el rango en **1h**. Con el envío automático corriendo, cada
+   período de un minuto junta una docena de valores, y el estadístico decide qué se ve de
+   ellos: **Maximum** el pico de la ventana, **Average** la media. Con envíos sueltos, en
+   cambio, un período de cinco minutos promedia el único valor contra el vacío, y la línea
+   casi desaparece.
 
-Las dos series salen del mismo botón conceptual, y llegan por caminos distintos. La de
+Las dos series salen del mismo gesto, y llegan por caminos distintos. La de
 `api` aparece casi de inmediato. La de `emf` tarda un poco más: primero se escribe la
 línea de log, y después CloudWatch extrae el número de ahí. Esa misma línea se ve llegar
 en la Live Tail de la sección anterior, si quedó una sesión abierta.
+
+Al terminar, pulsar **Pausar** en los dos controles. El envío automático sigue mientras la
+página esté abierta, y cada punto es una llamada a `PutMetricData`, o una línea de log
+más: dejarlo corriendo toda la tarde se paga.
 
 ::: extra ¿Y esto qué tiene que ver con DevOps?
 Las dos vías exigen colaboración entre quienes operan y quienes construyen la

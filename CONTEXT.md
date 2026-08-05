@@ -337,9 +337,14 @@ minute while Insights bills per scanned volume. **Live Tail moved before
 «Métricas personalizadas»**, so the custom-metric section can point back at it to
 watch the EMF line arrive; that section also gained the steps for finding
 `Taller/Custom` under **Custom namespaces** with `Maximum` / 1 minute / 1 h, and
-the reason the `api` series shows up before the `emf` one. Link fragments and
-menu names follow `.claude/context/content-authoring.md`. `20` still links to the
-bare `cloudwatch/home` landing — unconverted.
+the reason the `api` series shows up before the `emf` one. `19` also explains the
+two `<cb-metric>` buttons — **Enviar** for one point, **Auto (5 s)** / **Pausar**
+for a random value every five seconds — tells students to start both automatic
+runs before opening the console, reads the statistic/period step against a live
+series instead of scattered points, and closes by telling them to pause both
+widgets because every point costs a `PutMetricData` call or a log line. `20` now
+deep-links its two Dashboards steps to `#dashboards:`. Link fragments and menu
+names follow `.claude/context/content-authoring.md`.
 
 **Known inconsistency:** `12`'s module practice names the recreated eco stack
 `taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification

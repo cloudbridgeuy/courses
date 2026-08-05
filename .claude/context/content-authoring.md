@@ -126,10 +126,10 @@ Abra [**CloudWatch → Logs → Log Analytics**](https://console.aws.amazon.com/
 
 - Prefer deep-link fragments to the exact window: `#logsV2:` (Logs, which opens
   Log Analytics), `#logsV2:log-groups` (Log Management), `#metricsV2:` (Metrics,
-  which opens Classic metrics), `#alarmsV2:`, `#container-insights:`
-  (CloudWatch), `#TargetGroups:` (EC2). Use region-less service landings
-  (`ecs/home`, `ec2/home`, `ecr/home`, `codesuite/codebuild/home`) when no stable
-  fragment fits.
+  which opens Classic metrics), `#alarmsV2:`, `#dashboards:`,
+  `#container-insights:` (CloudWatch), `#TargetGroups:` (EC2). Use region-less
+  service landings (`ecs/home`, `ec2/home`, `ecr/home`,
+  `codesuite/codebuild/home`) when no stable fragment fits.
 - **Use the console's current menu names.** CloudWatch reorganised both menus:
   Logs holds **Log Management**, **Log Analytics** (Logs Insights, Live Tail, and
   Contributor Insights in one screen), and **Log Anomalies**; Metrics holds
