@@ -807,8 +807,16 @@
 
   // ---------------------------------------------------------------------------
   // Custom element: <cb-metric>
-  // Attributes: mode ("emf" | "api"), label
+  // Attributes: mode ("emf" | "api"), label, interval (auto period, seconds)
+  //
+  // Two ways to publish: one shot with the value in the field, or the auto
+  // button, which emits a random 0–100 value every `interval` seconds until it
+  // is stopped. The auto run fills a CloudWatch graph with a series instead of
+  // a single point, which is what a metric period or an alarm needs to react.
   // ---------------------------------------------------------------------------
+
+  var METRIC_AUTO_SECONDS = 5;
+  var MAX_METRIC_AUTO_SECONDS = 300;
 
   customElements.define(
     "cb-metric",
@@ -818,6 +826,12 @@
           this._rendered = true;
 
           this._method = this.getAttribute("mode") === "api" ? "api" : "emf";
+          var interval = Math.round(Number(this.getAttribute("interval")));
+          this._interval = isFinite(interval) && interval > 0
+            ? Math.min(MAX_METRIC_AUTO_SECONDS, interval)
+            : METRIC_AUTO_SECONDS;
+          this._timer = null;
+          this._left = 0;
           var label = this.getAttribute("label") || "Enviar métrica";
 
           this._input = document.createElement("input");
@@ -829,12 +843,42 @@
           this._input.className = "cb-app-input";
 
           this._btn = makeAppBtn(label);
+
+          // One toggle, two faces: ▶ starts the run, ⏸ stops it.
+          this._autoBtn = makeAppBtn("");
+          this._autoBtn.classList.add("cb-metric-auto");
+          this._autoGlyph = document.createElement("span");
+          this._autoGlyph.className = "cb-metric-glyph";
+          this._autoGlyph.setAttribute("aria-hidden", "true");
+          this._autoText = document.createElement("span");
+          this._autoBtn.appendChild(this._autoGlyph);
+          this._autoBtn.appendChild(this._autoText);
+
+          // Only visible while the run is on: a pulsing dot and the countdown.
+          this._live = document.createElement("span");
+          this._live.className = "cb-metric-live";
+          this._live.hidden = true;
+          var dot = document.createElement("span");
+          dot.className = "cb-metric-dot";
+          dot.setAttribute("aria-hidden", "true");
+          this._liveText = document.createElement("span");
+          this._live.appendChild(dot);
+          this._live.appendChild(this._liveText);
+
           this._status = document.createElement("span");
           this._status.className = "cb-app-status";
 
-          this.appendChild(this._input);
-          this.appendChild(this._btn);
+          var controls = document.createElement("div");
+          controls.className = "cb-app-controls";
+          controls.appendChild(this._input);
+          controls.appendChild(this._btn);
+          controls.appendChild(this._autoBtn);
+          controls.appendChild(this._live);
+
+          this.appendChild(controls);
           this.appendChild(this._status);
+
+          this._paintAuto();
 
           this._btn.addEventListener("click", () => {
             var n = Math.round(Number(this._input.value));
@@ -842,32 +886,12 @@
               this._status.textContent = "Valor inválido";
               return;
             }
-            n = Math.max(0, Math.min(100, n));
-            var id = uuid();
-            this._btn.disabled = true;
-            this._status.textContent = "Enviando…";
-            cbEvents
-              .emit(
-                id,
-                "metric",
-                JSON.stringify({ value: n, method: this._method })
-              )
-              .then((code) => {
-                if (code === 202) {
-                  this._status.textContent = "Enviado";
-                } else if (code === 403) {
-                  this._status.textContent = "";
-                  this._btn.disabled = false;
-                  handleForbidden();
-                } else {
-                  this._status.textContent = "Error (" + code + ")";
-                  this._btn.disabled = false;
-                }
-              })
-              .catch(() => {
-                this._status.textContent = "Error de red";
-                this._btn.disabled = false;
-              });
+            this._send(Math.max(0, Math.min(100, n)), true);
+          });
+
+          this._autoBtn.addEventListener("click", () => {
+            if (this._timer) this._stopAuto("Auto en pausa");
+            else this._startAuto();
           });
         }
 
@@ -878,6 +902,7 @@
             typeof envelope.id === "string" &&
             envelope.id.indexOf("status-metric-submitted-" + this._method) === 0
           ) {
+            // The server's own wording wins; the live chip carries the run state.
             this._status.textContent = envelope.payload || "";
             this._btn.disabled = false;
           }
@@ -886,10 +911,98 @@
       }
 
       disconnectedCallback() {
+        this._stopAuto("");
         unregisterLockable(this);
         var idx = appStatusListeners.indexOf(this._statusListener);
         if (idx !== -1) appStatusListeners.splice(idx, 1);
         this._statusListener = null;
+      }
+
+      // Emits one value. A manual send holds its button until the server
+      // answers on the bus; an auto send leaves the controls alone.
+      _send(value, manual) {
+        if (manual) this._btn.disabled = true;
+        this._status.textContent = "Enviando " + value + "…";
+        cbEvents
+          .emit(
+            uuid(),
+            "metric",
+            JSON.stringify({ value: value, method: this._method })
+          )
+          .then((code) => {
+            if (code === 202) {
+              this._status.textContent = "Enviado " + value;
+            } else if (code === 403) {
+              this._status.textContent = "";
+              this._btn.disabled = false;
+              this._stopAuto("");
+              handleForbidden();
+            } else {
+              this._btn.disabled = false;
+              this._stopAuto("");
+              this._status.textContent = "Error (" + code + ")";
+            }
+          })
+          .catch(() => {
+            this._btn.disabled = false;
+            this._stopAuto("");
+            this._status.textContent = "Error de red";
+          });
+      }
+
+      // Starts the repeating run. The first value goes out now, so the operator
+      // sees an effect without waiting a full period. The ticker runs once a
+      // second — the period is a countdown, which is what the chip shows.
+      _startAuto() {
+        if (this._timer) return;
+        this._left = this._interval;
+        this._fire();
+        this._timer = setInterval(() => {
+          this._left -= 1;
+          if (this._left <= 0) {
+            this._left = this._interval;
+            this._fire();
+          }
+          this._paintAuto();
+        }, 1000);
+        this._paintAuto();
+      }
+
+      _fire() {
+        var value = Math.floor(Math.random() * 101);
+        this._input.value = String(value);
+        this._send(value, false);
+      }
+
+      // `message` of "" stops without writing over whatever the caller shows.
+      _stopAuto(message) {
+        if (this._timer) {
+          clearInterval(this._timer);
+          this._timer = null;
+        }
+        this._paintAuto();
+        if (message) this._status.textContent = message;
+      }
+
+      // Single place where the run state reaches the DOM: button face, the
+      // pressed style, and the live chip with its countdown.
+      _paintAuto() {
+        var running = !!this._timer;
+        this._autoGlyph.textContent = running ? "⏸" : "▶";
+        this._autoText.textContent = running
+          ? "Pausar"
+          : "Auto (" + this._interval + " s)";
+        this._autoBtn.title = running
+          ? "Detener el envío automático"
+          : "Envía un valor al azar (0–100) cada " +
+            this._interval +
+            " s hasta pausarlo";
+        this._autoBtn.setAttribute("aria-pressed", String(running));
+        this._autoBtn.classList.toggle("cb-app-btn-on", running);
+        this._live.hidden = !running;
+        if (running) {
+          this._liveText.textContent = "Enviando · próximo en " + this._left + " s";
+        }
       }
     }
   );

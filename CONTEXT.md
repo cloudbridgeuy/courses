@@ -524,7 +524,11 @@ SSE bus.
   multiplexed `EventSource`. `<cb-cpu-burst>` renders a fixed note on how the burst
   works plus an editable duration field — `seconds` is only its initial value; the
   client rounds and clamps it to 1–120 s, and `CpuBurstConfig::parse` caps it at 120 s
-  again server-side (no lower bound there). `<cb-file>` accepts a repository-relative UTF-8 path;
+  again server-side (no lower bound there). `<cb-metric>` pairs a one-shot submit
+  button with an auto play/pause toggle that emits a random 0–100 value every
+  `interval` seconds (default 5, cap 300), showing a pulsing live chip with the
+  countdown while it runs and stopping itself on any error or on disconnect — a
+  single point cannot fill a CloudWatch graph, a series can. `<cb-file>` accepts a repository-relative UTF-8 path;
   the server embeds the source during rendering rather than exposing a filesystem
   route. It can start collapsed with `toggleable`, and provides content-size and copy
   controls. `full-path` disables truncation of the slide label. The bundle loads when

@@ -95,6 +95,12 @@ cb-file .cb-file-content > pre {
   opacity: 0.85;
 }
 
+/* A toggle button while its loop runs (e.g. <cb-metric> auto send). */
+.cb-app-btn-on {
+  background: var(--cb-ink, #2d2926);
+  box-shadow: inset 0 0 0 2px var(--cb-teal, #5fc8be);
+}
+
 .cb-app-input {
   width: 5rem;
   margin-right: 0.5rem;
@@ -135,8 +141,16 @@ cb-file .cb-file-content > pre {
 
 /* The input already carries a right margin for inline widgets; inside a
    flex row the gap covers it. */
-.cb-app-label > .cb-app-input {
+.cb-app-label > .cb-app-input,
+.cb-app-controls > .cb-app-input {
   margin-right: 0;
+}
+
+/* A status line under a controls row starts at the left edge, not indented
+   like the inline form. */
+.cb-app-controls + .cb-app-status {
+  margin-top: 0.5rem;
+  margin-left: 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -148,6 +162,61 @@ cb-file .cb-file-content > pre {
 cb-cpu-burst,
 cb-cpu-burst.cb-app-locked {
   display: block;
+}
+
+/* ---------------------------------------------------------------------------
+   <cb-metric> — value field, send button, and the auto play/pause toggle
+   --------------------------------------------------------------------------- */
+
+cb-metric,
+cb-metric.cb-app-locked {
+  display: block;
+}
+
+/* The glyph carries the play/pause state; keep it from riding the baseline. */
+.cb-metric-glyph {
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+/* Shown only while the run is on. */
+.cb-metric-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: 0.85rem;
+  color: var(--cb-teal-deep, #1f7a70);
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-metric-live[hidden] {
+  display: none;
+}
+
+.cb-metric-dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: currentColor;
+  animation: cb-metric-pulse 1s ease-in-out infinite;
+}
+
+@keyframes cb-metric-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-metric-dot {
+    animation: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -189,9 +189,16 @@ Wires routes, owns `Mutex<RecentIds>`, and builds `AppsCtx`:
   `<cb-counter>` takes a `mode` attribute — `increment` (button only), `view`
   (value only), or `both` (default); elements sharing a `key` stay in sync via the
   SSE bus, so an incrementer and a separate viewer can sit in different parts of the
-  page. `<cb-metric>` takes `mode` (`emf` | `api`) and `label`; it renders a 0–100
-  number input plus submit button and emits a `metric` event
-  `{ value, method }`, locking like `cb-cpu-burst` when gated.
+  page. `<cb-metric>` takes `mode` (`emf` | `api`), `label`, and `interval`; it
+  renders a controls row — 0–100 number input, submit button, auto play/pause
+  toggle — and emits a `metric` event `{ value, method }`, locking like
+  `cb-cpu-burst` when gated. The toggle drives a repeating run: a random 0–100
+  value every `interval` seconds (default 5, capped at 300), the first one
+  immediately. While it runs the button reads ⏸ Pausar with the pressed style
+  (`.cb-app-btn-on`) and a live chip beside it shows a pulsing dot plus the
+  countdown to the next send. The run stops on a second click, on 403 or any
+  other error code, on a network error, and on disconnect. A manual send holds
+  the submit button until the bus answers; auto sends leave the controls alone.
 - Lock UI + unlock modal (see "Lock UI" above): dims gated widgets, validates the
   secret via `/events/verify`, stores it in `sessionStorage` under `cb-apps-secret`.
 - `<cb-file path="./buildspec.yml" type="yaml">` is a read-only app. The server
