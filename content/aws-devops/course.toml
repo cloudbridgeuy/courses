@@ -60,6 +60,5 @@ slug = "observabilidad-y-cierre"
 title = "Observabilidad y cierre"
 sections = [
   "20-dashboards-y-alarmas.md",
-  "21-container-insights-trazabilidad.md",
-  "22-cierre-del-curso.md",
+  "21-cierre-del-curso.md",
 ]

@@ -115,16 +115,29 @@ Agentes de IA son excelentes para crear graficos complejos utilizando el format 
 
 ### Crear la alarma de CPU
 
-1. Abrir [**CloudWatch → Alarms → All alarms**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:) y pulsar **Create alarm**.
+1. Abrir [**CloudWatch → Alarms**](https://console.aws.amazon.com/cloudwatch/home#alarmsV2:) y pulsar **Create alarm**.
 2. **Select metric**: `ECS → por servicio → CPUUtilization` del servicio.
-3. En la condición, elegir **Greater than** con un umbral de `70` (por ciento), evaluado
+3. En la condición, elegir **Greater than** con un umbral de `40` (por ciento), evaluado
    durante un período.
 4. En **Notification**, seleccionar el **tema de SNS** del pod (el mismo
    `codestar-notifications-taller-aws-<su-nombre>` que recibe las notificaciones del
    pipeline).
-5. Nombrarlo `cpu-alta-<su-nombre>` y crearlo.
+5. Nombrarlo `taller-aws-<su-nombre>-cpu-alta` y crearlo.
 
 La alarma comienza en `INSUFFICIENT_DATA`, pasa a `OK` cuando hay datos, y entraría en
-`ALARM` —publicando en SNS— si la CPU superara el 70%.
+`ALARM` (publicando en SNS) si la CPU superara el 40%.
 
----
+Utilice las siguientes apps para lanzar la alerta.
+
+#### Carga CPU Alta
+
+:::app
+<cb-cpu-burst seconds="120" intensity="high" label="Generar carga de CPU"></cb-cpu-burst>
+:::
+
+#### Carga CPU Baja
+
+:::app
+<cb-cpu-burst seconds="120" intensity="low" label="Generar carga de CPU"></cb-cpu-burst>
+:::
+
