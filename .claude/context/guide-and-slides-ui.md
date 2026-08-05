@@ -83,6 +83,11 @@
   teal→blue divider, `h2` a tapered underline, `h3` a teal marker and rule, and `h4`
   a compact uppercase label. `.cb-title-slide` and exercise-card headings retain
   their specialized styles.
+- Each level also pins its own `font-size` (h1 `1.55em`, h2 `1.2em`, h3 `1em`, h4
+  `0.45em`). reveal's core stylesheet sets no heading sizes — the stock themes this
+  file replaces did — so without this the sizes come from the UA sheet, where an `h1`
+  inside a `<section>` computes to the same size as an `h2`. The h2 rule also hugs
+  the text (`display: table`) while the h1 divider spans the slide.
 - A slide's first child gets `margin-top: 0` so content starts flush with the
   canvas top (the UA h2 margin otherwise pushes the slide down and eats canvas
   height). `.cb-title-slide` is exempt — the hero has nothing below it.

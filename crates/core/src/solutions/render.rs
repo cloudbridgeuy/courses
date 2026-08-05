@@ -23,8 +23,9 @@ pub struct RenderedBody {
 /// guide HTML. `:::inline-slide` renders in BOTH places; with the
 /// `with-title` modifier its slide copy is prefixed with the nearest heading
 /// found in the top-level Markdown above it (falling back to the section
-/// `title`) — the guide copy is untouched, since that heading already sits
-/// above it in the document. `:::title-slide`
+/// `title` as an `h1`, one level above any heading the body can carry, so the
+/// two never render alike) — the guide copy is untouched, since that heading
+/// already sits above it in the document. `:::title-slide`
 /// produces a slide showing only `title` (the section heading); its body must
 /// be empty. `:::skip` renders its content in the guide only — inside a slide
 /// (including an inline slide's slide copy) it is dropped. `:::add` filters
@@ -71,9 +72,10 @@ pub fn render_section_body(title: &str, body: &str) -> Result<RenderedBody> {
             } => {
                 uses_slides = true;
                 let slide_md = if with_title {
-                    let heading = last_heading
-                        .clone()
-                        .unwrap_or_else(|| format!("## {title}"));
+                    // The section title is the concept above every heading the
+                    // body can write, so it comes in as an `h1`. As an `h2` it
+                    // was indistinguishable from a body `## …` right under it.
+                    let heading = last_heading.clone().unwrap_or_else(|| format!("# {title}"));
                     format!("{heading}\n\n{md}")
                 } else {
                     md.clone()
@@ -503,6 +505,7 @@ mod tests {
     fn inline_slide_with_title_falls_back_to_section_title() {
         let body = "Prosa sin encabezado.\n:::inline-slide with-title\nX.\n:::\n";
         let result = render_section_body("Mi sección", body).unwrap();
+        assert!(result.slide_html[0].html.contains("<h1 id=\"mi-seccion\">"));
         assert!(result.slide_html[0].html.contains("Mi sección"));
         assert!(!result.html.contains("Mi sección"));
     }

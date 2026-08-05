@@ -64,7 +64,12 @@
 
 /* The four heading levels are distinct visual tools: h1 carries a concept,
    h2 starts a major section, h3 introduces a subsection, and h4 works as a
-   compact label. Title-only slides retain their dedicated hero treatment. */
+   compact label. Title-only slides retain their dedicated hero treatment.
+
+   Every level pins its own font-size. reveal's core stylesheet sets no heading
+   sizes (the stock themes this file replaces did), so the sizes fell back to
+   the UA sheet — where an h1 inside a `<section>` computes to the same size as
+   an h2, making the two levels indistinguishable. */
 
 /* Slides start flush with the canvas top. Without this, whatever opens the
    slide (usually an h2, whose UA top margin nothing else resets) pushes the
@@ -77,16 +82,25 @@
 }
 
 .reveal .slides > section > h1:not(.cb-title-slide) {
-  margin: 0 0 0.55em;
-  padding-bottom: 0.28em;
+  margin: 0 0 0.5em;
+  padding-bottom: 0.24em;
+  font-size: 1.55em;
+  font-weight: 800;
   letter-spacing: -0.035em;
-  border-bottom: 0.1em solid var(--cb-teal);
+  border-bottom: 0.07em solid var(--cb-teal);
   border-image: linear-gradient(90deg, var(--cb-teal), var(--cb-blue), transparent) 1;
 }
 
+/* The section title sits a full step below the concept title, and its rule
+   hugs the text (`display: table`) instead of spanning the slide like the h1
+   divider — so the two never read as the same object at different sizes. */
+
 .reveal .slides > section > h2 {
   position: relative;
-  padding-bottom: 0.35em;
+  display: table;
+  margin: 0 0 0.7em;
+  padding-bottom: 0.3em;
+  font-size: 1.2em;
   border-bottom: 0;
 }
 
@@ -110,6 +124,7 @@
   align-items: center;
   gap: 0.35em;
   margin: 0 0 0.85em;
+  font-size: 1em;
   letter-spacing: 0;
 }
 
