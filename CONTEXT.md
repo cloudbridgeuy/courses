@@ -123,11 +123,12 @@ Kept unchanged: «Qué sigue, más allá del taller» (no longer grouped by vía
 the `::: extra` on SAM/CDK/Terraform (user asked for it explicitly), and all of
 «Desarmar el ambiente». The closing slide is "Muchas Gracias".
 
-**Missing asset**: the closer references `../assets/standards.png`, which does
-not exist — there is no `content/assets/` directory, and images are served only
-from `/static/<name>` through an explicit match arm in
-`crates/server/src/routes.rs`. The image 404s until both the file and its route
-exist.
+The xkcd-927 image is served as `/static/standards.png`, embedded from
+`crates/server/static/` with its own `include_bytes!` constant and match arm in
+`crates/server/src/routes.rs`, like every other image. Content Markdown cannot
+reference the repo-root `assets/` directory: it is gitignored (QA screenshots),
+and the server serves images only from `/static/<name>`. The comic is
+CC BY-NC 2.5, so the guide carries the attribution line under it.
 
 **CloudFormation coverage (2026-08-01).** A gap audit compared sections `07`–`12`
 against the features actually used in `infra/templates/*.yaml`. Eleven features

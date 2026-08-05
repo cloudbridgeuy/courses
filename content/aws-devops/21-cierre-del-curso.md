@@ -62,7 +62,10 @@ A diferencia del manifiesto Agile, no existe un equivalente para DevOps
 
 Asi, que.
 
-![standards](../assets/standards.png)
+![Hay 14 estándares en competencia. Alguien propone uno universal que cubra todos los
+casos. Ahora hay 15 estándares en competencia.](/static/standards.png)
+
+[Fuente: xkcd 927 — *Standards*](https://xkcd.com/927/) (CC BY-NC 2.5)
 
 Este es el mío.
 
