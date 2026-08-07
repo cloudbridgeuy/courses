@@ -1,6 +1,6 @@
 use crate::assets::{
     APPS_JS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets, SHIKI_INIT_JS_PATH,
-    TOGGLE_JS_PATH,
+    TOGGLE_JS_PATH, VARS_JS_PATH,
 };
 use crate::course::{Course, CourseSlug, GuideSection, Session, SessionSlug};
 use crate::error::{Error, Result};
@@ -74,6 +74,7 @@ fn assemble_session(
     let mut uses_syntax_highlighting = false;
     let mut uses_apps = false;
     let mut uses_file_apps = false;
+    let mut uses_vars = false;
     let mut all_slides = Vec::new();
     // Source file of each section / slide, index-aligned, so a cb-goto error
     // after the loop can still name the file it came from.
@@ -110,6 +111,11 @@ fn assemble_session(
                 .iter()
                 .any(|slide| slide.html.contains("<cb-file"));
         uses_apps |= rendered.uses_apps;
+        uses_vars |= rendered.html.contains("class=\"cb-var\"")
+            || rendered
+                .slide_html
+                .iter()
+                .any(|slide| slide.html.contains("class=\"cb-var\""));
         section_files.push(file.as_str());
         slide_files.extend(std::iter::repeat_n(
             file.as_str(),
@@ -154,6 +160,9 @@ fn assemble_session(
     if uses_apps {
         assets.push_script(APPS_JS_PATH);
     }
+    if uses_vars {
+        assets.push_script(VARS_JS_PATH);
+    }
     // `cb-file` creates its code block when apps.js runs, so apps must be
     // registered before Shiki scans the document for language-tagged blocks.
     // `cb-http`, and `cb-eco`, need Shiki too — their response panel highlights
@@ -184,7 +193,7 @@ fn in_file(file: &str, error: &Error) -> Error {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::assets::{APPS_JS_PATH, SHIKI_INIT_JS_PATH, TOGGLE_JS_PATH};
+    use crate::assets::{APPS_JS_PATH, SHIKI_INIT_JS_PATH, TOGGLE_JS_PATH, VARS_JS_PATH};
 
     fn make_section(title: &str, body: &str) -> String {
         format!("+++\ntitle = \"{title}\"\n+++\n{body}")
@@ -502,6 +511,56 @@ mod tests {
             !loaded.session_assets[0]
                 .scripts
                 .contains(&APPS_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn section_with_a_variable_token_injects_vars_script() {
+        let body = "Hola {%su-nombre%}, bienvenido.\n";
+        let files = make_files(&[("01-var.md", make_section("With Var", body))]);
+        let input = CourseInput {
+            slug: "course-var",
+            manifest: &make_manifest_one_session("Course Var", &["01-var.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&VARS_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn section_without_a_variable_token_does_not_inject_vars_script() {
+        let files = make_files(&[("01-plain.md", make_section("Plain", "No variables.\n"))]);
+        let input = CourseInput {
+            slug: "course-no-var",
+            manifest: &make_manifest_one_session("Course No Var", &["01-plain.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            !loaded.session_assets[0]
+                .scripts
+                .contains(&VARS_JS_PATH.to_owned())
+        );
+    }
+
+    #[test]
+    fn a_variable_token_only_inside_a_slide_still_injects_vars_script() {
+        let body = ":::slide\nHola {%su-nombre%}.\n:::\n";
+        let files = make_files(&[("01-slide-var.md", make_section("Slide Var", body))]);
+        let input = CourseInput {
+            slug: "course-slide-var",
+            manifest: &make_manifest_one_session("Course Slide Var", &["01-slide-var.md"]),
+            files: &files,
+        };
+        let loaded = parse_course(&input).unwrap();
+        assert!(
+            loaded.session_assets[0]
+                .scripts
+                .contains(&VARS_JS_PATH.to_owned())
         );
     }
 

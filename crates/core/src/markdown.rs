@@ -12,12 +12,17 @@ use crate::render::escape_html;
 /// Headings get a slug `id` derived from their text, and their text is wrapped
 /// in a self-link (`<a class="cb-hlink" href="#slug">`), so every title is
 /// perma-linkable. Duplicate slugs within one document get `-2`, `-3`, …
+///
+/// A `{%name%}` token — `name` matching `[a-z][a-z0-9_-]*` — renders as the
+/// unfilled display `<span class="cb-var" data-var="name">&lt;name&gt;</span>`.
 pub fn render_markdown(markdown: &str) -> String {
     let options = pulldown_cmark::Options::ENABLE_TABLES
         | pulldown_cmark::Options::ENABLE_FOOTNOTES
         | pulldown_cmark::Options::ENABLE_STRIKETHROUGH;
     let parser = pulldown_cmark::Parser::new_ext(markdown, options);
-    let events = render_mermaid_blocks(open_external_links_in_new_tab(anchor_headings(parser)));
+    let events = wrap_variables(render_mermaid_blocks(open_external_links_in_new_tab(
+        anchor_headings(parser),
+    )));
     let mut html = String::new();
     pulldown_cmark::html::push_html(&mut html, events.into_iter());
     html
@@ -119,6 +124,124 @@ fn render_mermaid_blocks(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
         }
     }
     out
+}
+
+/// Rewrites `{%name%}` tokens — `name` matching `[a-z][a-z0-9_-]*` — into
+/// `<span class="cb-var" data-var="name">&lt;name&gt;</span>`, the unfilled
+/// display for a course content variable.
+///
+/// Tokens are recognized in prose, in fenced-code text, and in inline code
+/// (`Event::Text` and `Event::Code`). A mermaid diagram has already been
+/// collapsed into a single raw `Event::Html` by `render_mermaid_blocks`,
+/// which runs before this pass, so tokens inside a diagram are never
+/// scanned — no separate exclusion is needed.
+fn wrap_variables(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
+    let mut out = Vec::with_capacity(events.len());
+    for event in events {
+        match event {
+            Event::Text(text) => {
+                let segments = split_tokens(&text);
+                if segments.iter().all(|s| matches!(s, Segment::Literal(_))) {
+                    out.push(Event::Text(text));
+                } else {
+                    for segment in segments {
+                        out.push(match segment {
+                            Segment::Literal(literal) => Event::Text(literal.to_owned().into()),
+                            Segment::Var(name) => Event::Html(variable_span_html(name).into()),
+                        });
+                    }
+                }
+            }
+            // The renderer turns a whole `Event::Code` into `<code>…</code>`,
+            // escaping its payload as one unit. A token inside can't be
+            // split out of that, so once one is found the wrapper and its
+            // content are built here instead, as a single raw `Event::Html`.
+            Event::Code(text) => {
+                let segments = split_tokens(&text);
+                if segments.iter().all(|s| matches!(s, Segment::Literal(_))) {
+                    out.push(Event::Code(text));
+                } else {
+                    let mut html = String::from("<code>");
+                    for segment in segments {
+                        match segment {
+                            Segment::Literal(literal) => html.push_str(&escape_html(literal)),
+                            Segment::Var(name) => html.push_str(&variable_span_html(name)),
+                        }
+                    }
+                    html.push_str("</code>");
+                    out.push(Event::Html(html.into()));
+                }
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// One piece of scanned text: either literal prose, kept as-is, or a
+/// variable name that matched the token grammar.
+#[derive(Debug, PartialEq, Eq)]
+enum Segment<'a> {
+    Literal(&'a str),
+    Var(&'a str),
+}
+
+/// Splits `text` on `{%name%}` tokens. Anything that isn't a well-formed
+/// token — unmatched braces, an uppercase or digit-led name, an internal
+/// space — is left as literal text, unchanged.
+fn split_tokens(text: &str) -> Vec<Segment<'_>> {
+    let mut segments = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("{%") {
+        let after_open = &rest[start + 2..];
+        match match_token(after_open) {
+            Some((name, after_token)) => {
+                if start > 0 {
+                    segments.push(Segment::Literal(&rest[..start]));
+                }
+                segments.push(Segment::Var(name));
+                rest = after_token;
+            }
+            None => {
+                // Not a well-formed token: keep the `{%` as literal text and
+                // resume scanning right after it.
+                segments.push(Segment::Literal(&rest[..start + 2]));
+                rest = after_open;
+            }
+        }
+    }
+    if !rest.is_empty() {
+        segments.push(Segment::Literal(rest));
+    }
+    segments
+}
+
+/// If `input` starts with a name matching `[a-z][a-z0-9_-]*` immediately
+/// followed by `%}`, returns the name and the remainder after `%}`.
+fn match_token(input: &str) -> Option<(&str, &str)> {
+    let mut chars = input.char_indices();
+    let (_, first) = chars.next()?;
+    if !first.is_ascii_lowercase() {
+        return None;
+    }
+    let mut end = first.len_utf8();
+    for (idx, c) in chars {
+        if c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_' {
+            end = idx + c.len_utf8();
+        } else {
+            break;
+        }
+    }
+    let (name, after) = input.split_at(end);
+    let after_close = after.strip_prefix("%}")?;
+    Some((name, after_close))
+}
+
+/// The raw markup for a variable token's unfilled display. `name` is
+/// already restricted to `[a-z0-9_-]` by `match_token`, so it needs no
+/// escaping.
+fn variable_span_html(name: &str) -> String {
+    format!("<span class=\"cb-var\" data-var=\"{name}\">&lt;{name}&gt;</span>")
 }
 
 /// True for absolute `http`/`https` URLs — links that leave the site.
@@ -318,5 +441,139 @@ mod tests {
     fn heading_self_link_is_not_marked_external() {
         let html = render_markdown("## Título\n");
         assert!(!html.contains("target=\"_blank\""));
+    }
+
+    // ── variable tokens ──────────────────────────────────────────────────
+
+    #[test]
+    fn token_in_prose_renders_as_var_span() {
+        let html = render_markdown("Cree el repositorio {%su-nombre%}.\n");
+        assert!(
+            html.contains("<span class=\"cb-var\" data-var=\"su-nombre\">&lt;su-nombre&gt;</span>")
+        );
+    }
+
+    #[test]
+    fn token_with_underscore_name_renders_as_var_span() {
+        let html = render_markdown("{%su_nombre%}\n");
+        assert!(
+            html.contains("<span class=\"cb-var\" data-var=\"su_nombre\">&lt;su_nombre&gt;</span>")
+        );
+    }
+
+    #[test]
+    fn token_in_inline_code_renders_as_var_span_inside_code() {
+        let html = render_markdown("Use `taller-{%su-nombre%}`.\n");
+        assert!(html.contains(
+            "<code>taller-<span class=\"cb-var\" data-var=\"su-nombre\">\
+             &lt;su-nombre&gt;</span></code>"
+        ));
+    }
+
+    #[test]
+    fn inline_code_without_token_is_unchanged() {
+        let html = render_markdown("La rama `desarrollo` está activa.\n");
+        assert!(html.contains("<code>desarrollo</code>"));
+    }
+
+    #[test]
+    fn token_in_fenced_code_renders_as_var_span() {
+        let html = render_markdown("```\nexport NAME={%su-nombre%}\n```\n");
+        assert!(html.contains(
+            "export NAME=<span class=\"cb-var\" data-var=\"su-nombre\">\
+             &lt;su-nombre&gt;</span>"
+        ));
+    }
+
+    #[test]
+    fn multiple_tokens_on_one_line_both_render() {
+        let html = render_markdown("{%su-nombre%} y {%su-nombre%} otra vez.\n");
+        let expected = "<span class=\"cb-var\" data-var=\"su-nombre\">&lt;su-nombre&gt;</span>";
+        assert_eq!(html.matches(expected).count(), 2);
+    }
+
+    #[test]
+    fn plain_html_tag_is_not_a_token() {
+        let html = render_markdown("Texto en <b>negrita</b>.\n");
+        assert!(html.contains("<b>negrita</b>"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn dollar_brace_is_not_a_token() {
+        let html = render_markdown("Valor: `${nombre}`.\n");
+        assert!(html.contains("<code>${nombre}</code>"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn spaced_braces_are_not_a_token() {
+        let html = render_markdown("{% bad %}\n");
+        assert!(html.contains("{% bad %}"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn uppercase_name_is_not_a_token() {
+        let html = render_markdown("{%Upper%}\n");
+        assert!(html.contains("{%Upper%}"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn definition_site_literal_angle_brackets_stay_literal() {
+        let html = render_markdown("donde `<su-nombre>` es el primer nombre en minúsculas.\n");
+        assert!(html.contains("<code>&lt;su-nombre&gt;</code>"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn mermaid_block_excludes_token_from_wrapping() {
+        let html = render_markdown("```mermaid\nflowchart LR\n  A[{%su-nombre%}] --> B\n```\n");
+        assert!(html.contains("{%su-nombre%}"));
+        assert!(!html.contains("cb-var"));
+    }
+
+    #[test]
+    fn split_tokens_finds_bare_token() {
+        assert_eq!(
+            split_tokens("{%su-nombre%}"),
+            vec![Segment::Var("su-nombre")]
+        );
+    }
+
+    #[test]
+    fn split_tokens_keeps_surrounding_literal_text() {
+        assert_eq!(
+            split_tokens("hola {%x%} mundo"),
+            vec![
+                Segment::Literal("hola "),
+                Segment::Var("x"),
+                Segment::Literal(" mundo"),
+            ]
+        );
+    }
+
+    #[test]
+    fn split_tokens_empty_input_yields_no_segments() {
+        assert_eq!(split_tokens(""), Vec::new());
+    }
+
+    #[test]
+    fn match_token_rejects_digit_led_name() {
+        assert_eq!(match_token("9x%}"), None);
+    }
+
+    #[test]
+    fn match_token_rejects_missing_closer() {
+        assert_eq!(match_token("su-nombre"), None);
+    }
+
+    #[test]
+    fn match_token_accepts_hyphen_and_underscore() {
+        assert_eq!(
+            match_token("su-nombre_2%}resto"),
+            Some(("su-nombre_2", "resto"))
+        );
     }
 }

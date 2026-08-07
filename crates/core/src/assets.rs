@@ -21,6 +21,9 @@ pub const SHIKI_INIT_JS_PATH: &str = "/static/shiki-init.js";
 pub const CB_WIDGETS_CSS_PATH: &str = "/static/cb-widgets.css";
 /// URL path of the interactive-app widgets bundle, injected when a page uses `:::app` blocks.
 pub const APPS_JS_PATH: &str = "/static/apps.js";
+/// URL path of the content-variable editor script, injected when a guide
+/// page renders a `{%name%}` token.
+pub const VARS_JS_PATH: &str = "/static/vars.js";
 
 /// The stylesheets, and scripts, a rendered page must reference, in order,
 /// without duplicates.

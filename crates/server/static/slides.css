@@ -315,6 +315,32 @@
   border: 0;
 }
 
+/* Content variable tokens (`{%name%}`), unfilled display. Matches the
+   guide's inline-code chip so it reads consistently on both surfaces; the
+   light-slide variant needs its own contrast, same as the code chip above. */
+
+.reveal .cb-var {
+  display: inline-block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.04em 0.34em;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed var(--cb-teal);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.reveal section.cb-light .cb-var {
+  background: #e7ebea;
+  border-color: rgba(31, 122, 112, 0.3);
+  color: var(--cb-ink);
+}
+
+.reveal .cb-var-filled {
+  border-style: solid;
+}
+
 /* File-reference apps use the same compact chrome as a code-block label. Long
    repository paths must not consume a slide's layout while their code is closed. */
 .reveal .cb-file-header {

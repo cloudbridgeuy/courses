@@ -4,6 +4,7 @@ use std::fmt::Write as FmtWrite;
 use crate::assets::{
     APPS_JS_PATH, CB_WIDGETS_CSS_PATH, MERMAID_INIT_JS_PATH, MERMAID_JS_PATH, PageAssets,
     REVEAL_CSS_PATH, REVEAL_JS_PATH, SHIKI_INIT_JS_PATH, SLIDES_CSS_PATH, TOGGLE_JS_PATH,
+    VARS_JS_PATH,
 };
 use crate::catalog::LoadedCourse;
 use crate::course::{Course, Session};
@@ -255,6 +256,17 @@ pub fn render_slideshow_page(
     } else {
         String::new()
     };
+    // Load vars.js only when a slide carries a content-variable token, so
+    // token-free decks stay untouched (mirrors the guide-side check in
+    // catalog.rs, so both sides agree on what counts as "has tokens").
+    let uses_vars = slides_html
+        .iter()
+        .any(|slide| slide.html.contains("class=\"cb-var\""));
+    let vars_script = if uses_vars {
+        format!("<script defer src=\"{VARS_JS_PATH}\"></script>\n")
+    } else {
+        String::new()
+    };
     let uses_syntax_highlighting = slides_html.iter().any(|slide| {
         slide.html.contains("<code class=\"language-")
             || slide.html.contains("<cb-file")
@@ -287,6 +299,7 @@ aria-label=\"Desplazar diapositiva hacia abajo\" aria-hidden=\"true\" disabled><
          <script src=\"{TOGGLE_JS_PATH}\"></script>\n\
          {mermaid_script}\
          {apps_script}\
+         {vars_script}\
          {shiki_script}\
          <script>\
 var cbSlideKey='cb-slide:'+location.pathname;\
@@ -934,6 +947,29 @@ cbScheduleScrollIndicator();},true)"
             html.contains("apps.js"),
             "apps.js script tag must be present when a slide contains a cb-app div"
         );
+    }
+
+    #[test]
+    fn slideshow_page_with_a_cb_var_span_injects_vars_js_script_tag() {
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<span class=\"cb-var\" data-var=\"su-nombre\">&lt;su-nombre&gt;</span>\n"
+                .to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(html.contains(VARS_JS_PATH));
+    }
+
+    #[test]
+    fn slideshow_page_without_a_cb_var_span_skips_vars_js() {
+        let loaded = sample();
+        let slides = vec![SlideFragment {
+            html: "<p>Sin tokens</p>\n".to_owned(),
+            light: false,
+        }];
+        let html = render_slideshow_page(&loaded.course, &loaded.course.sessions[0], &slides);
+        assert!(!html.contains(VARS_JS_PATH));
     }
 
     #[test]
