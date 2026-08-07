@@ -22,7 +22,8 @@ All content uses an impersonal, timeless manual register. No personal subjects, 
   not "Despliegue la aplicación".
 
 Leave untouched: placeholder tokens (`<su-nombre>`, `taller-<su-nombre>`,
-`cpu-alta-<su-nombre>`), English AWS console labels in bold (**Create stack**,
+`cpu-alta-<su-nombre>`), content variable tokens (`{%nombre%}`, `{%region%}`,
+`{%perfil%}`), English AWS console labels in bold (**Create stack**,
 **Next**, **CREATE_COMPLETE**), code blocks, resource and file names, and all
 directive fences and anchors.
 
@@ -48,6 +49,7 @@ directive fences and anchors.
 | `:::add` … `:::` / `:::add visibility=slide` | Visibility filter, transparent (no wrapper markup). `visibility=both` (default): guide AND slide, overriding any enclosing `:::skip`. `visibility=guide`: guide only (like `:::skip`). `visibility=slide`: slide only, also overriding `:::skip`. Any other argument makes it plain Markdown. Top-level content only reaches slides through slide directives, so a top-level `visibility=slide` block renders nowhere |
 | `{#name}` on its own line | Anchors the following subsection (heading through next same-level heading) |
 | `{{name}}` inside a `:::slide` | Embeds the anchored subsection as an exercise hero card |
+| `{%name%}` inline | Content variable token; `name` matches `[a-z][a-z0-9_-]*`. Renders as a fillable `<span class="cb-var">` showing `<name>`; a click-to-fill popover stores the student's value and live-syncs it into open slide decks. Recognized in prose, inline code, and fenced code; NOT inside mermaid diagrams. Malformed tokens (uppercase, digit-led, spaces, unmatched braces) stay literal text |
 | ```` ```mermaid ```` fenced block | Renders a mermaid.js diagram (`<pre class="mermaid">`). Works in guide and slides; mermaid.js loads only on pages that use it |
 
 ### Mermaid diagrams
