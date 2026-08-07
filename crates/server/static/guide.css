@@ -232,6 +232,26 @@ pre code {
   color: inherit;
 }
 
+/* Content variable tokens (`{%name%}`), unfilled display. The chip keeps
+   its own background box so it stays legible both in prose and inside a
+   dark code fence. */
+
+.cb-var {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  background: #eef1f3;
+  border: 1px dashed var(--cb-teal);
+  color: var(--cb-ink);
+  cursor: pointer;
+}
+
+.cb-var-filled {
+  border-style: solid;
+}
+
 /* Code-copy buttons (markup injected by toggle.js) */
 
 .cb-code {
