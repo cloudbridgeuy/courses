@@ -134,7 +134,7 @@ CC BY-NC 2.5, so the guide carries the attribution line under it.
 against the features actually used in `infra/templates/*.yaml`. Eleven features
 appeared in templates the students read without ever being taught, and `06`'s
 bridge answer promised `DependsOn` for Week 2 without delivering it. All are now
-closed, with no new exercises (numbering stays 1–18):
+closed, with no new exercises added:
 
 - `07` — `!Join`/`!Select`/`!GetAZs`/`!Split`/`!FindInMap`, pseudo parameters
   (`AWS::Region`, `AWS::StackName`, `AWS::AccountId`, `AWS::Partition`,
@@ -448,7 +448,7 @@ reload, so it needs neither step.
 | File | Topic | Est. |
 |------|-------|------|
 | `01-introduccion` | DevOps, course objectives, week-by-week narrative (1–4), services table, how-to-use | 15–20 min |
-| `02-codecommit` | Pre-reqs (HTTPS/SSH/Identity Center) · versioning · clone/remote/push · branching · ej. 1–2 | 60–75 min |
+| `02-codecommit` | Pre-reqs (auth: 1 HTTPS · 2 SSH · 3 Identity Center) · versioning · consola CodeCommit · GitOps y estrategias de ramas · práctica guiada en consola (repo, clone/remote/push, branch `dev`, PR, tags, commit ID) — sin ejercicios numerados | 60–75 min |
 | `03-codebuild-ecr` | Build problem · CodeBuild · ECR · `buildspec.yml` · `Dockerfile` deep-dive (re-tagging, monorepo, hadolint, cache, pull-through cache) · create ECR + CodeBuild project + IAM · run build · ECR beyond push (lifecycle, replication, cross-account/public access, scanning) · ej. 3–6 | 100–120 min |
 | `04-despliegue` | CloudFormation as black box · launch stack · ej. 7 | 30–45 min |
 | `05-teardown` | Tear down + recreate ("el seguro del taller") · ej. 8 | 30–40 min |
@@ -495,9 +495,10 @@ Week 3.
   and repoints both Dockerfile `FROM` lines at
   `<account>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/…` — same
   digests as Docker Hub (verified identical 2026-07-31), so the `@sha256:` pins
-  don't change. Exercises renumbered course-wide to be continuous 1–18 (04: ej. 7,
-  05: ej. 8, week 2+ shifted +2). The GitHub snapshot must be
-  republished so students actually clone them.
+  don't change. Exercises renumbered course-wide (04: ej. 7, 05: ej. 8, week 2+
+  shifted +2); on 2026-08-07 `02-codecommit`'s ej. 1–2 were folded into its
+  guided practice, so numbered exercises now run **3–18**. The GitHub snapshot
+  must be republished so students actually clone them.
 - Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
 - Instructor-provided CloudFormation templates (in `infra/templates/`): Week 1
