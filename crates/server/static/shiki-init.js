@@ -49,6 +49,33 @@ window.cbShiki = {
   },
 };
 
+// A fence's `code` element can hold content-variable token spans
+// (`<span class="cb-var" data-var="name">`) alongside plain text nodes.
+// `codeToHtml` only ever sees the flattened string (`code.textContent`), so
+// rebuilding the block would otherwise drop those spans. This walks the same
+// child nodes in the same order and records each token's `{start, end}`
+// character range in that flattened string, so shiki can be asked to paint
+// the identical `class`/`data-var` markup back onto the ranges it rebuilds.
+function cbVarDecorations(code) {
+  const decorations = [];
+  let offset = 0;
+  for (const node of code.childNodes) {
+    const text = node.textContent || '';
+    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('cb-var')) {
+      const name = node.dataset.var;
+      if (name) {
+        decorations.push({
+          start: offset,
+          end: offset + text.length,
+          properties: { class: 'cb-var', 'data-var': name },
+        });
+      }
+    }
+    offset += text.length;
+  }
+  return decorations;
+}
+
 (async function highlightCodeBlocks() {
   const blocks = Array.from(
     document.querySelectorAll('pre:not(.mermaid) > code[class*="language-"]'),
@@ -69,6 +96,7 @@ window.cbShiki = {
       const html = await codeToHtml(code.textContent || '', {
         lang: languageClass.slice('language-'.length),
         theme: TOKYONIGHT_STORM,
+        decorations: cbVarDecorations(code),
       });
       const template = document.createElement('template');
       template.innerHTML = html.trim();
@@ -77,6 +105,10 @@ window.cbShiki = {
 
       highlighted.classList.add('cb-code-block');
       pre.replaceWith(highlighted);
+      // The rebuilt block carries fresh (unfilled) token spans; apply the
+      // page's stored values to them right away. `vars.js` only runs on
+      // pages that actually declare a token, so this is undefined elsewhere.
+      window.cbVars?.apply?.();
     }));
   } catch (error) {
     // A failed grammar or an unavailable CDN leaves the original, readable
