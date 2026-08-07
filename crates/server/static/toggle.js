@@ -164,7 +164,10 @@ document.addEventListener("DOMContentLoaded", () => {
     copy.setAttribute("aria-label", "Copiar código");
     copy.addEventListener("click", async () => {
       try {
-        const text = code.textContent;
+        // Resolve the code element fresh on each click: shiki's client-side
+        // highlighter replaces the original <pre> after load, detaching the
+        // node captured above. Re-querying `wrap` always finds the live one.
+        const text = wrap.querySelector("code")?.textContent ?? "";
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
