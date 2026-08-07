@@ -211,7 +211,7 @@ El pipeline vigila `main` y despliega sobre el servicio de ECS. Si se dispara en
 del teardown, vuelve a tocar recursos que se están borrando.
 
 1. Abrir [**CodePipeline**](https://console.aws.amazon.com/codesuite/codepipeline/home),
-   entrar a `taller-aws-<su-nombre>-pipeline`, y pulsar **Delete pipeline**. La regla de
+   entrar a `taller-aws-{%nombre%}-pipeline`, y pulsar **Delete pipeline**. La regla de
    notificación de la Semana 3 se va con él.
 2. El auto scaling no hace falta tocarlo: la política vive dentro del servicio, y
    desaparece con el stack de aplicación.
@@ -223,11 +223,11 @@ este orden, esperando el `DELETE_COMPLETE` de cada uno antes de seguir:
 
 | Orden | Stack | Qué se lleva |
 | --- | --- | --- |
-| 1 | `taller-aws-<su-nombre>-eco` (si se creó) | El servicio de eco, su task definition, su target group, su regla del listener, y su grupo de logs. |
-| 2 | `taller-aws-<su-nombre>-app` | Lo mismo, para la aplicación principal. |
-| 3 | `taller-aws-<su-nombre>-datos` | El stack, pero **no la tabla**. |
-| 4 | `taller-aws-<su-nombre>-plataforma` | El clúster, el balanceador, los listeners, y —si se activó HTTPS— el certificado de ACM y los registros de Route 53. |
-| 5 | `taller-aws-<su-nombre>-red` | La VPC, las subredes, y los grupos de seguridad. |
+| 1 | `taller-aws-{%nombre%}-eco` (si se creó) | El servicio de eco, su task definition, su target group, su regla del listener, y su grupo de logs. |
+| 2 | `taller-aws-{%nombre%}-app` | Lo mismo, para la aplicación principal. |
+| 3 | `taller-aws-{%nombre%}-datos` | El stack, pero **no la tabla**. |
+| 4 | `taller-aws-{%nombre%}-plataforma` | El clúster, el balanceador, los listeners, y —si se activó HTTPS— el certificado de ACM y los registros de Route 53. |
+| 5 | `taller-aws-{%nombre%}-red` | La VPC, las subredes, y los grupos de seguridad. |
 
 Los stacks 1 y 2 se pueden borrar a la vez —ninguno importa nada del otro—, y lo mismo
 vale para el 3 y el 4 entre sí. Lo que no se puede es adelantar el 5.
@@ -235,7 +235,7 @@ vale para el 3 y el 4 entre sí. Lo que no se puede es adelantar el 5.
 Con la CLI, el orden se expresa esperando:
 
 ```bash
-TALLER=taller-aws-<su-nombre>
+TALLER=taller-aws-{%nombre%}
 for stack in "$TALLER-eco" "$TALLER-app" "$TALLER-datos" \
              "$TALLER-plataforma" "$TALLER-red"; do
   aws cloudformation delete-stack --stack-name "$stack"
@@ -274,12 +274,12 @@ se creó a mano por la consola, y por eso no se borra sola:
 
 | Recurso | Servicio |
 | --- | --- |
-| Repositorio `taller-aws-<su-nombre>` | CodeCommit |
-| Proyecto `taller-aws-<su-nombre>-build` | CodeBuild |
-| Repositorio `taller-aws-<su-nombre>`, con sus imágenes | ECR |
-| El bucket de artefactos que creó CodePipeline (`codepipeline-<región>-…`) | S3 |
-| El dashboard, y la alarma `cpu-alta-<su-nombre>` | CloudWatch |
-| El grupo de logs `/aws/codebuild/taller-aws-<su-nombre>-build` | CloudWatch Logs |
+| Repositorio `taller-aws-{%nombre%}` | CodeCommit |
+| Proyecto `taller-aws-{%nombre%}-build` | CodeBuild |
+| Repositorio `taller-aws-{%nombre%}`, con sus imágenes | ECR |
+| El bucket de artefactos que creó CodePipeline (`codepipeline-{%region%}-…`) | S3 |
+| El dashboard, y la alarma `cpu-alta-{%nombre%}` | CloudWatch |
+| El grupo de logs `/aws/codebuild/taller-aws-{%nombre%}-build` | CloudWatch Logs |
 | Los roles de servicio que crearon las consolas (`codebuild-…`, `AWSCodePipelineServiceRole-…`) | IAM |
 | El tipo `CloudBridge::Taller::App::MODULE`, si se hizo la práctica de módulos | CloudFormation Registry |
 
@@ -316,7 +316,7 @@ tabla. Entonces se leen como una advertencia.
 ### Confirmar que no queda nada
 
 1. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home), filtrar
-   por `taller-aws-<su-nombre>`. La lista debe quedar vacía.
+   por `taller-aws-{%nombre%}`. La lista debe quedar vacía.
 2. Abrir la última **UrlBase** conocida: el navegador debe dar un error de conexión.
 3. Pasar un barrido por lo que suele quedar atrás:
 

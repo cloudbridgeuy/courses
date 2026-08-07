@@ -134,14 +134,14 @@ es una **suscripción HTTPS** al endpoint del instructor.
    y entrar al pipeline.
 2. Abrir el menu de navegación para ir a la opción **Settings** y luego, hacer
    click en la pestaña **Notifications**, pulsar **Create notification rule**.
-3. En **Notification name**, escribir `taller-aws-<su-nombre>-pipeline-notification`.
+3. En **Notification name**, escribir `taller-aws-{%nombre%}-pipeline-notification`.
 4. En **Detail type**, elegir **Full**. En **Events that trigger notifications**, marcar
    al menos:
    - **Pipeline execution: Succeeded**
    - **Pipeline execution: Failed**
    - **Manual approval: Needed**
 5. En **Targets**, pulsar **Create target → SNS topic** y completar el nombre después del
-   prefijo `codestar-notifications-`: `codestar-notifications-taller-aws-<su-nombre>`. Pulsar
+   prefijo `codestar-notifications-`: `codestar-notifications-taller-aws-{%nombre%}`. Pulsar
    **Create**. Crear el tema desde aquí aplica solo la política que permite a las reglas
    de notificación publicar en él.
 6. Pulsar **Submit**.
@@ -156,7 +156,7 @@ tema compartido sí sería el destino directo.
 
 ### Suscribir la aplicación del taller al tema
 
-1. Abrir [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics) y entrar al tema `codestar-notifications-taller-aws-<su-nombre>`.
+1. Abrir [**SNS → Topics**](https://console.aws.amazon.com/sns/v3/home#/topics) y entrar al tema `codestar-notifications-taller-aws-{%nombre%}`.
 2. Pulsar **Create subscription**. En **Protocol**, elegir **HTTPS**.
 3. En **Endpoint**, pegar la URL de la aplicación del taller:
 

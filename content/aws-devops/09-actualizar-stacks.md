@@ -123,14 +123,14 @@ template y aplicando el cambio con un change set.
 
 ### Crear el change set
 
-1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-aws-<su-nombre>`.
+1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home) y seleccionar el stack `taller-aws-{%nombre%}`.
 2. Pulsar **Stack actions → Create a change set**.
 3. En **Change set type** seleccionar **Drift aware change set - new**.
 4. Seleccionar **Replace existing template → Upload a template file**, y subir el
    archivo modificado.
 5. Avanzar por las pantallas (los parámetros siguen igual) hasta llegar a la
    vista del change set, nombrandolo algo como
-   `taller-aws-<nombre>-escalar-a-dos`, y aceptando las capabilities durante el
+   `taller-aws-{%nombre%}-escalar-a-dos`, y aceptando las capabilities durante el
    camino.
 6. Pulsar **Create change set**.
 
@@ -138,7 +138,7 @@ Con la `awscli`, subir el template y crear el change set es un solo comando. Cad
 parámetro existente se conserva con `UsePreviousValue=true`:
 
 ```bash
-export TALLER="taller-aws-<nombre>"
+export TALLER="taller-aws-{%nombre%}"
 
 aws cloudformation create-change-set \
    --stack-name $TALLER \

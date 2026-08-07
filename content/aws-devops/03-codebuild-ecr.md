@@ -714,7 +714,7 @@ segundos cuando el código no cambió, y de pocos minutos cuando sí.
 ### Crear el repositorio de imágenes
 
 1. Pulsar **Create repository**.
-2. En **Repository name**, escribir `taller-aws-<su-nombre>` (el mismo nombre usado
+2. En **Repository name**, escribir `taller-aws-{%nombre%}` (el mismo nombre usado
    en CodeCommit, por consistencia).
 3. Dejar **Image tag mutability** en **Mutable** — esto permite reutilizar etiquetas
    como `latest` entre builds sucesivos. Es una simplificación para el laboratorio;
@@ -734,9 +734,9 @@ necesitará al configurar CodeBuild.
 
 ### Configurar la fuente
 
-1. En **Project name**, escribir `taller-aws-<su-nombre>-build`.
+1. En **Project name**, escribir `taller-aws-{%nombre%}-build`.
 2. En la sección **Source**, seleccionar **Source provider: AWS CodeCommit**.
-3. En **Repository**, seleccionar el repositorio `taller-aws-<su-nombre>`.
+3. En **Repository**, seleccionar el repositorio `taller-aws-{%nombre%}`.
 4. En **Reference type**, seleccionar **Branch** y elegir `main`.
 
 ::: info
@@ -757,7 +757,7 @@ crear un tag, según las reglas de promoción acordadas por el equipo.
       `aws/codebuild/amazonlinux-x86_64-standard:6.0`).
     - **Image version**: **Always use the latest image for this runtime version**.
 2. En **Service role**, seleccionar **New service role**. La consola propone el
-    nombre en **Role name** (`codebuild-taller-aws-<su-nombre>-build-service-role`).
+    nombre en **Role name** (`codebuild-taller-aws-{%nombre%}-build-service-role`).
     Anotarlo —será necesario agregarle permisos de ECR a continuación.
 3. Expandir **Additional configuration** y:
     - En **Privileged**, activar la casilla **Enable this flag if you want to build
@@ -784,7 +784,7 @@ El rol creado automáticamente puede acceder a CodeCommit, pero aún no tiene pe
 para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
 
 1. En una nueva pestaña del navegador, abrir [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles) y buscar el rol recién
-    creado (su nombre comienza con `codebuild-taller-aws-<su-nombre>`).
+    creado (su nombre comienza con `codebuild-taller-aws-{%nombre%}`).
 2. Pulsar **Add permissions → Attach policies**.
 3. Buscar `AmazonEC2ContainerRegistryPowerUser` y seleccionarlo.
 4. Pulsar **Add permissions**. Volver a la pestaña de CodeBuild.
@@ -797,7 +797,7 @@ para publicar en ECR. Seguir estos pasos **antes** de ejecutar el build:
     | Name | Value | Type |
     |------|-------|------|
     | `AWS_ACCOUNT_ID` | El ID de la cuenta AWS (12 dígitos, sin guiones) | Plaintext |
-    | `IMAGE_REPO_NAME` | `taller-aws-<su-nombre>` | Plaintext |
+    | `IMAGE_REPO_NAME` | `taller-aws-{%nombre%}` | Plaintext |
     | `IMAGE_TAG` | `latest` | Plaintext |
 
     > **Tip:** el ID de cuenta se encuentra en la esquina superior derecha de la consola,
@@ -840,14 +840,14 @@ de cada build queda guardado en **CloudWatch Logs**:
 1. Encima del log, pulsar el enlace **View entire log**. Se abre el *log stream* de
     ese build en CloudWatch Logs.
 2. El mismo destino se alcanza desde [**CloudWatch → Logs → Log Management**](https://console.aws.amazon.com/cloudwatch/home#logsV2:log-groups):
-    CodeBuild crea un grupo por proyecto (`/aws/codebuild/taller-aws-<su-nombre>-build`)
+    CodeBuild crea un grupo por proyecto (`/aws/codebuild/taller-aws-{%nombre%}-build`)
     y, dentro, un *stream* por build, identificado por el ID del build. En el stream,
     el campo **Filter events** busca texto en todo el log. Por ejemplo,
     `"Tags resueltos"` localiza el bloque impreso al final de `pre_build`.
 3. Con la CLI:
 
     ```bash
-    export TALLER=taller-aws-<su-nombre>
+    export TALLER=taller-aws-{%nombre%}
     aws logs tail "/aws/codebuild/$TALLER-build" --since 1h
     ```
 
@@ -856,7 +856,7 @@ de cada build queda guardado en **CloudWatch Logs**:
 
 ### Verificar la imagen en ECR
 
-1. Volver a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abrir el repositorio `taller-aws-<su-nombre>`.
+1. Volver a la [consola de ECR](https://console.aws.amazon.com/ecr/home) y abrir el repositorio `taller-aws-{%nombre%}`.
 2. En la pestaña **Images**, se verá una fila por etiqueta recién publicada: `latest`,
    `branch-main`, el SHA corto y el SHA completo del commit —los mismos tags que el
    log imprimió al final de `pre_build`, más `cache`. El cache de capas que buildx
@@ -977,7 +977,7 @@ hacer *pull*. Para que sea segura:
 - **Conceder solo las acciones de pull**: `ecr:BatchGetImage`,
   `ecr:GetDownloadUrlForLayer` y `ecr:BatchCheckLayerAvailability`. Nunca `ecr:*`.
 - **Nombrar a los consumidores de forma explícita**: el ARN de cada cuenta
-  (`arn:aws:iam::<cuenta>:root`) o, mejor dentro de una organización, la condición
+  (`arn:aws:iam::{%cuenta%}:root`) o, mejor dentro de una organización, la condición
   `aws:PrincipalOrgID` — cualquier cuenta de la organización, y nadie más:
 
   ```json
@@ -1085,13 +1085,13 @@ lo que aquí aparece como un *toast*, en la organización aparecería en un cana
 {#ejercicio-3}
 ### Ejercicio 3 — Crear el repositorio de imágenes
 
-Crear un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>`.
+Crear un repositorio privado en Amazon ECR con el nombre `taller-aws-{%nombre%}`.
 
 ::: solucion
 1. Abrir [**Elastic Container Registry**](https://console.aws.amazon.com/ecr/home).
 2. En el panel lateral, seleccionar **Private registry → Repositories**.
 3. Pulsar **Create repository**.
-4. En **Repository name**, escribir `taller-aws-<su-nombre>`.
+4. En **Repository name**, escribir `taller-aws-{%nombre%}`.
 5. Dejar **Image tag mutability** en **Mutable**.
 6. Pulsar **Create repository**.
 7. En la lista de repositorios, pulsar sobre el nombre del repositorio recién creado.
@@ -1101,7 +1101,7 @@ Crear un repositorio privado en Amazon ECR con el nombre `taller-aws-<su-nombre>
    Con la CLI:
 
    ```bash
-   export TALLER=taller-aws-<su-nombre>
+   export TALLER=taller-aws-{%nombre%}
    aws ecr describe-repositories \
      --repository-names "$TALLER" \
      --query 'repositories[0].repositoryUri' \
@@ -1132,7 +1132,7 @@ etiqueta `latest`.
 
 ::: solucion
 1. En la consola de AWS, abrir [**CodeBuild**](https://console.aws.amazon.com/codesuite/codebuild/home) y pulsar **Create project**.
-2. En **Project name**, escribir `taller-aws-<su-nombre>-build`.
+2. En **Project name**, escribir `taller-aws-{%nombre%}-build`.
 3. En **Source provider**, seleccionar **AWS CodeCommit** y luego el repositorio.
 4. En **Reference type**, elegir **Branch → main**.
 
@@ -1189,18 +1189,18 @@ se construye siempre el `HEAD` de `main`.
 10. En **Additional configuration → Compute**, seleccionar **4 vCPUs, 8 GiB memory**.
 11. En **Additional configuration → Environment variables**, agregar:
     - `AWS_ACCOUNT_ID` = el ID de la cuenta (12 dígitos)
-    - `IMAGE_REPO_NAME` = `taller-aws-<su-nombre>`
+    - `IMAGE_REPO_NAME` = `taller-aws-{%nombre%}`
     - `IMAGE_TAG` = `latest`
 12. En **Buildspec**, bajo **Build specifications**, seleccionar **Use a buildspec
     file** (la consola preselecciona **Insert build commands**) y dejar **Buildspec
     name** vacío para que use el `buildspec.yml` de la raíz del repositorio.
 13. En **Artifacts**, seleccionar **No artifacts**.
 14. Pulsar **Create build project**.
-15. En [IAM](https://console.aws.amazon.com/iam/home), buscar el rol cuyo nombre comienza con `codebuild-taller-aws-<su-nombre>`,
+15. En [IAM](https://console.aws.amazon.com/iam/home), buscar el rol cuyo nombre comienza con `codebuild-taller-aws-{%nombre%}`,
     adjuntarle la política `AmazonEC2ContainerRegistryPowerUser`. Con la CLI:
 
     ```bash
-    export TALLER=taller-aws-<su-nombre>
+    export TALLER=taller-aws-{%nombre%}
     ROLE=$(aws iam list-roles \
       --query "Roles[?starts_with(RoleName, 'codebuild-$TALLER')].RoleName" \
       --output text)
@@ -1211,7 +1211,7 @@ se construye siempre el `HEAD` de `main`.
 16. Volver a CodeBuild, abrir el proyecto, y pulsar **Start build**.
 17. En la pestaña **Build logs**, seguir la ejecución hasta que el estado sea
     **Succeeded**. El log completo queda en CloudWatch Logs (**View entire log**, o
-    el grupo `/aws/codebuild/taller-aws-<su-nombre>-build`); con la CLI:
+    el grupo `/aws/codebuild/taller-aws-{%nombre%}-build`); con la CLI:
     `aws logs tail "/aws/codebuild/$TALLER-build" --since 1h`.
 18. En ECR, abrir el repositorio y confirmar las entradas con la fecha de hace unos
     minutos: la imagen con sus cuatro tags (`latest`, `branch-main`, SHA corto y SHA
@@ -1254,7 +1254,7 @@ duraciones en el historial del proyecto.
 
 ::: solucion
 1. Abrir [**CodeBuild**](https://console.aws.amazon.com/codesuite/codebuild/home),
-   entrar al proyecto `taller-aws-<su-nombre>-build` y pulsar **Edit**.
+   entrar al proyecto `taller-aws-{%nombre%}-build` y pulsar **Edit**.
 2. Desplazarse hasta la sección **Artifacts** y expandir **Additional configuration**.
 3. En **Cache**, seleccionar **Local**, y marcar las casillas **Source cache** y
    **Docker layer cache** (esta última requiere **Privileged**, que ya quedó
@@ -1299,7 +1299,7 @@ a descargar `rust` ni `debian` desde Docker Hub.
    `pull-through-cache`:
 
    ```bash
-   export TALLER=taller-aws-<su-nombre>
+   export TALLER=taller-aws-{%nombre%}
    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
    ROLE=$(aws iam list-roles \
      --query "Roles[?starts_with(RoleName, 'codebuild-$TALLER')].RoleName" \
@@ -1331,11 +1331,11 @@ a descargar `rust` ni `debian` desde Docker Hub.
    Docker Hub, así que los pins `@sha256:` no cambian —solo cambia el host:
 
    ```dockerfile
-   FROM <AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS chef
+   FROM {%cuenta%}.dkr.ecr.{%region%}.amazonaws.com/ecr-public/docker/library/rust:1.95-slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS chef
    ```
 
    ```dockerfile
-   FROM <AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/ecr-public/docker/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+   FROM {%cuenta%}.dkr.ecr.{%region%}.amazonaws.com/ecr-public/docker/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
    ```
 
 6. Confirmar y publicar el cambio: `git add Dockerfile`, `git commit`, `git push`.

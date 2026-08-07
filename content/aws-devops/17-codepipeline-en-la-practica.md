@@ -97,7 +97,7 @@ desde el principio:
 | Rol | Quién lo asume | Para qué |
 | --- | --- | --- |
 | El del pipeline (`AWSCodePipelineServiceRole-…`) | CodePipeline | Leer el repositorio, lanzar el build, llamar a CloudFormation, y **pasar** el segundo rol |
-| `taller-aws-<su-nombre>-cfn-deploy` | CloudFormation | Crear, modificar, y borrar los recursos del stack |
+| `taller-aws-{%nombre%}-cfn-deploy` | CloudFormation | Crear, modificar, y borrar los recursos del stack |
 
 El asistente crea el primero, pero solo con los permisos de las etapas que **él** configura;
 como este pipeline salta la etapa de despliegue, ese rol queda sin permisos de
@@ -112,18 +112,18 @@ pide por nombre, y no ofrece crearlo.
 3. Pulsar **Next**, y adjuntar las políticas **PowerUserAccess** y **IAMFullAccess**.
    `IAMFullAccess` no es opcional: el template de la aplicación crea el rol de tarea y el
    de ejecución, y sin permiso sobre IAM el stack falla a mitad de camino.
-4. En **Role name**, escribir `taller-aws-<su-nombre>-cfn-deploy`, y pulsar **Create role**.
+4. En **Role name**, escribir `taller-aws-{%nombre%}-cfn-deploy`, y pulsar **Create role**.
 
 El mismo rol, desde CloudShell:
 
 ```bash
 aws iam create-role \
-  --role-name taller-aws-<su-nombre>-cfn-deploy \
+  --role-name taller-aws-{%nombre%}-cfn-deploy \
   --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"cloudformation.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 
 for P in PowerUserAccess IAMFullAccess; do
   aws iam attach-role-policy \
-    --role-name taller-aws-<su-nombre>-cfn-deploy \
+    --role-name taller-aws-{%nombre%}-cfn-deploy \
     --policy-arn "arn:aws:iam::aws:policy/$P"
 done
 ```
@@ -135,13 +135,13 @@ no existe, y no se queja hasta que se pulsa **Save**. Ahí aparece
 ```
 AccessDeniedException
 User: arn:aws:sts::…:assumed-role/… is not authorized to perform:
-iam:PassRole on resource: taller-aws-<su-nombre>-cfn-deploy
+iam:PassRole on resource: taller-aws-{%nombre%}-cfn-deploy
 ```
 
 y se lee como un problema de permisos, aunque quien guarda sea administrador. No lo es: el
 rol **no existe**, IAM no puede resolver el nombre a un ARN (por eso el mensaje muestra el
 nombre pelado, y no un ARN), y la respuesta a un recurso que no existe es `AccessDenied`.
-Se verifica con `aws iam get-role --role-name taller-aws-<su-nombre>-cfn-deploy`: si
+Se verifica con `aws iam get-role --role-name taller-aws-{%nombre%}-cfn-deploy`: si
 contesta `NoSuchEntity`, falta este paso.
 :::
 
@@ -191,7 +191,7 @@ test stage**, **Add deploy stage**, y **Review**.
 
 ### Choose pipeline settings (Step 2 of 7)
 
-1. En **Pipeline name**, escribir `taller-aws-<su-nombre>-pipeline`.
+1. En **Pipeline name**, escribir `taller-aws-{%nombre%}-pipeline`.
 2. En **Service role**, dejar **New service role**: CodePipeline crea el rol con los
    permisos que el pipeline necesita.
 3. Dejar **Advanced settings** como viene, y pulsar **Next**.
@@ -199,7 +199,7 @@ test stage**, **Add deploy stage**, y **Review**.
 ### Add source stage (Step 3 of 7)
 
 1. En **Source provider**, seleccionar **AWS CodeCommit**.
-2. En **Repository name**, elegir `taller-aws-<su-nombre>`; en **Branch name**, `main`.
+2. En **Repository name**, elegir `taller-aws-{%nombre%}`; en **Branch name**, `main`.
 3. Dejar marcado **Create EventBridge rule to automatically detect source changes**: esa
    regla es la que hace que un `git push` a `main` **dispare el pipeline
    automáticamente**. Sin ella, el pipeline solo corre a mano.
@@ -240,7 +240,7 @@ un `buildspec.yml` mal escrito, un permiso que falta, vuelve a fallar igual.
 
 1. En **Build provider**, seleccionar **Other build providers -> AWS CodeBuild**, y dejar la **Region** del
    pipeline.
-2. En **Project name**, elegir `taller-aws-<su-nombre>-build` (el de la Semana 1).
+2. En **Project name**, elegir `taller-aws-{%nombre%}-build` (el de la Semana 1).
 3. Pulsar **Next**.
 
 ### Add test stage (Step 5 of 7)
@@ -272,22 +272,22 @@ vuelven a generar la política: el rol se calcula una sola vez, al crear el pipe
 El síntoma llega recién en la primera ejecución de `ChangeSet`, y la acción falla así:
 
 ```
-User: arn:aws:sts::…:assumed-role/AWSCodePipelineServiceRole-us-east-2-taller-aws-<su-nombre>-pipeline/…
+User: arn:aws:sts::…:assumed-role/AWSCodePipelineServiceRole-us-east-2-taller-aws-{%nombre%}-pipeline/…
 is not authorized to perform: cloudformation:DescribeStacks on resource:
-arn:aws:cloudformation:us-east-2:…:stack/taller-aws-<su-nombre>-app/…
+arn:aws:cloudformation:us-east-2:…:stack/taller-aws-{%nombre%}-app/…
 because no identity-based policy allows the cloudformation:DescribeStacks action
 ```
 
 Con dos roles en juego, lo primero es leer **quién** es el `User` del mensaje: dice
-`AWSCodePipelineServiceRole-…`, el del pipeline, y no `taller-aws-<su-nombre>-cfn-deploy`.
+`AWSCodePipelineServiceRole-…`, el del pipeline, y no `taller-aws-{%nombre%}-cfn-deploy`.
 Lo que falta es el permiso de **llamar** a CloudFormation, no el de crear los recursos del
 stack. Un `PowerUserAccess` de más en el rol de despliegue no arregla nada.
 
 1. Abrir [**IAM → Roles**](https://console.aws.amazon.com/iam/home#/roles), y buscar
-   `AWSCodePipelineServiceRole-<región>-taller-aws-<su-nombre>-pipeline`.
+   `AWSCodePipelineServiceRole-{%region%}-taller-aws-{%nombre%}-pipeline`.
 2. En **Permissions**, pulsar **Add permissions → Create inline policy**, y cambiar a la
    pestaña **JSON**.
-3. Pegar la política, reemplazando `<su-nombre>`:
+3. Pegar la política, reemplazando `{%nombre%}`:
 
    ```json
    {
@@ -306,8 +306,8 @@ stack. Un `PowerUserAccess` de más en el rol de despliegue no arregla nada.
            "cloudformation:SetStackPolicy"
          ],
          "Resource": [
-           "arn:aws:cloudformation:*:*:stack/taller-aws-<su-nombre>-*/*",
-           "arn:aws:cloudformation:*:*:changeSet/taller-aws-<su-nombre>-*/*"
+           "arn:aws:cloudformation:*:*:stack/taller-aws-{%nombre%}-*/*",
+           "arn:aws:cloudformation:*:*:changeSet/taller-aws-{%nombre%}-*/*"
          ]
        },
        {
@@ -321,7 +321,7 @@ stack. Un `PowerUserAccess` de más en el rol de despliegue no arregla nada.
        {
          "Effect": "Allow",
          "Action": "iam:PassRole",
-         "Resource": "arn:aws:iam::*:role/taller-aws-<su-nombre>-cfn-deploy"
+         "Resource": "arn:aws:iam::*:role/taller-aws-{%nombre%}-cfn-deploy"
        }
      ]
    }
@@ -334,7 +334,7 @@ rol no hace falta escribirlo: sale del pipeline.
 
 ```bash
 ROL=$(aws codepipeline get-pipeline \
-  --name taller-aws-<su-nombre>-pipeline \
+  --name taller-aws-{%nombre%}-pipeline \
   --query 'pipeline.roleArn' --output text | cut -d/ -f3)
 
 aws iam put-role-policy \
@@ -343,7 +343,7 @@ aws iam put-role-policy \
   --policy-document file://politica.json
 ```
 
-El primer bloque cubre los stacks del taller por **prefijo**, `taller-aws-<su-nombre>-*`, y
+El primer bloque cubre los stacks del taller por **prefijo**, `taller-aws-{%nombre%}-*`, y
 no uno por uno. Es a propósito: la lista de stacks crece durante el taller (`-app`, `-eco`,
 y las copias que salen de las pruebas, como un `-eco2`), y una lista cerrada obliga a volver
 a IAM cada vez. El prefijo sigue siendo un límite real —el rol no toca ningún stack de otra
@@ -356,7 +356,7 @@ CloudFormation autoriza contra el ARN del **stack**. El mensaje de error lo mues
 
 ```
 is not authorized to perform: cloudformation:DescribeChangeSet on resource:
-arn:aws:cloudformation:us-east-2:…:stack/taller-aws-<su-nombre>-eco2/…
+arn:aws:cloudformation:us-east-2:…:stack/taller-aws-{%nombre%}-eco2/…
 ```
 
 `DescribeChangeSet` sobre un recurso `stack/…`. Poner las dos formas evita adivinar cuál de
@@ -385,8 +385,8 @@ con `--no-execute-changeset`. En un pipeline, cada mitad es una acción.
 | **Region** | la del pipeline |
 | **Input artifacts** | `BuildArtifact` |
 | **Action mode** | **Create or replace a change set** |
-| **Stack name** | `taller-aws-<su-nombre>-app` |
-| **Change set name** | `taller-aws-<su-nombre>-app-cs` |
+| **Stack name** | `taller-aws-{%nombre%}-app` |
+| **Change set name** | `taller-aws-{%nombre%}-app-cs` |
 | **Template — Artifact name** | `BuildArtifact` |
 | **Template — File name** | `infra/templates/taller-aws-devops-semana3-app.yaml` |
 | **Capabilities** | `CAPABILITY_IAM` |
@@ -394,15 +394,15 @@ con `--no-execute-changeset`. En un pipeline, cada mitad es una acción.
 Los campos que quedan —**Template configuration**, **Output file name**, **Variable
 namespace**, **Output artifacts**— se dejan vacíos.
 
-3. Más abajo, en **Role name**, elegir `taller-aws-<su-nombre>-cfn-deploy`.
+3. Más abajo, en **Role name**, elegir `taller-aws-{%nombre%}-cfn-deploy`.
 4. Abrir **Advanced**, y en **Parameter overrides** pegar:
 
    ```json
    {
      "ImageUri": { "Fn::GetParam": ["BuildArtifact", "imagen.json", "ImageUri"] },
-     "RedStackName": "taller-aws-<su-nombre>-red",
-     "DatosStackName": "taller-aws-<su-nombre>-datos",
-     "PlataformaStackName": "taller-aws-<su-nombre>-plataforma"
+     "RedStackName": "taller-aws-{%nombre%}-red",
+     "DatosStackName": "taller-aws-{%nombre%}-datos",
+     "PlataformaStackName": "taller-aws-{%nombre%}-plataforma"
    }
    ```
 
@@ -441,8 +441,8 @@ en CloudFormation, con la lista exacta de lo que va a cambiar. Se revisa en
 | **Region** | la del pipeline |
 | **Input artifacts** | vacío |
 | **Action mode** | **Execute a change set** |
-| **Stack name** | `taller-aws-<su-nombre>-app` |
-| **Change set name** | `taller-aws-<su-nombre>-app-cs` |
+| **Stack name** | `taller-aws-{%nombre%}-app` |
+| **Change set name** | `taller-aws-{%nombre%}-app-cs` |
 
 3. Guardar la acción, y pulsar **Save** para confirmar la edición del pipeline.
 
@@ -463,8 +463,8 @@ un grupo nuevo debajo.
 | Campo | Valor |
 | --- | --- |
 | **Action name** | `eco-changeset` |
-| **Stack name** | `taller-aws-<su-nombre>-eco` |
-| **Change set name** | `taller-aws-<su-nombre>-eco-cs` |
+| **Stack name** | `taller-aws-{%nombre%}-eco` |
+| **Change set name** | `taller-aws-{%nombre%}-eco-cs` |
 | **Template — File name** | `infra/templates/taller-aws-devops-semana2-app.yaml` |
 
 3. En **Parameter overrides**, los mismos cuatro valores, más los tres que hacen que ese
@@ -473,9 +473,9 @@ un grupo nuevo debajo.
    ```json
    {
      "ImageUri": { "Fn::GetParam": ["BuildArtifact", "imagen.json", "ImageUri"] },
-     "RedStackName": "taller-aws-<su-nombre>-red",
-     "DatosStackName": "taller-aws-<su-nombre>-datos",
-     "PlataformaStackName": "taller-aws-<su-nombre>-plataforma",
+     "RedStackName": "taller-aws-{%nombre%}-red",
+     "DatosStackName": "taller-aws-{%nombre%}-datos",
+     "PlataformaStackName": "taller-aws-{%nombre%}-plataforma",
      "ComandoContenedor": "courses_server,echo",
      "RutaPath": "/eco/*",
      "Prioridad": "10"
@@ -489,8 +489,8 @@ un grupo nuevo debajo.
    la aplicación.
 
 4. Repetir en la etapa `Desplegar`: **Add action** a la derecha de `app-deploy`, modo
-   **Execute a change set**, stack `taller-aws-<su-nombre>-eco`, change set
-   `taller-aws-<su-nombre>-eco-cs`.
+   **Execute a change set**, stack `taller-aws-{%nombre%}-eco`, change set
+   `taller-aws-{%nombre%}-eco-cs`.
 5. Pulsar **Save**.
 
 ::: warning

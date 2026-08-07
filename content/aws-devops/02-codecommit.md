@@ -466,7 +466,7 @@ Usaremos la región **`us-east-2`**.
 ### Crear el repositorio
 
 1. Pulsar **Create repository**.
-2. En **Repository name**, escribir `taller-aws-<su-nombre>`. Usar el primer nombre en
+2. En **Repository name**, escribir `taller-aws-{%nombre%}`. Usar el primer nombre en
    minúsculas y sin acentos (por ejemplo: `taller-aws-carlos`).
 3. En **Description** (opcional), escribir una descripción breve, por ejemplo:
    `Repositorio del taller AWS DevOps — Semana 1`.
@@ -500,9 +500,9 @@ cd courses
 En la vista del repositorio recién creado en la consola, pulsar el botón **Clone URL**
 y copiar la URL correspondiente al método de acceso configurado:
 
-- **HTTPS**: `https://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
-- **SSH**: `ssh://git-codecommit.<región>.amazonaws.com/v1/repos/taller-aws-<su-nombre>`
-- **Identity Center (grc)**: `codecommit::<región>://<perfil>@taller-aws-<su-nombre>`
+- **HTTPS**: `https://git-codecommit.{%region%}.amazonaws.com/v1/repos/taller-aws-{%nombre%}`
+- **SSH**: `ssh://git-codecommit.{%region%}.amazonaws.com/v1/repos/taller-aws-{%nombre%}`
+- **Identity Center (grc)**: `codecommit::{%region%}://{%perfil%}@taller-aws-{%nombre%}`
   (no aparece en el botón **Clone URL**; construirla con la región y el nombre del perfil).
 
 Agregar CodeCommit como remoto adicional:

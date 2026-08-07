@@ -368,7 +368,7 @@ nuevo:
 
 ```bash
 aws cloudformation deploy \
-  --stack-name taller-aws-<su-nombre>-app \
+  --stack-name taller-aws-{%nombre%}-app \
   --template-file taller-aws-devops-semana3-app.yaml \
   --parameter-overrides ImageUri=... RedStackName=... DatosStackName=... PlataformaStackName=... \
   --capabilities CAPABILITY_IAM \

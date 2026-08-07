@@ -21,9 +21,10 @@ All content uses an impersonal, timeless manual register. No personal subjects, 
 - **Exercise titles** take the infinitive: "Ejercicio 5 — Desplegar la aplicación",
   not "Despliegue la aplicación".
 
-Leave untouched: placeholder tokens (`<su-nombre>`, `taller-<su-nombre>`,
-`cpu-alta-<su-nombre>`), content variable tokens (`{%nombre%}`, `{%region%}`,
-`{%perfil%}`), English AWS console labels in bold (**Create stack**,
+Leave untouched: content variable tokens (`{%nombre%}`, `{%region%}`,
+`{%perfil%}`, `{%cuenta%}`, `{%dominio%}`), generic command-syntax placeholders
+(`git remote add <nombre> <url>`, `<rama>`), English AWS console labels in bold
+(**Create stack**,
 **Next**, **CREATE_COMPLETE**), code blocks, resource and file names, and all
 directive fences and anchors.
 

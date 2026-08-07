@@ -144,12 +144,12 @@ AWS CodeCommit es un servicio de control de versiones compatible con Git.
 
 ### Ejercicio 1 — Cree su repositorio
 
-Cree un repositorio llamado `taller-aws-<su-nombre>`.
+Cree un repositorio llamado `taller-aws-{%nombre%}`.
 
 ::: solucion
 1. Abra la consola de AWS y busque **CodeCommit**.
 2. Pulse **Create repository**.
-3. En **Repository name**, escriba `taller-aws-<su-nombre>`.
+3. En **Repository name**, escriba `taller-aws-{%nombre%}`.
 4. Pulse **Create**.
 :::
 ```

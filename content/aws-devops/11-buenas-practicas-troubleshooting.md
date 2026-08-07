@@ -183,7 +183,7 @@ cuenta. Un mínimo razonable:
 | --- | --- |
 | `Proyecto` | `taller-aws-devops` |
 | `Ambiente` | `taller` |
-| `Responsable` | `<su-nombre>` |
+| `Responsable` | `{%nombre%}` |
 
 
 ::: info
@@ -395,7 +395,7 @@ usando un change set por debajo:
 
 ```bash
 aws cloudformation deploy \
-  --stack-name taller-aws-<su-nombre>-app \
+  --stack-name taller-aws-{%nombre%}-app \
   --template-file taller-aws-devops-semana2-app.yaml \
   --parameter-overrides ImageUri=... RedStackName=... DatosStackName=... PlataformaStackName=... \
   --capabilities CAPABILITY_IAM

@@ -57,13 +57,13 @@ el template haya creado.
 ### Iniciar la eliminación
 
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. En la lista de stacks, seleccionar el stack `taller-aws-<su-nombre>`.
+2. En la lista de stacks, seleccionar el stack `taller-aws-{%nombre%}`.
 3. Pulsar **Delete**.
 4. En el diálogo de confirmación, pulsar **Delete stack**.
 
 ::: warning
 Si se hizo la sección opcional de HTTPS, borrar primero el stack
-`taller-aws-<su-nombre>-https`. CloudFormation bloquea el borrado del stack
+`taller-aws-{%nombre%}-https`. CloudFormation bloquea el borrado del stack
 base mientras otro stack use sus exports.
 :::
 
@@ -96,12 +96,12 @@ motivo.
    —`taller-aws-devops-semana1.yaml` o `taller-aws-devops-semana1-vpc-existente.yaml`.
    (Si la consola ofrece reutilizar el template anterior porque se subió
    recientemente, se puede hacer.)
-3. En **Stack name**, usar exactamente el mismo nombre: `taller-aws-<su-nombre>`.
+3. En **Stack name**, usar exactamente el mismo nombre: `taller-aws-{%nombre%}`.
 4. En el campo del URI de la imagen, pegar el mismo URI de ECR usado antes.
     La imagen sigue en ECR — no es necesario volver a hacer el build. Con la
     variante de VPC existente, seleccionar también la misma VPC y las mismas
     subredes. Si se usó la sección opcional de HTTPS, dejar `RedirigirAHttps`
-    en `no` hasta volver a desplegar el stack `taller-aws-<su-nombre>-https`.
+    en `no` hasta volver a desplegar el stack `taller-aws-{%nombre%}-https`.
 5. Pulsar **Next**, aceptar las capacidades de IAM, y pulsar **Submit**.
 6. En la pestaña **Events**, esperar a que el estado vuelva a **CREATE_COMPLETE**.
 
@@ -109,7 +109,7 @@ Con la `awscli`:
 
 {#bash-recrear-stack}
 ```bash
-export TALLER="taller-aws-<nombre>"
+export TALLER="taller-aws-{%nombre%}"
 
 # URI de la imagen (sigue en ECR)
 IMAGE="$(aws ecr describe-repositories \
@@ -170,7 +170,7 @@ vuelve a estar en línea.
 **Destrucción:**
 
 1. En la consola de AWS, abrir [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home).
-2. Seleccionar el stack `taller-aws-<su-nombre>`.
+2. Seleccionar el stack `taller-aws-{%nombre%}`.
 3. Pulsar **Delete → Delete stack**.
 4. En la pestaña **Events**, seguir los eventos hasta que el stack desaparezca de la
    lista.
@@ -182,7 +182,7 @@ vuelve a estar en línea.
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir el mismo template usado la primera vez (o reutilizar el cargado
    anteriormente).
-3. En **Stack name**, escribir `taller-aws-<su-nombre>`.
+3. En **Stack name**, escribir `taller-aws-{%nombre%}`.
 4. En el campo del URI de la imagen, pegar el URI de ECR con la etiqueta `latest`.
    La imagen sigue disponible en ECR sin necesidad de un nuevo build. Con la
    variante de VPC existente, seleccionar también la misma VPC y las mismas

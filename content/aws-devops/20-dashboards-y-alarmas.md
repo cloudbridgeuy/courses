@@ -64,7 +64,7 @@ ya recibe los avisos del pipeline (sin montar nada nuevo.)
 ### Crear el dashboard
 
 1. Abrir [**CloudWatch → Dashboards**](https://console.aws.amazon.com/cloudwatch/home#dashboards:) y pulsar **Create dashboard**. Nombrarlo
-   `taller-aws-<su-nombre>`.
+   `taller-aws-{%nombre%}`.
 2. Agregar un *widget* de línea con la métrica `CPUUtilization` del servicio de ECS.
 3. Agregar otro widget con `TargetResponseTime` del ALB.
 4. Agregar un tercero con `HTTPCode_Target_5XX_Count`. Guardar el dashboard.
@@ -120,9 +120,9 @@ Agentes de IA son excelentes para crear graficos complejos utilizando el format 
 3. En la condición, elegir **Greater than** con un umbral de `40` (por ciento), evaluado
    durante un período.
 4. En **Notification**, seleccionar el **tema de SNS** del pod (el mismo
-   `codestar-notifications-taller-aws-<su-nombre>` que recibe las notificaciones del
+   `codestar-notifications-taller-aws-{%nombre%}` que recibe las notificaciones del
    pipeline).
-5. Nombrarlo `taller-aws-<su-nombre>-cpu-alta` y crearlo.
+5. Nombrarlo `taller-aws-{%nombre%}-cpu-alta` y crearlo.
 
 La alarma comienza en `INSUFFICIENT_DATA`, pasa a `OK` cuando hay datos, y entraría en
 `ALARM` (publicando en SNS) si la CPU superara el 40%.

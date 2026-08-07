@@ -174,7 +174,7 @@ comandos**—, y las tres viven en la misma pantalla:
    **facetas**, filtros que acotan el universo de grupos antes de elegir. Como los grupos
    del taller los crea CloudFormation, llegan etiquetados solos, y en **Log group tags**
    aparece `aws:cloudformation:stack-name` con un valor por stack
-   (`taller-aws-<su-nombre>-app` y `taller-aws-<su-nombre>-eco`). Filtrar por ahí es el
+   (`taller-aws-{%nombre%}-app` y `taller-aws-{%nombre%}-eco`). Filtrar por ahí es el
    atajo cuando la cuenta tiene cientos de grupos y no se recuerda el nombre exacto.
 3. **Ventana.** Arriba a la derecha, fijar el rango: los atajos **5m**, **30m**,
    **1h**, **3h**, **12h**, o un rango propio. No es un adorno —marca cuánto log se

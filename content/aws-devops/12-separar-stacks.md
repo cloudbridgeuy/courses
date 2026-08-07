@@ -406,11 +406,11 @@ En el directorio `/infra/templates` esta el mismo template de la semana 1 dividi
 
 | Template | Stack | Contiene |
 | --- | --- | --- |
-| `taller-aws-devops-semana2-red.yaml` | `taller-aws-<su-nombre>-red` | VPC, subredes, gateway, grupos de seguridad |
-| `taller-aws-devops-semana2-datos.yaml` | `taller-aws-<su-nombre>-datos` | La tabla de DynamoDB, con `DeletionPolicy: Retain` |
-| `taller-aws-devops-semana2-datos-import.yaml` | `taller-aws-<su-nombre>-datos` | La misma tabla, sin `Outputs`: la versión que exige la operación de import |
-| `taller-aws-devops-semana2-plataforma.yaml` | `taller-aws-<su-nombre>-plataforma` | Clúster de ECS, balanceador, listeners |
-| `taller-aws-devops-semana2-app.yaml` | `taller-aws-<su-nombre>-app` | Servicio, task definition, target group, regla, logs, roles |
+| `taller-aws-devops-semana2-red.yaml` | `taller-aws-{%nombre%}-red` | VPC, subredes, gateway, grupos de seguridad |
+| `taller-aws-devops-semana2-datos.yaml` | `taller-aws-{%nombre%}-datos` | La tabla de DynamoDB, con `DeletionPolicy: Retain` |
+| `taller-aws-devops-semana2-datos-import.yaml` | `taller-aws-{%nombre%}-datos` | La misma tabla, sin `Outputs`: la versión que exige la operación de import |
+| `taller-aws-devops-semana2-plataforma.yaml` | `taller-aws-{%nombre%}-plataforma` | Clúster de ECS, balanceador, listeners |
+| `taller-aws-devops-semana2-app.yaml` | `taller-aws-{%nombre%}-app` | Servicio, task definition, target group, regla, logs, roles |
 
 
 :::app
@@ -588,7 +588,7 @@ La tabla nunca se recrea. Los datos nunca se mueven.
    ```
 
 2. En [**CloudFormation**](https://console.aws.amazon.com/cloudformation/home),
-   seleccionar el stack `taller-aws-<su-nombre>` y aplicar el cambio con un change set,
+   seleccionar el stack `taller-aws-{%nombre%}` y aplicar el cambio con un change set,
    como en la sección anterior: **Stack actions → Create change set for current
    stack**, subir el template modificado, y ejecutarlo. `TablaApp` aparece como
    **Modify** sin reemplazo —la política es metadata del stack, no toca la tabla.
@@ -602,7 +602,7 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    Con la `awscli`:
 
    ```bash
-   export TALLER=taller-aws-<su-nombre>
+   export TALLER=taller-aws-{%nombre%}
    TABLA=$(aws cloudformation describe-stack-resources \
      --stack-name "$TALLER" \
      --logical-resource-id TablaApp \
@@ -616,7 +616,7 @@ Antes de migrar, escribir un dato que demuestre, al final, que nada se perdió.
    tabla el mismo `UpdateItem` con `ADD` que se lanzaría a mano con la CLI.
    Como escribe en la tabla del ambiente que sirve la página, usar esta misma
    sección en la guía del propio stack. Encontrar la **UrlBase** de
-   `taller-aws-<su-nombre>` en los `Outputs`, desbloquear la app con el
+   `taller-aws-{%nombre%}` en los `Outputs`, desbloquear la app con el
    secreto, y pulsar el botón un par de veces:
 
 :::app
@@ -650,15 +650,15 @@ primero.
 
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir `taller-aws-devops-semana2-red.yaml`.
-3. En **Stack name**, escribir `taller-aws-<su-nombre>-red`. No tiene parámetros.
+3. En **Stack name**, escribir `taller-aws-{%nombre%}-red`. No tiene parámetros.
 4. Pulsar **Next** hasta **Submit**, y esperar a **CREATE_COMPLETE**.
 
 ### Crear el stack de plataforma
 
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir `taller-aws-devops-semana2-plataforma.yaml`.
-3. En **Stack name**, escribir `taller-aws-<su-nombre>-plataforma`.
-4. En **RedStackName**, escribir `taller-aws-<su-nombre>-red`. Dejar **NombreDominio**
+3. En **Stack name**, escribir `taller-aws-{%nombre%}-plataforma`.
+4. En **RedStackName**, escribir `taller-aws-{%nombre%}-red`. Dejar **NombreDominio**
    y **HostedZoneId** vacíos: son la parte opcional de HTTPS, más abajo.
 5. Pulsar **Next** hasta **Submit**, y esperar a **CREATE_COMPLETE**.
 6. Abrir la **UrlBase** de la pestaña **Outputs**. Responde `404` con el texto
@@ -677,7 +677,7 @@ después un update, con el template completo, para publicar los exports.
 3. En la pantalla **Identify resources**, CloudFormation lista los recursos del
    template que necesitan un identificador. Para `TablaApp`, pegar en **TableName**
    el nombre físico de la tabla (el valor de `$TABLA`).
-4. En **Stack name**, escribir `taller-aws-<su-nombre>-datos`, y pulsar **Next**.
+4. En **Stack name**, escribir `taller-aws-{%nombre%}-datos`, y pulsar **Next**.
 5. Revisar el resumen: la operación es **Import**, y no crea ni modifica nada más.
    Pulsar **Import resources**.
 6. En la pestaña **Events**, esperar a **IMPORT_COMPLETE**. La tabla no se reinició
@@ -691,10 +691,10 @@ después un update, con el template completo, para publicar los exports.
 
    ```bash
    aws cloudformation update-stack \
-     --stack-name taller-aws-<su-nombre>-datos \
+     --stack-name taller-aws-{%nombre%}-datos \
      --template-body file://taller-aws-devops-semana2-datos.yaml
    aws cloudformation wait stack-update-complete \
-     --stack-name taller-aws-<su-nombre>-datos
+     --stack-name taller-aws-{%nombre%}-datos
    ```
 
    El cambio debe ser directo, y no con un change set, por una limitación de
@@ -708,10 +708,10 @@ después un update, con el template completo, para publicar los exports.
 
 1. Pulsar **Create stack → With new resources (standard)**.
 2. Subir `taller-aws-devops-semana2-app.yaml`.
-3. En **Stack name**, escribir `taller-aws-<su-nombre>-app`.
+3. En **Stack name**, escribir `taller-aws-{%nombre%}-app`.
 4. Completar el **URI de la imagen** en ECR, y los nombres de los otros tres stacks:
-   `taller-aws-<su-nombre>-red`, `taller-aws-<su-nombre>-datos`, y
-   `taller-aws-<su-nombre>-plataforma`. Dejar **RutaPath**, **Prioridad**, y
+   `taller-aws-{%nombre%}-red`, `taller-aws-{%nombre%}-datos`, y
+   `taller-aws-{%nombre%}-plataforma`. Dejar **RutaPath**, **Prioridad**, y
    **UsarHttps** en sus valores por defecto: esta es la única aplicación, y atiende
    todo el tráfico.
 5. Aceptar la capacidad de IAM, pulsar **Submit**, y esperar a **CREATE_COMPLETE**.
@@ -755,7 +755,7 @@ Resources:
 
 Para activarlo sobre un ambiente ya desplegado:
 
-1. Actualizar el stack `taller-aws-<su-nombre>-plataforma` con un change set,
+1. Actualizar el stack `taller-aws-{%nombre%}-plataforma` con un change set,
    completando los dos parámetros. El change set muestra cinco **Add** y ningún
    reemplazo.
 2. Actualizar el stack de aplicación poniendo **UsarHttps** en `si`. Eso agrega su
@@ -791,7 +791,7 @@ adentro de la que se usó toda la semana: es un subcomando del mismo binario.
 
 1. Pulsar **Create stack → With new resources (standard)** y subir el **mismo**
    `taller-aws-devops-semana2-app.yaml`.
-2. En **Stack name**, escribir `taller-aws-<su-nombre>-eco`.
+2. En **Stack name**, escribir `taller-aws-{%nombre%}-eco`.
 3. Repetir los tres nombres de stack —red, datos, plataforma— sin cambiar ninguno: son
    las mismas dependencias.
 4. Cambiar solo cuatro valores:
@@ -895,7 +895,7 @@ y del lado de CloudFormation cuesta cinco líneas.
 
 :::skip
 `/eco/*` funciona, pero obliga a que la aplicación viva bajo un prefijo. La alternativa
-es darle **nombre propio**: `echo.<dominio>`, con el mismo balanceador. El template lo
+es darle **nombre propio**: `echo.{%dominio%}`, con el mismo balanceador. El template lo
 soporta con el parámetro `NombreHost`, que cambia el tipo de condición de la regla:
 :::
 
@@ -913,15 +913,15 @@ Conditions:
 :::
 
 Para que un nombre nuevo funcione hacen falta dos cosas del lado de la plataforma, y las
-dos ya están resueltas allí: el certificado se pide **con comodín** (`*.<dominio>` como
+dos ya están resueltas allí: el certificado se pide **con comodín** (`*.{%dominio%}` como
 `SubjectAlternativeNames`), y Route 53 lleva un registro alias comodín hacia el
 balanceador. Con eso, cada aplicación nueva elige su subdominio sin tocar el stack de
 plataforma. Con un certificado por nombre, en cambio, agregar una aplicación obligaría a
 modificar —y volver a validar— el stack compartido.
 
-Con `NombreHost=echo.<dominio>` y `UsarHttps=si`, el servidor de eco contesta en
-`https://echo.<dominio>`. Si además el comando se lanza como
-`courses_server,echo,--name,echo.<dominio>`, la respuesta trae
+Con `NombreHost=echo.{%dominio%}` y `UsarHttps=si`, el servidor de eco contesta en
+`https://echo.{%dominio%}`. Si además el comando se lanza como
+`courses_server,echo,--name,echo.{%dominio%}`, la respuesta trae
 `"matched_public_name": true` cuando el pedido llegó por ese nombre, y `false` cuando
 llegó por el DNS crudo del balanceador. Es una forma barata de comprobar que la regla
 de host enruta lo que se cree que enruta.
@@ -937,7 +937,7 @@ Lo que hay que mirar después vale más que el despliegue en sí:
 
 :::skip
   ```bash
-  export TALLER=taller-aws-<su-nombre>
+  export TALLER=taller-aws-{%nombre%}
   aws ecs list-services \
     --cluster "$TALLER-plataforma" \
     --query "serviceArns" --output text
@@ -959,8 +959,8 @@ Lo que hay que mirar después vale más que el despliegue en sí:
   ```
 :::
 
-- En **CloudWatch → Logs → Log Management** hay dos grupos, `/ecs/taller-aws-<su-nombre>-app` y
-  `/ecs/taller-aws-<su-nombre>-eco`. Salen separados solos, porque el template los
+- En **CloudWatch → Logs → Log Management** hay dos grupos, `/ecs/taller-aws-{%nombre%}-app` y
+  `/ecs/taller-aws-{%nombre%}-eco`. Salen separados solos, porque el template los
   nombra con `!Sub "/ecs/${AWS::StackName}"`.
 
 :::skip
@@ -1137,7 +1137,7 @@ set, CloudFormation lo expande y sus recursos aparecen **en el stack del
 consumidor**, con el nombre del módulo como prefijo del ID lógico
 (`Eco` → `EcoServicioApp`). Los nombres físicos siguen saliendo de
 `${AWS::StackName}` (ahora el del consumidor), así que un stack llamado
-`taller-aws-<su-nombre>-eco` produce exactamente los mismos nombres que el stack
+`taller-aws-{%nombre%}-eco` produce exactamente los mismos nombres que el stack
 clásico que se borró.
 ::: # info
 
@@ -1345,7 +1345,7 @@ stacks y es normal: es infraestructura de la herramienta, no del taller.
 
 1. Pulsar **Create stack → With new resources (standard)** y subir
    `taller-aws-devops-semana2-eco-modulo.yaml`.
-2. En **Stack name**, escribir `taller-aws-<su-nombre>-modulo-eco`.
+2. En **Stack name**, escribir `taller-aws-{%nombre%}-modulo-eco`.
 3. Completar **ImageUri** con la imagen de siempre, y los tres nombres de stack
    (red, datos, plataforma). El resto ya viene con los valores del eco:
    `ComandoContenedor=courses_server,echo`, `RutaPath=/eco2/*`, `Prioridad=10`.
@@ -1367,7 +1367,7 @@ regla, y el resto, todos con el prefijo `Eco` en el ID lógico. No hay ningún
 stack anidado. La misma vista, desde la terminal:
 
 ```bash
-export TALLER=taller-aws-<su-nombre>
+export TALLER=taller-aws-{%nombre%}
 aws cloudformation describe-stack-resources \
   --stack-name "$TALLER-eco" \
   --query "StackResources[].{Logico:LogicalResourceId,Tipo:ResourceType,Modulo:ModuleInfo.TypeHierarchy}" \
@@ -1375,7 +1375,7 @@ aws cloudformation describe-stack-resources \
 ```
 
 La columna `Modulo` dice de qué tipo salió cada recurso: esa es la traza que queda
-después de la expansión. Y el grupo de logs se llama `/ecs/taller-aws-<su-nombre>-eco`,
+después de la expansión. Y el grupo de logs se llama `/ecs/taller-aws-{%nombre%}-eco`,
 como siempre, porque `${AWS::StackName}` resolvió al stack consumidor:
 
 ```bash

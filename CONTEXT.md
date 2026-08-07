@@ -242,7 +242,7 @@ register the app pattern as the private type `CloudBridge::Taller::App::MODULE`
 (CloudShell, `pip3 install cloudformation-cli`, `cfn init` + `cfn submit`) and
 recreate the eco — deleted at the end of the previous section — as **one**
 resource of that type, in a stack with the same name
-(`taller-aws-<su-nombre>-eco`), so physical names (`/ecs/${AWS::StackName}` etc.)
+(`taller-aws-{%nombre%}-eco`), so physical names (`/ecs/${AWS::StackName}` etc.)
 match and sessions 13/14/21 keep their running eco. Teaching beats: a fragment
 rejects `Fn::ImportValue`/`Export`, so the nine imports become module parameters
 and the consumer does the importing (the drill's contract becomes explicit
@@ -305,7 +305,7 @@ fails with `didn't contain changes` when the same commit is re-run.
 
 The practice opens with **«Paso previo: el rol que despliega»**, because the two
 roles are the part that bites first: the wizard makes the pipeline's own role, and
-`taller-aws-<su-nombre>-cfn-deploy` (trust `cloudformation.amazonaws.com`,
+`taller-aws-{%nombre%}-cfn-deploy` (trust `cloudformation.amazonaws.com`,
 PowerUserAccess + IAMFullAccess — broad on purpose, `IAMFullAccess` non-optional
 since the app template creates the task and execution roles) must exist **before**
 the action is configured. The action's **Role name** field is a free-text search box
@@ -409,8 +409,8 @@ The shapes live in **Server / build notes** below. In the guide, **`<cb-eco>`**
 is the widget over the first one. No content section uses it yet.
 
 **Known inconsistency:** `12`'s module practice names the recreated eco stack
-`taller-aws-<su-nombre>-modulo-eco` in the create step, while the verification
-commands in the same practice — and `17` — use `taller-aws-<su-nombre>-eco`. The
+`taller-aws-{%nombre%}-modulo-eco` in the create step, while the verification
+commands in the same practice — and `17` — use `taller-aws-{%nombre%}-eco`. The
 reference account (`410228653321`, `us-east-2`) actually has
 `taller-aws-guzman-eco2`. Three names for one stack; unresolved — the naming
 decision is the user's.
@@ -499,7 +499,7 @@ Week 3.
   shifted +2); on 2026-08-07 `02-codecommit`'s ej. 1–2 were folded into its
   guided practice, so numbered exercises now run **3–18**. The GitHub snapshot
   must be republished so students actually clone them.
-- Per-participant resource naming: `taller-aws-<su-nombre>` (CodeCommit repo, ECR
+- Per-participant resource naming: `taller-aws-{%nombre%}` (CodeCommit repo, ECR
   repo, CodeBuild project `…-build`).
 - Instructor-provided CloudFormation templates (in `infra/templates/`): Week 1
   monolith `taller-aws-devops-semana1.yaml` plus variant

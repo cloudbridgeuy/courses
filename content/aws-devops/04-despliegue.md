@@ -148,13 +148,13 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 
 ### Completar los parámetros
 
-1. En **Stack name**, escribir `taller-aws-<su-nombre>` (por ejemplo: `taller-aws-maria`). El
+1. En **Stack name**, escribir `taller-aws-{%nombre%}` (por ejemplo: `taller-aws-maria`). El
    nombre del stack identifica el ambiente en la consola y debe ser único en la región.
 2. En los parámetros del template, localizar el campo correspondiente al **URI de
    la imagen**. Pegar el URI completo copiado de ECR al final de la sección anterior.
    El formato es similar a:
    ```
-   123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-<su-nombre>:latest
+   123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-{%nombre%}:latest
    ```
 
    Con la `awscli`:
@@ -245,7 +245,7 @@ aplicación está en línea.
 3. Seleccionar **Upload a template file**, pulsar **Choose file**, y subir
    `taller-aws-devops-semana1.yaml` o `taller-aws-devops-semana1-vpc-existente.yaml`.
 4. Pulsar **Next**.
-5. En **Stack name**, escribir `taller-aws-<su-nombre>`.
+5. En **Stack name**, escribir `taller-aws-{%nombre%}`.
 6. En el campo del URI de la imagen, pegar el URI completo de ECR con la etiqueta
    `latest` (por ejemplo:
    `123456789012.dkr.ecr.us-east-1.amazonaws.com/taller-aws-maria:latest`).
@@ -332,15 +332,15 @@ detalle en la Semana 2.
 
 1. En CloudFormation, pulsar **Create stack → With new resources (standard)** y
    subir `taller-aws-devops-extra-https.yaml`.
-2. En **Stack name**, escribir `taller-aws-<su-nombre>-https`.
+2. En **Stack name**, escribir `taller-aws-{%nombre%}-https`.
 3. Completar los parámetros:
    - **AppStackName** — el nombre del stack ya desplegado:
-     `taller-aws-<su-nombre>`.
+     `taller-aws-{%nombre%}`.
    - **HostedZoneId** — la consola ofrece las hosted zones de la cuenta como
      desplegable. Seleccionar la zona del dominio
      (`courses.cloudbridge.com.uy`).
    - **NombreDominio** — el dominio completo para la aplicación, dentro de la
-     zona: `<su-nombre>.courses.cloudbridge.com.uy`.
+     zona: `{%nombre%}.courses.cloudbridge.com.uy`.
 
    Con la `awscli`:
    ```bash
@@ -356,7 +356,7 @@ detalle en la Semana 2.
 5. La creación tarda unos minutos más de lo habitual: CloudFormation espera a
    que el certificado se valide por DNS antes de crear el listener.
 6. En la pestaña **Outputs**, copiar **UrlHttps** y abrirla en el navegador. La
-   aplicación responde en `https://<su-nombre>.courses.cloudbridge.com.uy`, con
+   aplicación responde en `https://{%nombre%}.courses.cloudbridge.com.uy`, con
    el candado del certificado. La URL HTTP del ALB sigue funcionando.
 
 ### Dejar de servir la aplicación por HTTP
@@ -373,7 +373,7 @@ cambia:
 
 ```bash
 ❯ aws cloudformation update-stack \
-   --stack-name taller-aws-<su-nombre> \
+   --stack-name taller-aws-{%nombre%} \
    --template-body file://infra/templates/taller-aws-devops-semana1-vpc-existente.yaml \
    --parameters \
      ParameterKey=ImageUri,UsePreviousValue=true \
@@ -396,5 +396,5 @@ muestra una advertencia. Es el comportamiento esperado.
 ::: warning
 CloudFormation no permite borrar un stack cuyos exports están en uso. Antes de
 la práctica de destrucción de la siguiente sección, borrar primero el stack
-`taller-aws-<su-nombre>-https`.
+`taller-aws-{%nombre%}-https`.
 :::
