@@ -43,6 +43,7 @@ pub fn text_asset(file: &str) -> Option<TextAsset> {
         "toggle.js" => asset(JS, "crates/server/static/toggle.js"),
         "shiki-init.js" => asset(JS, "crates/server/static/shiki-init.js"),
         "mermaid-init.js" => asset(JS, "crates/server/static/mermaid-init.js"),
+        "vars.js" => asset(JS, "crates/server/static/vars.js"),
         _ => None,
     }
 }
@@ -137,6 +138,7 @@ mod tests {
                 JS,
                 "crates/server/static/mermaid-init.js",
             ),
+            ("vars.js", JS, "crates/server/static/vars.js"),
         ];
         for (file, content_type, repo_path) in cases {
             let found = text_asset(file).unwrap();

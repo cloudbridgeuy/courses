@@ -513,6 +513,7 @@ async fn static_file(State(state): State<AppState>, Path(file): Path<String>) ->
         "mermaid.min.js" => asset("application/javascript; charset=utf-8", MERMAID_JS),
         "mermaid-init.js" => asset("application/javascript; charset=utf-8", MERMAID_INIT_JS),
         "apps.js" => asset("application/javascript; charset=utf-8", APPS_JS),
+        "vars.js" => asset("application/javascript; charset=utf-8", VARS_JS),
         "dev-reload.js" => asset("application/javascript; charset=utf-8", DEV_RELOAD_JS),
         "montserrat.ttf" => bytes("font/ttf", MONTSERRAT_TTF),
         "cloudbridge.png" => bytes("image/png", CLOUDBRIDGE_PNG),
@@ -548,6 +549,7 @@ const REVEAL_CSS: &str = include_str!("../static/reveal.min.css");
 const SLIDES_CSS: &str = include_str!("../static/slides.css");
 const MERMAID_JS: &str = include_str!("../static/mermaid.min.js");
 const MERMAID_INIT_JS: &str = include_str!("../static/mermaid-init.js");
+const VARS_JS: &str = include_str!("../static/vars.js");
 const DEV_RELOAD_JS: &str = include_str!("../static/dev-reload.js");
 const FAVICON_ICO: &[u8] = include_bytes!("../static/favicon.ico");
 const FAVICON_PNG: &[u8] = include_bytes!("../static/favicon.png");
