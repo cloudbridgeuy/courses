@@ -20,20 +20,23 @@ La integración continua ejecuta el build en un entorno **estándar, limpio y
 reproducible**. Así, cada commit o tag produce un artefacto cuyo origen y proceso de
 construcción se pueden verificar, sin depender de una máquina local.
 
-:::inline-slide light
 ## Respuesta en AWS: CodeBuild y Amazon ECR
-:::
+:::inline-slide light with-title
 
 **AWS CodeBuild** es un servicio de `build` totalmente administrado. Se le indica la
 fuente, la imagen del entorno de construcción y los comandos que debe ejecutar.
 CodeBuild aprovisiona un entorno limpio, ejecuta el trabajo y libera los recursos al
 terminar. No hay servidores de build que mantener.
 
-:::inline-slide
-### ¿Qué expresa un `buildspec.yml`?
+**Amazon Elastic Container Registry (ECR)** es el registro de imágenes de contenedores de AWS. Como [DockerHub](https://hub.docker.com/)
+:::
 
-Un `buildspec.yml` es una especificación YAML que funciona como el pequeño DSL de
-CodeBuild: declara las fases del trabajo y los comandos que se ejecutan en cada una.
+:::inline-slide with-title
+### CodeBuild
+
+CodeBuild utiliza una especificación definida en un archivo YAML, conocido como
+`buildspec.yml`. Funciona como el pequeño DSL de CodeBuild: declara las fases
+del trabajo y los comandos que se ejecutan en cada una.
 
 ```yaml
 version: 0.2
@@ -53,13 +56,10 @@ phases:
   `post_build`.
 - `commands` contiene la lista de órdenes de shell de cada fase, ejecutadas en orden.
 - También puede declarar `env`, `artifacts`, `cache` y `reports`.
-
 :::
 
 :::inline-slide light
-### ¿Qué es Amazon ECR?
-
-**Amazon Elastic Container Registry (ECR)** es el registro de imágenes de contenedores de AWS. Como [DockerHub](https://hub.docker.com/)
+### Amazon ECR
 
 Una vez construida la imagen Docker, hay que guardarla en algún lugar. **Amazon ECR**
 (Elastic Container Registry) es el servicio de AWS para almacenar imágenes Docker de
@@ -67,29 +67,31 @@ forma privada y segura. Cuando ECS necesite lanzar el contenedor en la Semana 3,
 buscar la imagen directamente a ECR.
 :::
 
-## Artefactos desplegables: construir una vez, promover muchas veces
+## Construir una vez, promover muchas veces
+:::inline-slide with-title
 
-:::slide light
-## Artefactos desplegables: construir una vez, promover muchas veces
-
-El objetivo es solo producir el artefacto a desplegar **una vez**, para luego **promoverlo**
-entre ambientes.
-
-{{info-realidad}}
-:::
-
+:::skip
 El resultado de CodeBuild no es solo una imagen Docker: es el **artefacto desplegable**
 que conecta el cambio de código con un despliegue. Debe poder responderse con precisión
 qué commit, qué PR o qué tag de Git produjo una imagen, qué validaciones superó y en
 qué ambientes se utilizó.
+:::
 
 En un pipeline de equipo, un evento de Git inicia el trabajo adecuado: un PR puede
 ejecutar `lint`, pruebas, análisis de seguridad y un ambiente efímero; un *merge* o un
-tag de release puede construir la imagen candidata. Cuando esa imagen se aprueba para
-otro ambiente, se promueve **el mismo artefacto**, sin reconstruirlo. Así, `staging` y
-producción prueban y ejecutan exactamente los mismos bytes.
+tag de release puede construir la imagen candidata.
 
-{#info-realidad}
+Cuando esa imagen se aprueba para otro ambiente, se promueve **el mismo
+artefacto**, sin reconstruirlo. Así, `staging` y producción prueban y ejecutan
+exactamente los mismos bytes.
+:::
+
+:::inline-slide light with-title
+Para lograrlo, conviene identificar las imágenes con una referencia inmutable o
+inequívoca: el SHA del commit, un tag de versión como `v1.4.0`, o el *digest* que ECR
+asigna a la imagen. Una etiqueta mutable como `latest` es cómoda para un laboratorio,
+pero no indica qué versión se está desplegando y puede cambiar entre dos operaciones.
+
 ::: info
 La realidad es que no siempre se sigue esta práctica, y lo que termina pasando es
 que se termina reconstruyendo el artefacto en cada fase de su ciclo de vida. Algunas
@@ -100,12 +102,8 @@ necesario que se comporte distinto en cada ambiente (se conecte a distintos serv
 de terceros, bases de datos, nivel de logging, etc.) estos cambios de comportamiento
 deben producirse a través de cambios en su configuración, las cuales puede absorber de
 diversas maneras: variables de entorno, argumentos, archivos de configuración, etc.
-:::
-
-Para lograrlo, conviene identificar las imágenes con una referencia inmutable o
-inequívoca: el SHA del commit, un tag de versión como `v1.4.0`, o el *digest* que ECR
-asigna a la imagen. Una etiqueta mutable como `latest` es cómoda para un laboratorio,
-pero no indica qué versión se está desplegando y puede cambiar entre dos operaciones.
+::: #info
+::: #inline-slide
 
 :::slide light
 ## Del código a la imagen publicada
@@ -148,6 +146,7 @@ flowchart LR
 :::
 
 ## Nuestro archivo `buildspec.yml`
+:::inline-slide light with-title
 
 El archivo `buildspec.yml` vive en la raíz del repositorio que se clonó y subió a
 CodeCommit en la sección anterior, junto al `Dockerfile`. Es el contrato entre el
@@ -157,9 +156,11 @@ código y CodeBuild, y usa las cuatro fases:
 <cb-file path="./buildspec.yml" type="yaml"></cb-file>
 :::
 
+:::skip
 De más está decir que cada `command` puede invocar cualquier herramienta o script dentro
 del ambiente de CodeBuild, o dentro del repositorio. Los `commands` se ejecutan desde
 un directorio con la revisión de código que disparó el proceso de `build`.
+:::
 
 Es común utilizar comandos de `bash` directamente, pero no es necesario. Podemos, por
 ejemplo, ejecutar un `script` de `python` almacenado dentro del repositorio:
@@ -178,6 +179,7 @@ phases:
       - python scripts/build_image_metadata.py
 ```
 
+:::skip
 Por defecto, el archivo `buildspec.yml` es leído por CodeBuild desde la revisión que lanzó
 el `build`. Esto tiene la ventaja de que podemos probar cambios en el `buildspec.yml` sin
 necesidad de desplegar nada.
@@ -187,21 +189,19 @@ mediante la opción `buildSpecOverride` al momento de iniciar el build. Colocar 
 externa para el `buildspec.yml` puede ser útil si contamos con un repositorio centralizado
 donde gestionamos las especificaciones de ejecución.
 
-En `install` se confirma que las herramientas del entorno están disponibles. Aquí no
-hay nada que instalar porque la imagen administrada de CodeBuild ya trae Docker y la
-CLI de AWS. En `pre_build` se corre `hadolint` sobre el `Dockerfile` (volvemos sobre
-esto más adelante), se autentica con ECR para poder empujar la imagen construida
-al repositorio correcto, y se crea un
-*builder* de BuildKit con `docker buildx create --use`: el driver por defecto de
-Docker no puede exportar cache hacia un registro, y este paso lo habilita. El porqué
-del cache lo vemos al final de la sección [Cache de build en
+En `install` se confirma que las herramientas del entorno están disponibles.
+Aquí no hay nada que instalar porque la imagen administrada de CodeBuild ya
+trae Docker y la CLI de AWS. En `pre_build` se corre `hadolint` sobre el
+`Dockerfile` (volvemos sobre esto más adelante), se autentica con ECR para
+poder empujar la imagen construida al repositorio correcto, y se crea un
+*builder* de BuildKit con `docker buildx create --use`: el driver por defecto
+de Docker no puede exportar cache hacia un registro, y este paso lo habilita.
+El porqué del cache lo vemos al final de la sección [Cache de build en
 CodeBuild](#cache-de-build-en-codebuild).
-
-::: info
-Es _muy_ común que utilicemos una cuenta para centralizar todas las imágenes de la empresa,
-desde la cual luego se consumen en los demás ambientes.
+::: #skip
 :::
 
+:::inline-slide light with-title
 Las cuatro fases y su propósito:
 
 | Fase | Propósito |
@@ -211,12 +211,21 @@ Las cuatro fases y su propósito:
 | `build` | Construcción y publicación: `docker buildx build` etiqueta la imagen con el URI de ECR y la empuja (`--push`), junto con su cache. |
 | `post_build` | Verificación: confirmar con `aws ecr describe-images` que la imagen quedó publicada. |
 
+:::skip
 Las variables de entorno (`$AWS_ACCOUNT_ID`, `$AWS_DEFAULT_REGION`, `$IMAGE_REPO_NAME`,
 `$IMAGE_TAG`) se definen en el proyecto de CodeBuild, no en el archivo. Esto permite
 reutilizar el mismo `buildspec.yml` en distintos entornos sin modificarlo.
 `SOURCE_BRANCH` y `CODECOMMIT_REPOSITORY_ARN` son opcionales: un pipeline puede
 proporcionarlos explícitamente para mantener la trazabilidad incluso cuando el origen
 llega como un commit en lugar de una rama.
+::: #skip
+
+::: info
+Es _muy_ común que utilicemos una cuenta para centralizar todas las imágenes de la empresa,
+desde la cual luego se consumen en los demás ambientes.
+:::
+
+::: #inline-slide
 
 ### ¿Por qué estos labels?
 
@@ -254,42 +263,19 @@ en ECR y responder qué commit, repositorio y ejecución la produjeron.
 [codebuild-env-vars]: https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html
 
 ## Nuestro archivo `Dockerfile`
+:::inline-slide with-title
 
 El `Dockerfile` es la otra mitad del contrato: el `buildspec.yml` declara *cuándo* y
 *con qué contexto* se construye; el `Dockerfile` declara *cómo*. El nuestro también
 vive en la raíz del repositorio:
 
 :::app
-<cb-file path="./Dockerfile" type="dockerfile" toggleable></cb-file>
-:::
+<cb-file path="./Dockerfile" type="dockerfile" toggleable open></cb-file>
+::: #app
+::: #inline-slide
 
-### Beneficios, y sus trampas
-
-:::slide light
-## Un solo build, muchas etiquetas
-
-- Mismo artefacto en local y en producción.
-- Evitar reconstruir en cada fase (tiempo, y bytes distintos.)
-- Busquemos **re-etiquetar**, guiados por tags, labels y el *digest* de ECR.
-
-```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 25, "rankSpacing": 40}}}%%
-flowchart LR
-    build["docker build<br/>(una sola vez)"] ==> img[("Imagen<br/>sha256:9f2c…")]
-    img -->|"pr-123"| pr["Ambiente efímero"]
-    img -->|"staging"| stg["Staging"]
-    img ==>|"v1.4.0"| prod["Producción"]
-    classDef dockerNode fill:#eff8ff,stroke:#2396ed,color:#0c4a6e
-    classDef artifactNode fill:#f1f5f9,stroke:#475569,color:#0f172a
-    classDef envNode fill:#ffffff,stroke:#94a3b8,color:#0f172a
-    classDef prodNode fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#14532d
-    class build dockerNode
-    class img artifactNode
-    class pr,stg envNode
-    class prod prodNode
-```
-:::
-
+:::inline-slide light with-title
+:::skip
 Lo mejor de trabajar con un `Dockerfile` es que nos garantiza un artefacto
 desplegable que corre igual en la máquina de un desarrollador que en un ambiente
 productivo: mismos bytes, mismas dependencias, mismo comportamiento.
@@ -307,6 +293,20 @@ reutilizar estas fuentes de información para evitar realizar el proceso de buil
 nuevamente, y en cambio **re-etiquetar** la imagen correcta a medida que nos movemos
 dentro del ciclo de vida del despliegue: la imagen que pasó las pruebas del PR es la
 que recibe el tag de `staging`, y esa misma es la que recibe el tag de release.
+:::
+
+:::add visibility=slide
+- **Un Dockerfile garantiza un artefacto desplegable que se comporta igual en
+  desarrollo y en producción**: mismos bytes, mismas dependencias.
+- **Repetir el build en cada etapa del despliegue desperdicia esa garantía**:
+  cuesta tiempo de pipeline y puede producir bytes distintos, con lo que se
+  despliega algo que no es lo que se probó.
+- **El remedio es aprovechar las etiquetas y metadatos existentes** para identificar la imagen
+  ya construida en lugar de volver a hacer build.
+- **La imagen se re-etiqueta conforme avanza en el ciclo de despliegue**: la que
+  pasó las pruebas del PR recibe el tag de staging, y esa misma recibe el tag
+  de release.
+:::
 
 ::: info
 Re-etiquetar no requiere descargar ni volver a subir la imagen. ECR permite agregar
@@ -321,16 +321,26 @@ aws ecr put-image --repository-name "$IMAGE_REPO_NAME" \
 
 La operación tarda segundos, sin importar el tamaño de la imagen.
 :::
+:::
 
+:::inline-slide light
+## Mono-repo: build único por servicio
+
+:::skip
 En repositorios donde el resultado es una única imagen, esto es relativamente fácil:
 hay un solo artefacto que seguir, y su historia es la historia del repositorio. El
 problema ocurre cuando trabajamos con un mono-repositorio, en donde se gestionan
 varias aplicaciones que pueden ser desplegadas en distinto orden, a través de
 diferentes PR. Evitar múltiples builds en estos escenarios, garantizando a la vez que
 todas las aplicaciones se prueben y ejecuten junto a los demás servicios, es difícil.
+:::
 
-:::slide light
-## Mono-repo: build único por servicio
+:::add visibility=slide
+Seguir un único artefacto por repositorio es fácil, pero en un
+mono-repositorio con varias aplicaciones que se despliegan en distinto orden
+por diferentes PR, evitar builds repetidos y a la vez garantizar que todas se
+prueben junto a los demás servicios es difícil.
+:::
 
 - La identidad no es el commit: es el **tree hash** del contenido.
 - ¿Ya existe en ECR? **Re-etiquetar**. ¿No existe? Construir.
@@ -371,8 +381,8 @@ nosotros: cada directorio tiene un *tree hash* que solo cambia si cambia algo de
 de él.
 :::
 
-:::inline-slide
 ### Como obtener el tree-hash
+:::inline-slide with-title
 
 ```bash
 ❯ TREE_SHA=$(git rev-parse "HEAD:crates/server" | cut -c1-12)
@@ -396,13 +406,14 @@ b4067697c8594c8cdce9e37e4fc8e4512a837853
 ```
 :::
 
+:::inline-slide with-title
 Con esa identidad, el flujo en cada `push` al PR es, para cada servicio:
 
 1. Calcular su `TREE_SHA` (si el servicio depende de código compartido, por ejemplo
-   librerías en `lib/`, el hash debe combinar ambos árboles — de lo contrario un
+   librerías en `lib/`, el hash debe combinar ambos árboles, de lo contrario un
    cambio en la librería pasaría inadvertido).
 2. Preguntarle a ECR si ya existe una imagen con el tag `tree-$TREE_SHA`.
-3. Si existe, el build ya ocurrió —y ya fue exitoso—: solo se re-etiqueta esa imagen
+3. Si existe, el build ya ocurrió: solo se re-etiqueta esa imagen
    con el tag del PR (`pr-123-abc123`), en segundos.
 4. Si no existe, se construye, se publica con ambos tags, y queda disponible para el
    próximo `push`.
@@ -415,6 +426,10 @@ algunas de ellas mencionadas a continuación, es posible que estos builds fallen
 lo cual puede producir información valiosa o falsos positivos difíciles de
 investigar.
 :::
+:::
+
+:::inline-slide with-title
+Es posible hacer esto utilizando la `awscli`.
 
 ```bash
 if aws ecr describe-images --repository-name "$SVC" \
@@ -431,6 +446,7 @@ else
   docker push --all-tags "$IMAGE_URI"
 fi
 ```
+:::
 
 Así se cumple la política: cada `push` termina con **tres imágenes etiquetadas con la
 identidad del PR**. Algunas recién construidas, otras re-etiquetadas. Y el ambiente
@@ -464,18 +480,10 @@ Si cambia cualquiera de las tres rutas (el código del `gateway`, una librería 
 El `cut -c1-12` solo lo acorta para que el tag resulte legible.
 :::
 
-### El `Dockerfile` no es solo de los desarrolladores
-
-:::slide
 ## El `Dockerfile` no es solo de los desarrolladores
+:::inline-slide with-title
 
-- **Multi-stage**: la imagen final lleva solo lo mínimo.
-- **Dependencias**: registro interno antes que PPA público.
-- **Imágenes base**: ECR Public o registro propio, no Docker Hub.
-- **Pins**: *digest* de la base + versiones de `apt`, siempre juntos.
-- **Imagen base corporativa**, pre-cargada en CI.
-:::
-
+:::skip
 Es importante que el equipo de DevOps esté involucrado en el proceso de escribir los
 `Dockerfile`s. Son archivos muy flexibles, y es común que los desarrolladores se
 preocupen solamente de que su aplicación corra, sin tener en cuenta requerimientos
@@ -504,9 +512,18 @@ depender de un PPA público que utilizar el *Artifact Registry* de la compañía
 registro interno evita exponer dependencias con vulnerabilidades conocidas, y
 elimina la dependencia de terceros para poder realizar los builds: si el mirror
 público está caído, el pipeline sigue funcionando.
+:::
 
-:::inline-slide
-::: info
+:::add visibility=slide
+- **Multi-stage**: la imagen final lleva solo lo mínimo.
+- **Dependencias**: registro interno antes que PPA público.
+- **Imágenes base**: ECR Public o registro propio, no Docker Hub.
+- **Pins**: *digest* de la base + versiones de `apt`, siempre juntos.
+- **Imagen base corporativa**, pre-cargada en CI.
+:::
+:::
+
+:::inline-slide with-title light
 ### Un registro de artefactos administrado
 
 ::: warning
@@ -529,8 +546,7 @@ y los runners de CI los agotan rápido. Además, usualmente apuntamos las etique
 nuevo `build`. Es mejor utilizar la [galería pública de ECR](https://gallery.ecr.aws/),
 que no impone los límites agresivos de Docker Hub. O, mejor aún, nuestro propio
 repositorio: con un *pull-through cache* logramos ambas cosas a la vez, y es
-exactamente lo que configuramos en el
-[Ejercicio 6](#ejercicio-6-servir-las-imagenes-base-desde-nuestro-registro).
+exactamente lo que se propone configurar en el siguiente ejercio.
 
 En cualquier caso, conviene fijar las imágenes base por su *digest* y
 no solamente por etiqueta, en pos de asegurar que siempre hacemos el build con la
@@ -599,7 +615,7 @@ decisión visible en el código, revisable en un PR — no una omisión silencio
 :::
 
 :::slide
-## Automatizr linting de Dockerfiles con `hadolint`
+## Linting de Dockerfiles con `hadolint`
 
 - Codifica estas prácticas como reglas verificables: por ejemplo `DL3008` (pins de apt),
   `DL3006`/`DL3007` (imagen base sin fijar), y ShellCheck en cada `RUN`.
@@ -610,10 +626,9 @@ decisión visible en el código, revisable en un PR — no una omisión silencio
   `.hadolint.yaml` en el repositorio.
 :::
 
-### Cache de build en CodeBuild
 
-:::slide light
 ## Cache de build en CodeBuild
+:::inline-slide light with-title
 
 - **Local**: capas del host anterior — simple, pero *best effort*.
 - **S3**: rutas del `buildspec.yml` — entre hosts, con transferencia.
@@ -658,6 +673,7 @@ no paguen ese precio:
   la máquina de un desarrollador. Es lo que hace [nuestro
   `buildspec.yml`](#nuestro-archivo-buildspec-yml):
 
+:::inline-slide light with-title
   ```yaml
   build:
     commands:
@@ -669,18 +685,26 @@ no paguen ese precio:
           --push .
   ```
 
+:::skip
   `mode=max` guarda el cache de todas las etapas del multi-stage build (no solo la
   final), y `image-manifest=true,oci-mediatypes=true` es necesario para que ECR
   acepte el manifiesto de cache. Es la opción más robusta: el cache deja de depender
   del host y pasa a ser un artefacto compartido del equipo. Requiere el *builder*
   que creamos en `pre_build` — y en el primer build, `--cache-from` avisa que el tag
   `:cache` todavía no existe y sigue sin él; a partir del segundo, lo encuentra.
+:::
 
-Combinadas con una imagen base propia en ECR —misma región, sin *rate limiting*, sin
-salir de la red de AWS— estas capas convierten un build de 20 minutos en uno de
+Combinadas con una imagen base propia en ECR (misma región, sin *rate limiting*, sin
+salir de la red de AWS) estas capas convierten un build de 20 minutos en uno de
 segundos cuando el código no cambió, y de pocos minutos cuando sí.
+:::
 
 ## Práctica guiada: crear el repositorio ECR
+:::inline-slide with-title
+:::app
+<cb-goto path="Práctica guiada: crear el repositorio ECR"></cb-goto>
+::: #app
+:::
 
 ### Abrir Amazon ECR
 

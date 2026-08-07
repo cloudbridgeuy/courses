@@ -124,7 +124,13 @@ Los parámetros configurables son el **nombre del stack** y el **URI de la image
 :::
 
 
+:::inline-slide light
 ## Práctica guiada: lanzar el stack de CloudFormation
+
+:::app
+<cb-goto path="Práctica guiada: lanzar el stack de CloudFormation"></cb-goto>
+::: #app
+:::
 
 ### Abrir CloudFormation
 
