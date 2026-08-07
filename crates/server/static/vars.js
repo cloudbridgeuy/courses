@@ -192,3 +192,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", cbVarsOnDocumentClick);
   document.addEventListener("keydown", cbVarsOnDocumentKeydown);
 });
+
+// The storage event fires only in *other* tabs than the one that wrote the
+// value, which is exactly what live-syncs an already-open guide tab and an
+// already-open deck tab against each other with no polling. Re-reading and
+// re-applying is enough: cbVarsApply() queries the DOM fresh each call, so
+// it finds whatever tokens the current page has, guide or deck.
+window.addEventListener("storage", (event) => {
+  if (event.key !== cbVarsStorageKey()) return;
+  cbVarsApply();
+});
